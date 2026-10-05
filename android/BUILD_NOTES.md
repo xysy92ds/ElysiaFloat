@@ -23,6 +23,12 @@ java.io.IOException: Failed to delete '/tmp/tempdir_...'
 的操作改走 `rmdir()`，`build.sh` 会在启动 Gradle 前自动注入它，所以请始终
 使用 `./build.sh` 而不是直接调用 `gradle`。
 
+它的**完整源码在 [`tools/remove_fix.c`](tools/remove_fix.c)**，重新编译用
+[`tools/build-removefix.sh`](tools/build-removefix.sh)。
+
+> 注意：这个垫片只影响「能不能编译成功」，**不会被打进 APK**，也不影响
+> App 在手机上的运行。在普通的 Windows / Linux / macOS 上编译根本用不到它。
+
 `libremovefix.so` 的源码等价于：
 
 ```c

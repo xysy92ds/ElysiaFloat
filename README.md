@@ -125,6 +125,10 @@ ElysiaFloat/
 │   ├── gradle.properties
 │   ├── build.sh
 │   ├── BUILD_NOTES.md
+│   ├── tools/                    # 构建辅助：seccomp 环境的删除垫片（不进 APK）
+│   │   ├── remove_fix.c
+│   │   ├── build-removefix.sh
+│   │   └── README.md
 │   └── app/
 │       ├── build.gradle
 │       └── src/main/
