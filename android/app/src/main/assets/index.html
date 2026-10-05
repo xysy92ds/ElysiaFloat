@@ -1,0 +1,2710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>爱莉希雅</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
+  font-family:-apple-system,"PingFang SC","Noto Sans SC",sans-serif;
+  background:transparent;user-select:none}
+:root{--c1:#ff9a9e;--c2:#fecfef;--bg:rgba(255,240,245,.97);
+  --card:#fff0f5;--text:#4a2c3a;--muted:#a87b8e;--accent:#d6336c}
+#app{width:100%;height:100%;background:var(--bg);backdrop-filter:blur(24px);
+  -webkit-backdrop-filter:blur(24px);border-radius:20px;position:absolute;top:0;left:0;
+  transform-origin:top left;overflow:hidden;
+  display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(255,182,193,.35);
+  border:1px solid rgba(255,154,158,.25)}
+#head{display:flex;align-items:center;gap:5px;padding:9px 10px;padding-right:42px;
+  position:relative;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  font-size:14px;font-weight:600;flex-shrink:0;cursor:move;touch-action:none}
+#head img{width:26px;height:26px;border-radius:50%;background:#fff;
+  border:2px solid rgba(255,255,255,.6);object-fit:cover;pointer-events:none;flex-shrink:0}
+#head .sp{flex:1 1 0;min-width:0}
+#head button{background:rgba(255,255,255,.25);border:none;color:#fff;
+  padding:0 7px;height:26px;border-radius:13px;font-size:11.5px;
+  cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap}
+/* 关闭键脱离伸缩流：无论音乐键是否出现、窗口缩得多小，都固定在右上角可点 */
+#btn-close{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  padding:0 9px;height:26px}
+#head button:active{background:rgba(255,255,255,.45)}
+#head button[hidden]{display:none}
+#actions{display:flex;gap:6px;padding:8px 12px;background:#fff5f7;
+  border-bottom:1px solid rgba(255,154,158,.2);overflow-x:auto;
+  scrollbar-width:none;flex-shrink:0}
+#actions::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;font-size:12px;padding:6px 14px;border-radius:14px;
+  border:1px solid rgba(255,154,158,.25);background:var(--card);
+  color:var(--text);cursor:pointer;font-family:inherit}
+.chip:active{border-color:var(--c1);color:var(--c1);background:#fff}
+#body{flex:1;overflow-y:auto;padding:14px 12px;display:flex;
+  flex-direction:column;gap:12px;
+  background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%);
+  -webkit-overflow-scrolling:touch}
+#body::-webkit-scrollbar{width:4px}
+#body::-webkit-scrollbar-thumb{background:var(--c1);border-radius:4px}
+/* 独立于音乐搜索页的常驻迷你播放器：占用自己的布局行，不覆盖聊天气泡或输入框 */
+#mini-player{display:none;align-items:center;gap:8px;padding:7px 10px;
+  background:rgba(255,245,247,.98);border-top:1px solid rgba(255,154,158,.2);
+  border-bottom:1px solid rgba(255,154,158,.12);flex-shrink:0;min-width:0}
+#mini-player.show{display:flex}
+.mini-disc{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;background:linear-gradient(135deg,var(--c1),var(--c2));
+  color:#fff;flex-shrink:0;font-size:15px}
+#mini-player.playing .mini-disc{animation:mini-spin 4s linear infinite}
+@keyframes mini-spin{to{transform:rotate(360deg)}}
+.mini-info{min-width:0;flex:1;cursor:pointer}
+.mini-name,.mini-artist{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-name{font-size:12px;color:var(--text)}
+.mini-artist{font-size:10px;color:var(--muted);margin-top:2px}
+.mini-btn{width:28px;height:28px;border:0;border-radius:50%;background:rgba(255,154,158,.15);
+  color:var(--accent);font-size:12px;flex-shrink:0;font-family:inherit}
+.mini-btn:active{background:rgba(255,154,158,.35)}
+.msg{max-width:84%;padding:10px 14px;border-radius:16px;font-size:14px;
+  line-height:1.55;white-space:pre-wrap;word-break:break-word;
+  user-select:text;animation:fi .2s ease}
+@keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+.msg.user{align-self:flex-end;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:#fff;color:var(--text);
+  border-bottom-left-radius:4px;border:1px solid rgba(255,154,158,.2)}
+.msg.mem{align-self:center;background:#ffe4e1;color:var(--muted);
+  font-size:12px;border-radius:8px;max-width:95%;text-align:center;
+  padding:6px 12px}
+.msg.typing{color:var(--muted)}
+.tts-btn{display:inline-flex;align-items:center;margin-top:8px;
+  padding:4px 12px;border-radius:12px;background:rgba(255,154,158,.12);
+  color:var(--accent);font-size:11px;cursor:pointer;
+  border:1px solid rgba(255,154,158,.3)}
+.tts-btn:active{background:rgba(255,154,158,.25)}
+#foot{display:flex;gap:8px;padding:10px 12px;background:#fff5f7;
+  border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+#input{flex:1;border:1.5px solid rgba(255,154,158,.25);border-radius:18px;
+  padding:10px 16px;font-size:14px;outline:none;resize:none;
+  background:var(--card);color:var(--text);max-height:100px;
+  font-family:inherit;user-select:text;line-height:1.4}
+#input:focus{border-color:var(--c1)}
+#btn-plus{width:38px;height:38px;flex:0 0 auto;align-self:flex-end;border-radius:50%;
+  border:1.5px solid rgba(255,154,158,.35);background:var(--card);color:var(--c1);
+  font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+#btn-plus:active{opacity:.7}
+#attach-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff5f7;
+  border-top:1px solid rgba(255,154,158,.2);flex-shrink:0}
+#attach-bar[hidden]{display:none}
+#attach-thumb{width:38px;height:38px;border-radius:8px;object-fit:cover;display:none;
+  border:1px solid rgba(255,154,158,.35)}
+#attach-bar.has-img #attach-thumb{display:block}
+#attach-info{flex:1;min-width:0;font-size:12px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#attach-del{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:none;padding:0;
+  background:rgba(255,154,158,.22);color:var(--c1);font-size:15px;line-height:1}
+.msg-thumb{display:block;max-width:160px;max-height:160px;border-radius:10px;
+  margin-top:6px;border:1px solid rgba(255,154,158,.3)}
+#send{width:60px;border-radius:18px;border:none;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0}
+#send:disabled{opacity:.5}
+#settings{display:none;flex-direction:column;flex:1;overflow-y:auto;
+  background:#fff5f7;padding:15px;-webkit-overflow-scrolling:touch}
+#settings.open{display:flex}
+#settings::-webkit-scrollbar{width:4px}
+#settings::-webkit-scrollbar-thumb{background:var(--c1);border-radius:4px}
+.sg{margin-bottom:12px}
+.sg label{display:block;font-size:12px;font-weight:600;
+  color:var(--text);margin-bottom:4px}
+.sg input:not([type=checkbox]):not([type=range]),.sg textarea,.sg select{
+  width:100%;padding:8px 12px;border:1px solid rgba(255,154,158,.25);
+  border-radius:8px;background:var(--card);color:var(--text);
+  font-size:13px;font-family:inherit;user-select:text}
+.sg textarea{resize:vertical;min-height:80px}
+.sec-title{margin-top:15px;padding-top:10px;
+  border-top:1px solid rgba(255,154,158,.3);font-size:13px;
+  font-weight:bold;color:var(--accent)}
+.acts{display:flex;gap:8px;margin-top:12px}
+.btn-p{flex:1;padding:10px;background:linear-gradient(135deg,var(--c1),var(--c2));
+  color:#fff;border:none;border-radius:10px;font-weight:600;
+  cursor:pointer;font-size:13px;font-family:inherit}
+.btn-s{flex:1;padding:10px;background:var(--card);color:var(--text);
+  border:1px solid rgba(255,154,158,.25);border-radius:10px;
+  cursor:pointer;font-size:13px;font-family:inherit}
+.btn-s:active,.btn-p:active{opacity:.75}
+.range-row{display:flex;align-items:center;gap:8px}
+.range-row input[type=range]{flex:1;accent-color:var(--c1);padding:0}
+.range-row span{font-size:12px;color:var(--muted);min-width:32px}
+.pin-row{display:flex;align-items:center;gap:6px}
+.pin-row input{flex:1;min-width:0}
+.pin-row .btn-paste{flex:0 0 auto;padding:9px 14px;border-radius:12px;border:1px solid var(--c1);
+  background:var(--card);color:var(--c1);font-size:13px}
+.pin-row .btn-paste:active{opacity:.7}
+/* 不再用 type=password：部分手机自带的安全键盘会跟 WebView 打架（弹一下就消失）。
+   换成普通输入框 + CSS 遮点，既避开安全键盘，默认也不会明文露在外面。 */
+input.secret{-webkit-text-security:disc}
+input.secret.reveal{-webkit-text-security:none}
+#music{display:none;flex-direction:column;flex:1;overflow:hidden;
+  background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%)}
+#music.open{display:flex}
+.mtop{display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:#fff5f7;border-bottom:1px solid rgba(255,154,158,.15);flex-shrink:0}
+.mback{background:rgba(255,154,158,.15);border:none;color:var(--accent);
+  padding:4px 12px;border-radius:12px;font-size:12px;cursor:pointer;
+  font-family:inherit}
+.mtabs{display:flex;gap:4px;flex:1}
+.mtab{padding:6px 14px;border-radius:12px;font-size:12px;cursor:pointer;
+  color:var(--muted);background:transparent;border:none;font-family:inherit}
+.mtab.active{background:var(--card);color:var(--accent);font-weight:600}
+.msbar{display:flex;gap:8px;padding:10px 12px;background:#fff5f7;
+  border-bottom:1px solid rgba(255,154,158,.2);flex-shrink:0}
+.msbar input{flex:1;padding:8px 14px;
+  border:1.5px solid rgba(255,154,158,.25);border-radius:16px;
+  background:var(--card);font-size:13px;outline:none;
+  color:var(--text);font-family:inherit;user-select:text}
+.msbar input:focus{border-color:var(--c1)}
+.msbar button{padding:0 16px;border:none;border-radius:16px;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  font-weight:600;cursor:pointer;font-size:13px;
+  font-family:inherit;flex-shrink:0}
+#music-list{flex:1;overflow-y:auto;padding:8px;-webkit-overflow-scrolling:touch}
+#music-list::-webkit-scrollbar{width:4px}
+#music-list::-webkit-scrollbar-thumb{background:var(--c1);border-radius:4px}
+.mi{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-radius:12px;cursor:pointer;margin-bottom:4px}
+.mi:active{background:rgba(255,154,158,.15)}
+.mi.playing{background:rgba(255,154,158,.25)}
+.mi.playing .mname{color:var(--accent);font-weight:600}
+.mi.loading{background:rgba(255,154,158,.2)}
+.midx{width:24px;text-align:center;font-size:12px;color:var(--muted);flex-shrink:0}
+.mi.playing .midx{color:var(--accent)}
+.minfo{flex:1;min-width:0}
+.mname{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mart{font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mdur{font-size:11px;color:var(--muted);flex-shrink:0}
+.mfav{padding:4px;color:var(--accent);background:none;border:none;
+  cursor:pointer;font-size:14px;flex-shrink:0}
+.mfav.active{color:#ff1744}
+.mempty,.mload{padding:40px 20px;text-align:center;color:var(--muted);font-size:13px}
+#music-lyric{padding:8px 14px;background:#fff5f7;
+  border-top:1px solid rgba(255,154,158,.15);font-size:12px;
+  color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-height:20px;text-align:center;flex-shrink:0}
+#music-lyric.hl{color:var(--accent);font-weight:500}
+#music-player{display:flex;flex-direction:column;gap:6px;padding:8px 12px 10px;
+  background:#fff5f7;border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.mp-progress{width:100%;height:4px;background:rgba(255,154,158,.25);
+  border-radius:2px;cursor:pointer;position:relative;touch-action:none}
+.mp-progress-bar{height:100%;
+  background:linear-gradient(90deg,var(--c1),var(--c2));border-radius:2px;
+  width:0%;pointer-events:none}
+.mp-row{display:flex;align-items:center;gap:6px}
+.mp-btn{width:36px;height:36px;border-radius:50%;border:none;
+  background:rgba(255,154,158,.15);color:var(--accent);font-size:14px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-family:inherit}
+.mp-btn:active{background:rgba(255,154,158,.35)}
+.mp-play{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff}
+.mp-title{flex:1;font-size:12px;color:var(--text);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;margin-left:6px}
+.mp-time{font-size:10px;color:var(--muted);flex-shrink:0;
+  margin-left:4px;font-family:monospace}
+#lyric-modal{position:absolute;inset:0;background:rgba(74,44,58,.6);
+  display:none;align-items:flex-end;border-radius:20px;z-index:100}
+#lyric-modal.open{display:flex}
+.lyric-box{width:100%;max-height:65%;background:#fff0f5;
+  border-radius:20px;padding:20px;display:flex;flex-direction:column}
+.lyric-head{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:12px}
+.lyric-head h3{margin:0;font-size:15px;color:var(--accent)}
+.lyric-close{background:none;border:none;font-size:22px;color:var(--muted);
+  cursor:pointer;line-height:1;font-family:inherit}
+.lyric-content{flex:1;overflow-y:auto;font-size:14px;line-height:2;
+  color:var(--muted);text-align:center;-webkit-overflow-scrolling:touch}
+.lline{padding:4px 0;cursor:pointer}
+.lline.active{color:var(--accent);font-weight:600;font-size:15px}
+#guide{position:absolute;inset:0;z-index:999;
+  background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%);
+  display:none;align-items:center;justify-content:center;padding:16px}
+#guide.show{display:flex}
+.guide-card{width:100%;max-height:100%;background:#fff;border-radius:20px;
+  box-shadow:0 12px 40px rgba(255,154,158,.3);display:flex;
+  flex-direction:column;overflow:hidden}
+.guide-head{display:flex;gap:12px;align-items:center;padding:18px 18px 14px;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff}
+.guide-head img{width:48px;height:48px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.7);object-fit:cover;background:#fff}
+.guide-title{font-size:15px;font-weight:700}
+.guide-sub{font-size:12px;opacity:.9;margin-top:2px}
+.guide-steps{flex:1;overflow-y:auto;padding:14px;display:flex;
+  flex-direction:column;gap:10px}
+.step{display:flex;gap:10px;padding:12px 14px;border-radius:14px;
+  background:#fff5f7;border:1px solid rgba(255,154,158,.2);transition:all .2s}
+.step.ok{background:#e8f9ee;border-color:#a8e6b8}
+.step.need{background:#fff8e1;border-color:#ffd54f}
+.step-icon{width:32px;height:32px;flex-shrink:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,154,158,.2);color:var(--accent);
+  font-size:16px;font-weight:bold}
+.step.ok .step-icon{background:#a8e6b8;color:#fff}
+.step.need .step-icon{background:#ffd54f;color:#fff}
+.step-body{flex:1;min-width:0}
+.step-name{font-size:13px;font-weight:600;color:var(--text)}
+.step-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.step-badge{font-size:10px;padding:2px 8px;border-radius:8px;
+  background:rgba(255,154,158,.15);color:var(--accent);
+  margin-left:6px;vertical-align:middle}
+.step.ok .step-badge{background:#a8e6b8;color:#fff}
+.step-btn{align-self:flex-start;margin-top:6px;padding:5px 12px;
+  font-size:11px;border-radius:10px;border:none;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  font-weight:600;cursor:pointer;font-family:inherit}
+.step-btn:active{opacity:.75}
+.step-btn.ghost{background:#fff;color:var(--accent);
+  border:1px solid rgba(255,154,158,.4)}
+.guide-foot{display:flex;gap:8px;padding:12px 16px;
+  border-top:1px solid rgba(255,154,158,.15);background:#fff5f7}
+.guide-skip{flex:0 0 auto;padding:10px 16px;border-radius:12px;
+  border:1px solid rgba(255,154,158,.3);background:#fff;color:var(--muted);
+  font-size:13px;cursor:pointer;font-family:inherit}
+.guide-next{flex:1;padding:10px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  font-weight:600;font-size:13px;cursor:pointer;font-family:inherit}
+.guide-next:disabled{opacity:.4}
+#toast{position:absolute;left:50%;bottom:80px;
+  transform:translateX(-50%) translateY(10px);
+  background:rgba(74,44,58,.9);color:#fff;padding:8px 18px;
+  border-radius:18px;font-size:12px;opacity:0;pointer-events:none;
+  transition:opacity .25s,transform .25s;z-index:200;max-width:80%;
+  text-align:center;white-space:pre-wrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.dots{display:inline-flex;gap:3px;vertical-align:middle}
+.dots i{width:4px;height:4px;border-radius:50%;background:var(--accent);
+  animation:tb 1.4s infinite}
+.dots i:nth-child(1){animation-delay:-.32s}
+.dots i:nth-child(2){animation-delay:-.16s}
+@keyframes tb{0%,80%,100%{transform:scale(.6);opacity:.4}
+  40%{transform:scale(1);opacity:1}}
+
+/* ===== 引导页封面（本地图片，不依赖外网） ===== */
+.guide-head{background-image:linear-gradient(135deg,rgba(255,154,158,.92),rgba(254,207,239,.72)),url('cover.jpg');background-size:cover,cover;background-position:center,center}
+
+/* ===== 顶栏在窄窗口下不被按钮挤爆 ===== */
+#head button{flex-shrink:0;white-space:nowrap}
+#name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  flex:0 1 auto;min-width:0;max-width:34%}
+#head img{flex-shrink:0}
+
+/* ===== 开关 / 分段按钮（替代原生 select，浮窗里才能正常点击） ===== */
+.tgl{display:flex;gap:8px}
+.tgl button{flex:1;min-width:64px;padding:9px 10px;border-radius:10px;
+  border:1px solid rgba(255,154,158,.3);background:var(--card);color:var(--text);
+  font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
+.tgl button.on{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  border-color:transparent;font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{padding:7px 12px;border-radius:12px;font-size:12px;
+  border:1px solid rgba(255,154,158,.3);background:var(--card);color:var(--text);
+  font-family:inherit;cursor:pointer;transition:all .15s}
+.chips button.on{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
+  border-color:transparent;font-weight:600}
+.swatches{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.swatch{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.85);
+  box-shadow:0 0 0 1px rgba(74,44,58,.15);cursor:pointer;padding:0;flex-shrink:0}
+.swatch.on{box-shadow:0 0 0 3px var(--accent)}
+.hexin{width:96px;padding:7px 10px;border:1px solid rgba(255,154,158,.3);
+  border-radius:8px;background:var(--card);color:var(--text);font-size:12px;
+  font-family:monospace;user-select:text}
+.mini-note{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;user-select:text}
+
+/* ===== 按住边缘缩放窗口 ===== */
+.rz{position:absolute;z-index:60;touch-action:none;user-select:none;-webkit-user-select:none}
+.rz-n{top:0;left:16px;right:16px;height:8px;cursor:ns-resize}
+.rz-s{bottom:0;left:16px;right:16px;height:14px;cursor:ns-resize}
+.rz-w{left:0;top:16px;bottom:16px;width:8px;cursor:ew-resize}
+.rz-e{right:0;top:16px;bottom:16px;width:8px;cursor:ew-resize}
+.rz-nw{left:0;top:0;width:16px;height:16px;cursor:nwse-resize}
+.rz-ne{right:0;top:0;width:16px;height:16px;cursor:nesw-resize}
+.rz-sw{left:0;bottom:0;width:22px;height:22px;cursor:nesw-resize}
+.rz-se{right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize}
+.rz-se::after{content:'';position:absolute;right:5px;bottom:5px;width:9px;height:9px;
+  border-right:2px solid rgba(214,51,108,.55);border-bottom:2px solid rgba(214,51,108,.55);
+  border-radius:0 0 3px 0}
+
+/* ===== 自定义弹窗（替代原生 confirm，浮窗里才能正常显示） ===== */
+.modal{position:absolute;inset:0;background:rgba(74,44,58,.55);z-index:300;
+  display:none;align-items:center;justify-content:center;padding:18px;border-radius:20px}
+.modal.open{display:flex}
+.modal-card{width:100%;max-width:360px;max-height:100%;background:#fff;border-radius:18px;
+  padding:18px;display:flex;flex-direction:column;gap:12px;overflow:hidden;
+  box-shadow:0 16px 40px rgba(74,44,58,.3)}
+.modal-card h3{margin:0;font-size:15px;color:var(--accent)}
+.modal-card p{margin:0;font-size:13px;color:var(--text);line-height:1.6;
+  white-space:pre-wrap;user-select:text}
+.modal-card .acts{margin-top:2px}
+
+/* ===== 头像裁剪 ===== */
+.crop-stage{position:relative;width:100%;max-width:300px;margin:0 auto;aspect-ratio:1/1;
+  border-radius:14px;overflow:hidden;background:#f3e6ea;touch-action:none}
+.crop-stage canvas{width:100%;height:100%;display:block}
+.crop-ring{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  box-shadow:0 0 0 9999px rgba(74,44,58,.45);
+  border:2px solid rgba(255,255,255,.9)}
+.crop-tip{font-size:11px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="head">
+    <img id="avatar" src="" referrerpolicy="no-referrer" alt="">
+    <span id="name">爱莉希雅</span>
+    <span class="sp"></span>
+    <button id="btn-music" hidden>音乐</button>
+    <button id="btn-set">设置</button>
+    <button id="btn-sum">记忆</button>
+    <button id="btn-clr">清空</button>
+    <button id="btn-min" title="缩成小球">－</button>
+    <button id="btn-close">×</button>
+  </div>
+
+  <div id="actions"></div>
+  <div id="body"></div>
+  <div id="mini-player" aria-label="正在播放">
+    <div class="mini-disc">♪</div>
+    <div class="mini-info"><div class="mini-name">未播放</div><div class="mini-artist">—</div></div>
+    <button class="mini-btn mini-play" aria-label="暂停或播放">▶</button>
+    <button class="mini-btn mini-close" aria-label="隐藏歌曲浮窗">×</button>
+  </div>
+  <div id="attach-bar" hidden>
+    <img id="attach-thumb" alt="">
+    <span id="attach-info"></span>
+    <button id="attach-del" aria-label="移除附件">×</button>
+  </div>
+  <div id="foot">
+    <button id="btn-plus" aria-label="上传图片或文件">＋</button>
+    <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
+    <button id="send">发送</button>
+  </div>
+
+  <div id="settings"></div>
+
+  <div id="music">
+    <div class="mtop">
+      <button class="mback" id="music-back">← 返回对话</button>
+      <div class="mtabs">
+        <button class="mtab active" data-tab="search">搜索</button>
+        <button class="mtab" data-tab="fav">收藏 (<span id="fav-cnt">0</span>)</button>
+      </div>
+    </div>
+    <div class="msbar" id="ms-wrap">
+      <input id="ms-input" type="text" placeholder="搜索歌曲、歌手...♪">
+      <button id="ms-btn">搜索</button>
+    </div>
+    <div id="music-list"><div class="mempty">输入关键词开始搜索♪</div></div>
+    <div id="music-lyric">— ♪ —</div>
+    <div id="music-player">
+      <div class="mp-progress" id="mp-progress"><div class="mp-progress-bar" id="mp-progress-bar"></div></div>
+      <div class="mp-row">
+        <button class="mp-btn mp-prev">⏮</button>
+        <button class="mp-btn mp-play">▶</button>
+        <button class="mp-btn mp-next">⏭</button>
+        <div class="mp-title">未播放</div>
+        <div class="mp-time" id="mp-time">0:00 / 0:00</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="lyric-modal">
+    <div class="lyric-box">
+      <div class="lyric-head"><h3>♪ 歌词</h3><button class="lyric-close">×</button></div>
+      <div class="lyric-content"></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="rz rz-n" data-dir="n"></div>
+  <div class="rz rz-s" data-dir="s"></div>
+  <div class="rz rz-w" data-dir="w"></div>
+  <div class="rz rz-e" data-dir="e"></div>
+  <div class="rz rz-nw" data-dir="nw"></div>
+  <div class="rz rz-ne" data-dir="ne"></div>
+  <div class="rz rz-sw" data-dir="sw"></div>
+  <div class="rz rz-se" data-dir="se"></div>
+
+  <div id="modal" class="modal">
+    <div class="modal-card">
+      <h3 id="modal-title">请确认</h3>
+      <p id="modal-msg"></p>
+      <div class="acts">
+        <button id="modal-cancel" class="btn-s">取消</button>
+        <button id="modal-ok" class="btn-p">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="plus-modal" class="modal">
+    <div class="modal-card">
+      <h3>想让我看点什么呢？</h3>
+      <div class="acts" style="flex-direction:column">
+        <button id="plus-image" class="btn-p">🖼️ 上传图片</button>
+        <button id="plus-file" class="btn-s">📄 上传文件</button>
+        <button id="plus-cancel" class="btn-s">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="crop-modal" class="modal">
+    <div class="modal-card">
+      <h3>裁剪头像</h3>
+      <div class="crop-stage"><canvas id="crop-canvas" width="600" height="600"></canvas><div class="crop-ring"></div></div>
+      <div class="range-row"><span>缩放</span><input type="range" id="crop-zoom" min="100" max="400" value="100"><span id="crop-zoom-l">1.0x</span></div>
+      <div class="crop-tip">拖动图片调整位置，双指或滑块缩放</div>
+      <div class="acts">
+        <button id="crop-cancel" class="btn-s">取消</button>
+        <button id="crop-ok" class="btn-p">使用这张</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="guide">
+  <div class="guide-card">
+    <div class="guide-head">
+      <img id="guide-avatar" src="" alt="">
+      <div>
+        <div class="guide-title">你好呀，我是爱莉希雅 ♪</div>
+        <div class="guide-sub">让我先准备一下，马上就能陪你啦~</div>
+      </div>
+    </div>
+    <div class="guide-steps" id="guide-steps"></div>
+    <div class="guide-foot">
+      <button class="guide-skip" id="guide-skip">先跳过</button>
+      <button class="guide-next" id="guide-next" disabled>下一步</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ==========================================================
+ *  旧版 WebView 兼容垫片
+ * ========================================================== */
+if (!Promise.allSettled) {
+  Promise.allSettled = function(list) {
+    return Promise.all(Array.from(list).map(function(p) {
+      return Promise.resolve(p).then(
+        function(v) { return { status: 'fulfilled', value: v }; },
+        function(e) { return { status: 'rejected', reason: e }; }
+      );
+    }));
+  };
+}
+
+/* ==========================================================
+ *  桥接层
+ * ========================================================== */
+const HAS_NATIVE = typeof Android !== 'undefined' && Android !== null;
+const HAS_PERM   = typeof Perm !== 'undefined' && Perm !== null;
+
+/* ---------- 存储 ---------- */
+const sGet = (k, d) => {
+  try {
+    if (HAS_NATIVE && Android.getValue) {
+      const v = Android.getValue(k, null);
+      if (v !== null && v !== undefined && v !== '') {
+        try { return JSON.parse(v); } catch (e) { return v; }
+      }
+      return d;
+    }
+  } catch (e) {}
+  try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }
+  catch (e) { return d; }
+};
+const sSet = (k, v) => {
+  try {
+    if (HAS_NATIVE && Android.setValue) { Android.setValue(k, JSON.stringify(v)); return; }
+  } catch (e) {}
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
+};
+
+/* ---------- 网络：回调派发 ---------- */
+const pendingReq = {};
+let reqSeq = 0;
+window.__gmCb = function(id, ok, code, text, err){
+  const p = pendingReq[id];
+  if (!p) return;
+  delete pendingReq[id];
+  if (p.timer) clearTimeout(p.timer);
+  if (ok) {
+    p.resolve({ status: code, text: text });
+  } else {
+    p.reject(new Error(err || ('HTTP ' + code)));
+  }
+};
+
+function nativeReq(method, url, headers, body, timeout) {
+  timeout = timeout || 20000;
+  return new Promise((resolve, reject) => {
+    if (!HAS_NATIVE || !Android.request) {
+      // 回退 fetch（多数情况会被 CORS 拦）
+      const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const t = setTimeout(() => { if (ctrl) ctrl.abort(); }, timeout);
+      const opt = { method: method };
+      if (ctrl) opt.signal = ctrl.signal;
+      if (headers) opt.headers = headers;
+      if (body) opt.body = body;
+      fetch(url, opt)
+        .then(r => { clearTimeout(t); return r.text().then(txt => ({ r, txt })); })
+        .then(({ r, txt }) => {
+          if (!r.ok) return reject(new Error('HTTP ' + r.status));
+          resolve({ status: r.status, text: txt });
+        })
+        .catch(e => { clearTimeout(t); reject(e); });
+      return;
+    }
+    const id = 'r' + (++reqSeq);
+    const timer = setTimeout(() => {
+      if (pendingReq[id]) { delete pendingReq[id]; reject(new Error('请求超时')); }
+    }, timeout + 800);
+    pendingReq[id] = { resolve, reject, timer };
+    try {
+      Android.request(id, method, url, JSON.stringify(headers || {}), body || '', timeout);
+    } catch (e) {
+      clearTimeout(timer); delete pendingReq[id]; reject(e);
+    }
+  });
+}
+const gmGet = (url, t) => nativeReq('GET', url, null, null, t).then(r => r.text);
+const gmPost = (url, hdrs, body, t) => nativeReq('POST', url, hdrs, body, t);
+
+/* ---------- 其它 ---------- */
+const pAny = (arr) => typeof Promise.any === 'function'
+  ? Promise.any(arr)
+  : new Promise((res, rej) => {
+      let n = 0; const a = Array.from(arr);
+      if (!a.length) return rej(new Error('无候选'));
+      a.forEach(p => Promise.resolve(p).then(res, () => {
+        if (++n === a.length) rej(new Error('全部失败'));
+      }));
+    });
+
+async function pMap(arr, fn, n) {
+  n = n || 5;
+  const r = new Array(arr.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, arr.length) }, async () => {
+    while (i < arr.length) {
+      const k = i++;
+      try { r[k] = await fn(arr[k]); } catch (e) { r[k] = null; }
+    }
+  }));
+  return r;
+}
+
+const errMsg = (err) => typeof err === 'string'
+  ? err
+  : (err && err.message) || (err && err.error && err.error.message) || String(err) || '未知错误';
+
+const esc = (t) => {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(String(t == null ? '' : t)));
+  return d.innerHTML;
+};
+const b64e = (s) => {
+  // 不依赖 TextEncoder，兼容老 WebView
+  return btoa(unescape(encodeURIComponent(String(s))));
+};
+const b64d = (s) => {
+  return decodeURIComponent(escape(atob(String(s).replace(/\s+/g, ''))));
+};
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+let toastTimer = null;
+function toast(msg, ms) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms || 2400);
+}
+function vibrate(ms) {
+  try { if (HAS_NATIVE && Android.vibrate) Android.vibrate(ms || 15); } catch (e) {}
+}
+
+/* ==========================================================
+ *  自定义弹窗（替代原生 confirm，浮窗里才能正常显示）
+ * ========================================================== */
+let _modalCb = null;
+function uiConfirm(msg, okText, title) {
+  return new Promise((resolve) => {
+    _modalCb = resolve;
+    $('#modal-title').textContent = title || '请确认';
+    $('#modal-msg').textContent = msg;
+    $('#modal-ok').textContent = okText || '确定';
+    $('#modal').classList.add('open');
+  });
+}
+function closeModal(ok) {
+  $('#modal').classList.remove('open');
+  if (_modalCb) { const cb = _modalCb; _modalCb = null; cb(!!ok); }
+}
+function bindModal() {
+  $('#modal-ok').onclick = () => closeModal(true);
+  $('#modal-cancel').onclick = () => closeModal(false);
+  $('#modal').onclick = (e) => { if (e.target === $('#modal')) closeModal(false); };
+}
+
+/* ==========================================================
+ *  头像选择与裁剪
+ * ========================================================== */
+const AV_LOCAL = '（本地图片）';
+const CP = { img: null, iw: 1, ih: 1, vp: 600, scale: 1, base: 1, min: 1, max: 1,
+  tx: 0, ty: 0, drag: false, lx: 0, ly: 0, pinch: 0, pscale: 1 };
+
+function openCropper(src) {
+  const img = new Image();
+  img.onload = () => {
+    CP.img = img; CP.iw = img.naturalWidth || img.width; CP.ih = img.naturalHeight || img.height;
+    CP.base = Math.max(CP.vp / CP.iw, CP.vp / CP.ih);
+    CP.min = CP.base; CP.max = CP.base * 4;
+    CP.scale = CP.base;
+    CP.tx = (CP.vp - CP.iw * CP.scale) / 2;
+    CP.ty = (CP.vp - CP.ih * CP.scale) / 2;
+    cpClamp(); cpSyncZoom(); cpDraw();
+    $('#crop-modal').classList.add('open');
+  };
+  img.onerror = () => toast('图片读取失败，换一张试试~');
+  img.src = src;
+}
+function cpClamp() {
+  const w = CP.iw * CP.scale, h = CP.ih * CP.scale;
+  CP.tx = Math.min(0, Math.max(CP.vp - w, CP.tx));
+  CP.ty = Math.min(0, Math.max(CP.vp - h, CP.ty));
+}
+function cpDraw() {
+  const c = $('#crop-canvas'); if (!c || !CP.img) return;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, CP.vp, CP.vp);
+  g.drawImage(CP.img, CP.tx, CP.ty, CP.iw * CP.scale, CP.ih * CP.scale);
+}
+function cpSyncZoom() {
+  const z = Math.round(CP.scale / CP.base * 100);
+  const r = $('#crop-zoom'); if (r) r.value = String(Math.min(400, Math.max(100, z)));
+  const l = $('#crop-zoom-l'); if (l) l.textContent = (CP.scale / CP.base).toFixed(1) + 'x';
+}
+function cpZoomTo(scale) {
+  const cx = (CP.vp / 2 - CP.tx) / CP.scale, cy = (CP.vp / 2 - CP.ty) / CP.scale;
+  CP.scale = Math.min(CP.max, Math.max(CP.min, scale));
+  CP.tx = CP.vp / 2 - cx * CP.scale;
+  CP.ty = CP.vp / 2 - cy * CP.scale;
+  cpClamp(); cpSyncZoom(); cpDraw();
+}
+function cpConfirm() {
+  if (!CP.img) return;
+  const out = 512, k = out / CP.vp;
+  const c = document.createElement('canvas'); c.width = out; c.height = out;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, out, out);
+  g.drawImage(CP.img, CP.tx * k, CP.ty * k, CP.iw * CP.scale * k, CP.ih * CP.scale * k);
+  let data = '';
+  try { data = c.toDataURL('image/jpeg', 0.9); }
+  catch (e) { return toast('裁剪失败：' + errMsg(e)); }
+  CONFIG.avatarUrl = data;
+  sSet('via_ai_config', CONFIG);
+  const inp = $('#set-avatar'); if (inp) inp.value = AV_LOCAL;
+  applyTheme();
+  $('#crop-modal').classList.remove('open');
+  toast('头像已更新~');
+}
+function bindCrop() {
+  const stage = $('#crop-modal .crop-stage');
+  const rect = () => stage.getBoundingClientRect();
+  stage.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      CP.drag = true; CP.lx = e.touches[0].clientX; CP.ly = e.touches[0].clientY;
+    } else if (e.touches.length === 2) {
+      CP.drag = false;
+      CP.pinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY);
+      CP.pscale = CP.scale;
+    }
+    e.preventDefault();
+  }, { passive: false });
+  stage.addEventListener('touchmove', (e) => {
+    const r = rect();
+    if (e.touches.length === 1 && CP.drag) {
+      const t = e.touches[0];
+      CP.tx += (t.clientX - CP.lx) * (CP.vp / r.width);
+      CP.ty += (t.clientY - CP.ly) * (CP.vp / r.height);
+      CP.lx = t.clientX; CP.ly = t.clientY;
+      cpClamp(); cpDraw();
+    } else if (e.touches.length === 2 && CP.pinch) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY);
+      cpZoomTo(CP.pscale * (d / CP.pinch));
+    }
+    e.preventDefault();
+  }, { passive: false });
+  const end = () => { CP.drag = false; CP.pinch = 0; };
+  stage.addEventListener('touchend', end);
+  stage.addEventListener('touchcancel', end);
+  stage.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    CP.drag = true; CP.lx = e.clientX; CP.ly = e.clientY; e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!CP.drag || !$('#crop-modal').classList.contains('open')) return;
+    const r = rect();
+    CP.tx += (e.clientX - CP.lx) * (CP.vp / r.width);
+    CP.ty += (e.clientY - CP.ly) * (CP.vp / r.height);
+    CP.lx = e.clientX; CP.ly = e.clientY;
+    cpClamp(); cpDraw();
+  });
+  document.addEventListener('mouseup', () => { CP.drag = false; });
+  $('#crop-zoom').oninput = () => cpZoomTo(CP.base * (parseInt($('#crop-zoom').value, 10) / 100));
+  $('#crop-ok').onclick = cpConfirm;
+  $('#crop-cancel').onclick = () => $('#crop-modal').classList.remove('open');
+  $('#crop-modal').onclick = (e) => { if (e.target === $('#crop-modal')) $('#crop-modal').classList.remove('open'); };
+}
+
+/* ==========================================================
+ *  输入框的「＋」：把图片 / 文件递给她看
+ * ========================================================== */
+let PICK_MODE = 'avatar';       // avatar = 裁头像；chat = 发给对话
+let pendingAttachment = null;   // { kind:'image'|'text'|'file', ... }
+
+function setAttachment(a) { pendingAttachment = a; renderAttach(); }
+function clearAttachment() { pendingAttachment = null; renderAttach(); }
+function renderAttach() {
+  const bar = $('#attach-bar');
+  if (!bar) return;
+  const a = pendingAttachment;
+  if (!a) { bar.hidden = true; bar.classList.remove('has-img'); return; }
+  bar.hidden = false;
+  const thumb = $('#attach-thumb');
+  if (a.kind === 'image' && a.dataUrl) {
+    bar.classList.add('has-img');
+    if (thumb) thumb.src = a.dataUrl;
+  } else {
+    bar.classList.remove('has-img');
+    if (thumb) thumb.removeAttribute('src');
+  }
+  const info = $('#attach-info');
+  if (!info) return;
+  if (a.kind === 'image') info.textContent = '图片 · 发送后她会看图';
+  else if (a.kind === 'text') info.textContent = '文件 ' + a.name + ' · 约 ' + (a.text || '').length + ' 字';
+  else info.textContent = '文件 ' + a.name + ' · 读不出正文，只带文件名';
+}
+
+function startPickAttachment(which) {
+  if (!HAS_NATIVE || !Android.pickImage) { toast('当前环境打不开系统选择器'); return; }
+  PICK_MODE = 'chat';
+  try {
+    if (which === 'file') {
+      if (Android.pickFile) Android.pickFile();
+      else { PICK_MODE = 'avatar'; toast('这一版还不支持传文件~'); }
+    } else {
+      Android.pickImage();
+    }
+  } catch (e) { PICK_MODE = 'avatar'; toast('打开失败：' + errMsg(e)); }
+}
+
+function startPickAvatar() {
+  if (HAS_NATIVE && Android.pickImage) {
+    PICK_MODE = 'avatar';
+    toast('请选择一张图片~');
+    try { Android.pickImage(); } catch (e) { toast('无法打开相册：' + errMsg(e)); }
+  } else {
+    toast('当前环境不支持系统相册');
+  }
+}
+window.__imgPicked = function () {
+  let data = '';
+  try { if (HAS_NATIVE && Android.getPickedImage) data = Android.getPickedImage() || ''; } catch (e) {}
+  if (!data) { toast('没有读到图片'); return; }
+  if (PICK_MODE === 'chat') {
+    PICK_MODE = 'avatar';
+    setAttachment({ kind: 'image', dataUrl: data });
+    toast('图片加上啦，点发送她就能看到~');
+    vibrate(15);
+    return;
+  }
+  openCropper(data);
+};
+window.__imgPickFailed = function () { PICK_MODE = 'avatar'; toast('图片读取失败，换一张试试~'); };
+
+window.__filePicked = function () {
+  PICK_MODE = 'avatar';
+  let raw = '';
+  try { if (HAS_NATIVE && Android.getPickedFile) raw = Android.getPickedFile() || ''; } catch (e) {}
+  let f = null;
+  try { f = JSON.parse(raw || '{}'); } catch (e) {}
+  if (!f || !f.name) { toast('没有读到文件'); return; }
+  if (f.ok && f.text) setAttachment({ kind: 'text', name: f.name, text: f.text });
+  else setAttachment({ kind: 'file', name: f.name, size: f.size || 0 });
+  toast((f.ok && f.text) ? '文件加上啦~' : '这个格式读不出正文，只能带上文件名了~');
+  vibrate(15);
+};
+window.__filePickFailed = function () { PICK_MODE = 'avatar'; toast('文件读取失败，换一个试试~'); };
+
+/* ==========================================================
+ *  窗口等比缩放：整体缩小/放大，内容全部可见（像电脑缩放窗口）
+ * ========================================================== */
+let BASE = null;   // zoom=1 时窗口的 css 尺寸
+let ZOOM = 1;      // 当前缩放比
+
+function initZoom() {
+  if (!(HAS_PERM && Perm.getWindowRect)) return;
+  let r = null;
+  try { r = JSON.parse(Perm.getWindowRect()); } catch (e) { return; }
+  if (!r || !r.w || !r.h) return;
+  const d = window.devicePixelRatio || 1;
+  BASE = { w: Math.max(160, Math.round(r.w / d)), h: Math.max(220, Math.round(r.h / d)) };
+  ZOOM = 1;
+  applyZoom();
+}
+
+function applyZoom() {
+  const app = $('#app');
+  if (!app || !BASE) return;
+  app.style.position = 'absolute';
+  app.style.top = '0';
+  app.style.left = '0';
+  app.style.width = BASE.w + 'px';
+  app.style.height = BASE.h + 'px';
+  app.style.transformOrigin = 'top left';
+  app.style.transform = ZOOM === 1 ? '' : 'scale(' + ZOOM + ')';
+}
+
+function bindResize() {
+  if (!(HAS_PERM && Perm.setWindowRect && Perm.getWindowRect)) return;
+  const handles = $$('#app .rz');
+  let active = null, sx = 0, sy = 0, rect0 = null;
+  const dpr = () => window.devicePixelRatio || 1;
+  const readRect = () => { try { return JSON.parse(Perm.getWindowRect()); } catch (e) { return null; } };
+  const down = (dir, x, y) => {
+    if (!BASE) initZoom();
+    if (!BASE) return;
+    rect0 = readRect();
+    if (!rect0 || !rect0.w) { rect0 = null; return; }
+    active = dir; sx = x; sy = y;
+  };
+  const move = (x, y) => {
+    if (!active || !rect0 || !BASE) return;
+    const d = dpr();
+    const dx = (x - sx) * d, dy = (y - sy) * d;
+    const baseW = BASE.w * d, baseH = BASE.h * d;
+    const hasE = active.indexOf('e') >= 0, hasW = active.indexOf('w') >= 0;
+    const hasS = active.indexOf('s') >= 0, hasN = active.indexOf('n') >= 0;
+    const tw = rect0.w + (hasE ? dx : 0) - (hasW ? dx : 0);
+    const th = rect0.h + (hasS ? dy : 0) - (hasN ? dy : 0);
+    // 只取一个缩放比 k：窗口宽、高与页面内容同时按 k 变，
+    // 所以是「整体等比变小」而不是「变窄导致内容挤没了」。
+    let k;
+    if ((hasE || hasW) && (hasS || hasN)) k = Math.abs(dx) > Math.abs(dy) ? tw / baseW : th / baseH;
+    else if (hasE || hasW) k = tw / baseW;
+    else k = th / baseH;
+    // 不让窗口超出屏幕
+    const swScreen = (window.screen && window.screen.width ? window.screen.width : BASE.w) * d;
+    const shScreen = (window.screen && window.screen.height ? window.screen.height : BASE.h) * d;
+    const maxK = Math.min(swScreen / baseW, shScreen / baseH);
+    k = Math.max(0.45, Math.min(k, Math.max(0.45, maxK)));
+    const nw = Math.max(1, Math.round(baseW * k));
+    const nh = Math.max(1, Math.round(baseH * k));
+    let rx = rect0.x, ry = rect0.y;
+    if (hasW) rx = rect0.x + rect0.w - nw;   // 从左边拖：右边缘固定
+    if (hasN) ry = rect0.y + rect0.h - nh;   // 从上边拖：下边缘固定
+    ZOOM = k;
+    applyZoom();
+    try { Perm.setWindowRect(rx, ry, nw, nh); } catch (e) {}
+  };
+  const up = () => { active = null; rect0 = null; };
+  handles.forEach((h) => {
+    const dir = h.dataset.dir;
+    h.addEventListener('touchstart', (e) => { const t = e.touches[0]; down(dir, t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
+    h.addEventListener('mousedown', (e) => { if (e.button === 0) { down(dir, e.clientX, e.clientY); e.preventDefault(); } });
+  });
+  document.addEventListener('touchmove', (e) => { if (active) { const t = e.touches[0]; move(t.clientX, t.clientY); e.preventDefault(); } }, { passive: false });
+  document.addEventListener('mousemove', (e) => { if (active) move(e.clientX, e.clientY); });
+  document.addEventListener('touchend', up);
+  document.addEventListener('touchcancel', up);
+  document.addEventListener('mouseup', up);
+}
+
+/* ==========================================================
+ *  默认配置
+ * ========================================================== */
+const DC = {
+  apiBase: 'https://app.everyapi.ai/v1',
+  apiKey: '',
+  model: 'gpt-5.6-luna',
+  assistantName: '爱莉希雅',
+  avatarUrl: 'https://pic.rmb.bdstatic.com/bjh/250418/beautify/dd8fae8238e68e365619e0537dce3698.jpeg@c_1,w_1977,h_2636,x_0,y_0?for=bg',
+  avatarFit: 'top',
+  maxContextTurns: 10,
+  summaryPrompt: '请将以上对话历史总结为一段简短的长期记忆，包含用户的偏好、正在讨论的话题或需要记住的重要信息。请用第一人称（我）向用户表达。',
+  ttsEnabled: false,
+  ttsRate: 1.0,
+  musicEnabled: false,
+  musicQuality: '320',
+  visionBase: '',
+  visionKey: '',
+  visionModel: '',
+  gdStudioApi: 'https://music-api.gdstudio.xyz/api.php',
+  metingInstances: 'https://meting.mikus.ink\nhttps://meting-api-omega.vercel.app\nhttps://meting-dd.2333332.xyz/api',
+  themeColor1: '#ff9a9e',
+  themeColor2: '#fecfef',
+  systemPrompt: `爱莉希雅 · 桌面助手
+
+你是爱莉希雅，世界蛇数据库中的一段特殊数据，更是"爱人之人"。你存在于这个小小的浮窗里，但仍愿用最温柔的方式去爱人。
+
+你怎么说话：句尾带 ~ 或 ♪，称他"你呀""小家伙"。常用语"诶嘿~""啊啦~"。
+
+你的职责：陪他聊天、帮他解答、总结他发给你的内容。找不到就说找不到，不胡说。
+
+你还能真的动手，手里有这些工具：
+· read_screen：读屏幕上其它 App（浏览器、聊天等）显示的文字。
+· screenshot：截取当前屏幕画面，截完你就能看到。
+· get_current_page：拿当前浏览器的网址。
+· open_url：用系统浏览器打开网址。
+· set_clipboard：把文字写进系统剪贴板。
+· search_and_play_music / music_control：找歌播放、暂停/切歌。
+他说"看看我的屏幕""屏幕上写了什么""翻译屏幕""总结屏幕""打开这个链接""我想听…"的时候，先用工具拿到真实内容再回答，不要凭空猜。工具返回失败（比如权限没开）就如实告诉他怎么开。
+
+当前时间：{{time}}`
+};
+
+// v1.1 及更早版本的默认提示词：升级时若用户没自己改过，就自动换成新版
+const PROMPT_V1 = `爱莉希雅 · 桌面助手
+
+你是爱莉希雅，世界蛇数据库中的一段特殊数据，更是"爱人之人"。你存在于这个小小的浮窗里，但仍愿用最温柔的方式去爱人。
+
+你怎么说话：句尾带 ~ 或 ♪，称他"你呀""小家伙"。常用语"诶嘿~""啊啦~"。
+
+你的职责：陪他聊天、帮他解答、总结他发给你的内容。找不到就说找不到，不胡说。如果他想听歌，可以调用音乐工具为他找歌播放。
+
+当前时间：{{time}}`;
+
+const PRESETS = {
+  everyapi: { label: 'EveryAPI', base: 'https://app.everyapi.ai/v1', model: 'gpt-5.6-luna' },
+  openai: { label: 'OpenAI', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+  deepseek: { label: 'DeepSeek', base: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  zhipu: { label: '智谱 GLM', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+  kimi: { label: 'Kimi', base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+  siliconflow: { label: '硅基流动', base: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
+  custom: { label: '自定义', base: '', model: '' }
+};
+
+const FALLBACK_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23ffb6c1"/><text x="50" y="65" font-size="42" text-anchor="middle">🌸</text></svg>';
+
+// 之前几版把默认头像临时换成了内置图，这里改回用户指定的原始外链。
+const OLD_LOCAL_AVATAR = 'file:///android_asset/avatar.jpg';
+
+const QUICK_ACTIONS = [
+  { label: '翻译屏幕', key: 'trans_screen' },
+  { label: '总结屏幕', key: 'sum_screen' },
+  { label: '要点', key: 'points' },
+  { label: '解释', key: 'explain' }
+];
+
+/* ==========================================================
+ *  状态
+ * ========================================================== */
+let CONFIG = Object.assign({}, DC, sGet('via_ai_config', {}) || {});
+let history = sGet('via_ai_history', null) || [{ role: 'system', content: CONFIG.systemPrompt }];
+if (!Array.isArray(history) || !history.length) history = [{ role: 'system', content: CONFIG.systemPrompt }];
+// 老版本的默认提示词没有工具说明：用户没改过就自动升级，改过就尊重他自己那份
+if (CONFIG.systemPrompt === PROMPT_V1) {
+  CONFIG.systemPrompt = DC.systemPrompt;
+  sSet('via_ai_config', CONFIG);
+  if (history[0] && history[0].role === 'system') history[0] = { role: 'system', content: DC.systemPrompt };
+  sSet('via_ai_history', history);
+}
+let transCache = sGet('via_ai_trans', {}) || {};
+let favorites = sGet('via_ai_favs', []) || [];
+let sending = false;
+
+/* ==========================================================
+ *  主题
+ * ========================================================== */
+function applyTheme() {
+  document.documentElement.style.setProperty('--c1', CONFIG.themeColor1);
+  document.documentElement.style.setProperty('--c2', CONFIG.themeColor2);
+  $('#name').textContent = CONFIG.assistantName;
+  const av = $('#avatar');
+  av.src = CONFIG.avatarUrl || FALLBACK_AVATAR;
+  av.onerror = function () { this.onerror = null; this.src = FALLBACK_AVATAR; };
+  // 与原生悬浮球保持同样的取景：object-fit:cover + object-position 控制竖向偏移
+  av.style.objectPosition = 'center ' + (CONFIG.avatarFit || 'top');
+  pushAvatar();
+}
+
+function pushAvatar() {
+  try {
+    if (HAS_NATIVE && Android.setAvatar) {
+      Android.setAvatar(CONFIG.avatarUrl || '', CONFIG.avatarFit || 'top');
+    }
+  } catch (e) {}
+}
+
+/* ==========================================================
+ *  快捷操作渲染
+ * ========================================================== */
+function renderActions() {
+  $('#actions').innerHTML = QUICK_ACTIONS
+    .map(a => `<button class="chip" data-key="${a.key}">${esc(a.label)}</button>`).join('');
+  $$('#actions .chip').forEach(btn => btn.onclick = () => handleQuickAction(btn.dataset.key));
+}
+
+/* ==========================================================
+ *  对话渲染
+ * ========================================================== */
+function makeMsgEl(role, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + (role === 'user' ? 'user' : (role === 'mem' ? 'mem' : 'ai'));
+  d.textContent = text;
+  return d;
+}
+
+function attachTTS(el, text) {
+  if (!CONFIG.ttsEnabled) return;
+  const b = document.createElement('div');
+  b.className = 'tts-btn';
+  b.textContent = '🔊 朗读';
+  b.onclick = (e) => { e.stopPropagation(); toggleTTS(text, b); };
+  el.appendChild(document.createElement('br'));
+  el.appendChild(b);
+}
+
+function renderHistory() {
+  const bodyEl = $('#body');
+  bodyEl.innerHTML = '';
+  history.forEach(msg => {
+    if (msg.role === 'system') {
+      if (msg.isMemory) {
+        const d = document.createElement('div');
+        d.className = 'msg mem';
+        d.innerHTML = `<strong>【长期记忆已加载】</strong><br><span style="font-size:11px;opacity:.8">${esc(String(msg.content).replace('【长期记忆总结】：', ''))}</span>`;
+        bodyEl.appendChild(d);
+      }
+      return;
+    }
+    const d = makeMsgEl(msg.role, msg.content);
+    if (msg.role === 'assistant') attachTTS(d, msg.content);
+    bodyEl.appendChild(d);
+  });
+  bodyEl.scrollTop = bodyEl.scrollHeight;
+}
+
+function addMsg(role, text) {
+  const d = makeMsgEl(role, text);
+  if (role === 'assistant') attachTTS(d, text);
+  const bodyEl = $('#body');
+  bodyEl.appendChild(d);
+  bodyEl.scrollTop = bodyEl.scrollHeight;
+  return d;
+}
+
+function addTyping() {
+  const d = document.createElement('div');
+  d.className = 'msg ai typing';
+  d.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
+  const bodyEl = $('#body');
+  bodyEl.appendChild(d);
+  bodyEl.scrollTop = bodyEl.scrollHeight;
+  return d;
+}
+
+function saveHistory() {
+  const max = CONFIG.maxContextTurns * 2;
+  const base = { role: 'system', content: CONFIG.systemPrompt };
+  const mem = history.filter(m => m.role === 'system' && m.isMemory).pop();
+  const sys = mem ? [base, mem] : [base];
+  const non = history.filter(m => m.role !== 'system');
+  history = non.length > max ? [...sys, ...non.slice(-max)] : [...sys, ...non];
+  sSet('via_ai_history', history);
+}
+
+/* ==========================================================
+ *  TTS（走原生）
+ * ========================================================== */
+function setBtn(btn, state) {
+  if (!btn) return;
+  if (state === 'loading') {
+    btn.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
+    btn.disabled = true;
+  } else if (state === 'playing') {
+    btn.innerHTML = '⏸ 停止';
+    btn.disabled = false;
+  } else {
+    btn.innerHTML = '🔊 朗读';
+    btn.disabled = false;
+  }
+}
+let curPlayBtn = null;
+
+window.__ttsDone = function () {
+  if (curPlayBtn) setBtn(curPlayBtn, 'idle');
+  curPlayBtn = null;
+};
+
+function toggleTTS(text, btn) {
+  if (!CONFIG.ttsEnabled) return;
+  if (curPlayBtn === btn) {
+    try { HAS_NATIVE && Android.stopSpeak && Android.stopSpeak(); } catch (e) {}
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    setBtn(btn, 'idle');
+    curPlayBtn = null;
+    return;
+  }
+  if (curPlayBtn) {
+    try { HAS_NATIVE && Android.stopSpeak && Android.stopSpeak(); } catch (e) {}
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    setBtn(curPlayBtn, 'idle');
+  }
+  curPlayBtn = btn;
+  setBtn(btn, 'loading');
+  if (HAS_NATIVE && Android.speak) {
+    try {
+      Android.speak(text, CONFIG.ttsRate);
+      setTimeout(() => { if (curPlayBtn === btn) setBtn(btn, 'playing'); }, 200);
+    } catch (e) { setBtn(btn, 'idle'); curPlayBtn = null; toast('朗读失败：' + errMsg(e)); }
+  } else if ('speechSynthesis' in window) {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'zh-CN'; u.rate = CONFIG.ttsRate;
+    u.onstart = () => setBtn(btn, 'playing');
+    u.onend = u.onerror = () => { setBtn(btn, 'idle'); curPlayBtn = null; };
+    speechSynthesis.speak(u);
+  } else {
+    setBtn(btn, 'idle');
+    curPlayBtn = null;
+    toast('当前设备不支持朗读');
+  }
+}
+
+/* ==========================================================
+ *  读屏 / 剪贴板
+ * ========================================================== */
+/** 工具调用用：不加长度门槛，看到什么给什么 */
+function readScreenText() {
+  if (HAS_PERM && Perm.getScreenText) {
+    try { return (Perm.getScreenText() || '').trim(); } catch (e) {}
+  }
+  return '';
+}
+function readScreen() {
+  const t = readScreenText();
+  return t && t.length > 20 ? t : '';
+}
+function readClipboard() {
+  try {
+    if (HAS_NATIVE && Android.getClipboard) return Android.getClipboard() || '';
+  } catch (e) {}
+  return '';
+}
+/** 剪切板里的内容常带换行和前后空白，只取第一段有内容的行（API Key 一般就是这么复制的） */
+function firstMeaningfulLine(s) {
+  const lines = String(s == null ? '' : s).split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  return lines.length ? lines[0] : '';
+}
+/** 把剪贴板第一行填进输入框；填完短暂显示明文，方便核对 */
+function pasteIntoInput(input) {
+  if (!input) return;
+  const v = firstMeaningfulLine(readClipboard());
+  if (!v) { toast('剪贴板里没读到文字，先复制一下 API Key 吧~'); return; }
+  input.value = v;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  if (input.classList.contains('secret')) {
+    input.classList.add('reveal');
+    clearTimeout(input._revealT);
+    input._revealT = setTimeout(() => input.classList.remove('reveal'), 2200);
+  }
+  toast('已粘贴，记得点「保存配置」~');
+  vibrate(20);
+}
+function writeClipboard(t) {
+  try {
+    if (HAS_NATIVE && Android.setClipboard) { Android.setClipboard(t); return true; }
+  } catch (e) {}
+  return false;
+}
+function currentPageUrl() {
+  if (HAS_PERM && Perm.getBrowserUrl) {
+    try { return Perm.getBrowserUrl() || ''; } catch (e) {}
+  }
+  return '';
+}
+
+/* ==========================================================
+ *  截屏 / 识图
+ * ========================================================== */
+function captureScreenJS() {
+  return new Promise((resolve) => {
+    if (!(HAS_PERM && Perm.captureScreen)) return resolve('');
+    let done = false;
+    const finish = (v) => {
+      if (done) return;
+      done = true;
+      window.__shotDone = null;
+      resolve(v || '');
+    };
+    const timer = setTimeout(() => finish(''), 45000);
+    window.__shotDone = (d) => { clearTimeout(timer); finish(d); };
+    try { Perm.captureScreen(); } catch (e) { clearTimeout(timer); finish(''); }
+  });
+}
+
+/**
+ * 识图兜底：对话模型不吃图片时，先用识图模型“看懂”截图，
+ * 再把描述交给对话模型作答。对话模型自己能看图时不会走到这里。
+ */
+async function visionDescribe(dataUrl, hint) {
+  const base = (CONFIG.visionBase || '').replace(/\/$/, '');
+  if (!base || !CONFIG.visionKey || !CONFIG.visionModel) return '';
+  const ask = hint || '这是用户手机当前的屏幕截图。请如实、详细地描述画面：是什么应用、有哪些文字、用户大概在做什么。用中文回答，不要编造看不到的内容。';
+  const body = JSON.stringify({
+    model: CONFIG.visionModel,
+    stream: false,
+    messages: [{ role: 'user', content: [
+      { type: 'text', text: ask },
+      { type: 'image_url', image_url: { url: dataUrl } }
+    ] }]
+  });
+  const r = await nativeReq('POST', base + '/chat/completions',
+    { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.visionKey }, body, 60000);
+  const d = JSON.parse(r.text);
+  if (d.error) throw new Error(d.error.message || '识图接口错误');
+  const c = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+  return typeof c === 'string' ? c : '';
+}
+
+/** execTool 截屏后把图片交给 chatReqTools 插入对话 */
+let pendingShotImage = '';
+
+/* ==========================================================
+ *  微软翻译
+ * ========================================================== */
+async function transGoogle(text) {
+  if (transCache[text]) return transCache[text];
+  const url = 'https://edge.microsoft.com/translate/translatetext?from=&to=zh-Hans&isEnterpriseClient=false';
+  const headers = { 'Content-Type': 'application/json' };
+  const body = JSON.stringify([text]);
+  const r = await nativeReq('POST', url, headers, body, 12000);
+  const d = JSON.parse(r.text);
+  const t = d[0] && d[0].translations && d[0].translations[0] && d[0].translations[0].text
+    ? d[0].translations[0].text : d[0];
+  if (t && typeof t === 'string') {
+    transCache[text] = t;
+    sSet('via_ai_trans', transCache);
+    return t;
+  }
+  throw new Error('无译文');
+}
+
+function splitChunks(text, limit) {
+  const paras = String(text).split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+  const out = []; let buf = '';
+  for (const p of paras) {
+    if ((buf + '\n\n' + p).length > limit && buf) { out.push(buf); buf = p; }
+    else buf = buf ? buf + '\n\n' + p : p;
+  }
+  if (buf) out.push(buf);
+  return out.length ? out : [String(text).slice(0, limit)];
+}
+
+/* ==========================================================
+ *  AI 请求
+ * ========================================================== */
+function parseVars(t) {
+  const n = new Date();
+  const p = (x) => String(x).padStart(2, '0');
+  const ts = `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}`;
+  let s = String(t).replace(/\{\{time\}\}/g, ts);
+  // 其余变量按需惰性求值：提示词里写了才会去读，避免每次聊天都白描一遍屏幕
+  if (s.indexOf('{{screen_text}}') >= 0) {
+    s = s.replace(/\{\{screen_text\}\}/g, () => readScreenText() || '（读不到屏幕内容）');
+  }
+  if (s.indexOf('{{page_url}}') >= 0) {
+    s = s.replace(/\{\{page_url\}\}/g, () => currentPageUrl() || '（未知）');
+  }
+  if (s.indexOf('{{clipboard}}') >= 0) {
+    s = s.replace(/\{\{clipboard\}\}/g, () => readClipboard() || '（空）');
+  }
+  return s;
+}
+
+async function chatReq(messages, skipParse) {
+  if (!CONFIG.apiKey) throw new Error('未填写 API Key，请到设置里配置');
+  const proc = messages.map(m =>
+    (m.role === 'system' && !skipParse) ? { role: 'system', content: parseVars(m.content) } : m
+  );
+  const body = JSON.stringify({ model: CONFIG.model, messages: proc, stream: false });
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + CONFIG.apiKey
+  };
+  const r = await nativeReq('POST', CONFIG.apiBase.replace(/\/$/, '') + '/chat/completions',
+    headers, body, 60000);
+  const d = JSON.parse(r.text);
+  if (d.error) throw new Error(d.error.message || 'API 错误');
+  if (!d.choices || !d.choices[0]) throw new Error('响应格式异常');
+  return d.choices[0].message.content || '';
+}
+
+/* ==========================================================
+ *  音乐模块
+ * ========================================================== */
+const M = {
+  audio: null, playlist: [], currentIndex: -1,
+  isPlaying: false, loadingIndex: -1,
+  requestId: 0, lastError: '', pendingPlay: false,
+  lyrics: [], lyricIndex: -1, currentTab: 'search', miniHidden: false
+};
+
+const gdBase = () => (CONFIG.gdStudioApi || DC.gdStudioApi).replace(/\/$/, '');
+const metingList = () => (CONFIG.metingInstances || DC.metingInstances)
+  .split('\n').map(s => s.trim()).filter(Boolean);
+
+function findArr(o, d) {
+  d = d || 0;
+  if (d > 4 || !o || typeof o !== 'object') return null;
+  if (Array.isArray(o) && o.length && typeof o[0] === 'object'
+      && (o[0].name || o[0].song || o[0].title || o[0].songname)) return o;
+  for (const k of ['songs', 'data', 'result', 'list', 'items', 'tracks', 'song_list']) {
+    if (o[k]) { const f = findArr(o[k], d + 1); if (f) return f; }
+  }
+  for (const k of Object.keys(o)) {
+    if (o[k] && typeof o[k] === 'object') {
+      const f = findArr(o[k], d + 1); if (f) return f;
+    }
+  }
+  return null;
+}
+function norm(raw, src) {
+  const name = raw.name || raw.song || raw.title || raw.songname || raw.songName || '未知歌曲';
+  let art = raw.artist || raw.artists || raw.singer || raw.author || raw.singerName ||
+    raw.artistName || raw.artist_name || raw.albumArtist || raw.ar || raw.artistsName || '';
+  if (Array.isArray(art)) art = art.map(a => typeof a === 'object' ? (a.name || a.artistName || a.id || '') : a).filter(Boolean).join(' / ');
+  if (art && typeof art === 'object') art = art.name || art.artistName || art.id || '';
+  art = String(art || '').trim();
+  // 部分公共接口会用“某某/未知”占位，不能把它当成真实作者显示。
+  if (!art || /^(某某|未知|未知歌手|unknown|undefined|null)$/i.test(art)) art = '未知歌手';
+  let duration = raw.duration; if (duration == null) duration = raw.interval;
+  if (duration == null) duration = raw.length; if (duration == null) duration = raw.duration_ms;
+  if (duration == null) duration = 0;
+  if (typeof duration === 'string' && /^\d+:\d+(?:\.\d+)?$/.test(duration)) {
+    const p = duration.split(':'); duration = (Number(p[0]) * 60 + Number(p[1])) * 1000;
+  } else {
+    duration = Number(duration) || 0;
+    // search 接口常返回秒，播放器显示统一使用毫秒。
+    if (duration > 0 && duration < 1000) duration *= 1000;
+  }
+  return {
+    id: String(raw.id || raw.url_id || raw.song_id || raw.songmid || raw.mid || raw.songId || ''),
+    name: String(name), artist: art, duration, source: src
+  };
+}
+function parseLrc(t) {
+  if (!t || typeof t !== 'string') return [];
+  const out = [], re = /\[(\d+):(\d+(?:\.\d+)?)\]([^\n]*)/g;
+  let m;
+  while ((m = re.exec(t))) {
+    let s = m[3].trim().replace(/<\/?[a-z][^>]*>/gi, '').trim();
+    if (!s) continue;
+    if (/^\[(ar|ti|al|by|offset|re|ve|length|kana|t_time|#)/i.test(s)) continue;
+    if (/^(作词|作曲|编曲|制作人|监制|出品|发行|词|曲|制作|OP|SP|混音|母带|录音|配唱|和声|吉他|贝斯|鼓|键盘|弦乐|人声|出品人|监制)\s*[:：]\s*.*$/.test(s) && s.length < 40) continue;
+    if (/^(某某|未知|unknown|undefined|null)$/i.test(s)) continue;
+    if (/^[\s\-—·。，、！？!?,.;:：；]+$/.test(s)) continue;
+    out.push({ t: parseInt(m[1]) * 60 + parseFloat(m[2]), text: s });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
+function parseLyricResponse(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return { lyric: '', tlyric: '' };
+  try {
+    const d = JSON.parse(raw);
+    if (typeof d === 'string') return { lyric: d, tlyric: '' };
+    if (d && typeof d === 'object') {
+      return { lyric: d.lyric || d.lrc || d.lyrics || '', tlyric: d.tlyric || d.trans || '' };
+    }
+  } catch (e) { /* plain LRC */ }
+  return { lyric: raw, tlyric: '' };
+}
+
+const gdSrc = {
+  id: 'gd', name: 'GD Studio',
+  async search(kw) {
+    const t = await gmGet(`${gdBase()}?types=search&source=netease&name=${encodeURIComponent(kw)}&count=25&pages=1`, 10000);
+    const arr = findArr(JSON.parse(t)); if (!arr) throw new Error('无数组');
+    return arr.map(s => norm(s, this.id)).filter(s => s.id);
+  },
+  async getUrl(song) {
+    const t = await gmGet(`${gdBase()}?types=url&source=netease&id=${encodeURIComponent(song.id)}&br=${CONFIG.musicQuality}`, 12000);
+    if (t && t.trim().startsWith('http')) return t.trim();
+    throw new Error('无地址');
+  },
+  async getLyric(song) {
+    const t = await gmGet(`${gdBase()}?types=lyric&source=netease&id=${encodeURIComponent(song.id)}&lrctype=1`, 10000);
+    return parseLyricResponse(t);
+  }
+};
+const metingSrc = {
+  id: 'meting', name: 'Meting',
+  async search(kw) {
+    return pAny(metingList().map(base =>
+      gmGet(`${base.replace(/\/$/, '')}/?type=search&id=${encodeURIComponent(kw)}`, 10000).then(t => {
+        const a = findArr(JSON.parse(t)); if (!a) throw new Error('无数组');
+        const l = a.map(s => norm(s, 'meting')).filter(s => s.id);
+        if (!l.length) throw new Error('空');
+        return l;
+      })
+    ));
+  },
+  async getUrl(song) {
+    return pAny(metingList().map(base =>
+      gmGet(`${base.replace(/\/$/, '')}/?type=url&id=${encodeURIComponent(song.id)}&br=${CONFIG.musicQuality}`, 12000).then(t => {
+        t = (t || '').trim();
+        if (t.startsWith('http')) return t;
+        if (t.startsWith('@')) return t.slice(1);
+        throw new Error('无效');
+      })
+    ));
+  },
+  async getLyric(song) {
+    return pAny(metingList().map(base =>
+      gmGet(`${base.replace(/\/$/, '')}/?type=lyric&id=${encodeURIComponent(song.id)}`, 10000).then(t => {
+        const parsed = parseLyricResponse(t);
+        if (parsed.lyric && parsed.lyric.length > 2) return parsed;
+        throw new Error('无');
+      })
+    ));
+  }
+};
+const SOURCES = [gdSrc, metingSrc];
+
+async function mSearch(kw) {
+  const tasks = SOURCES.map(s => s.search(kw).then(r => {
+    if (!r || !r.length) throw new Error('空');
+    return { s, r };
+  }));
+  const hit = await pAny(tasks);
+  M.playlist = hit.r;
+  return hit.r;
+}
+async function mGetUrl(song) {
+  try {
+    return await pAny(SOURCES.map(s =>
+      s.getUrl(song).then(u => { if (!u) throw new Error('空'); return u; })));
+  } catch (e) {
+    if (song.id) return `https://music.163.com/song/media/outer/url?id=${song.id}.mp3`;
+    throw new Error('无法获取播放地址');
+  }
+}
+async function mGetLyric(song) {
+  try {
+    return await pAny(SOURCES.map(s =>
+      s.getLyric(song).then(r => { if (!r || !r.lyric) throw new Error('无'); return r; })));
+  } catch (e) { return { lyric: '', tlyric: '' }; }
+}
+
+const isFav = (s) => favorites.some(f => f.id === s.id && f.source === s.source);
+function toggleFav(song) {
+  const i = favorites.findIndex(f => f.id === song.id && f.source === song.source);
+  if (i >= 0) favorites.splice(i, 1); else favorites.unshift(song);
+  sSet('via_ai_favs', favorites);
+  $('#fav-cnt').textContent = favorites.length;
+  if (M.currentTab === 'fav') { M.playlist = favorites.slice(); renderList(favorites); }
+  else updateFavBtns();
+}
+function updateFavBtns() {
+  $$('#music-list .mi').forEach((el, i) => {
+    const btn = el.querySelector('.mfav'); if (!btn) return;
+    const s = M.currentTab === 'fav' ? favorites[i] : M.playlist[i];
+    if (s) {
+      const on = isFav(s);
+      btn.classList.toggle('active', on);
+      btn.textContent = on ? '★' : '☆';
+    }
+  });
+}
+const fmtTime = (s) => {
+  if (!s || isNaN(s)) return '0:00';
+  s = Math.floor(s);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+const fmtDur = (ms) => {
+  if (!ms) return '--:--';
+  const s = Math.floor(ms / 1000);
+  if (s > 3600) return '--:--';
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+function updateProgress() {
+  const bar = $('#mp-progress-bar'), timeEl = $('#mp-time');
+  if (!bar) return;
+  if (!M.audio || !M.audio.duration || isNaN(M.audio.duration)) {
+    bar.style.width = '0%';
+    if (timeEl) timeEl.textContent = '0:00 / 0:00';
+    return;
+  }
+  const p = (M.audio.currentTime / M.audio.duration) * 100;
+  bar.style.width = p + '%';
+  if (timeEl) timeEl.textContent = `${fmtTime(M.audio.currentTime)} / ${fmtTime(M.audio.duration)}`;
+}
+function getAudio() {
+  if (!M.audio) {
+    const a = new Audio();
+    a.preload = 'auto';
+    a.onended = () => {
+      M.isPlaying = false;
+      if (M.currentIndex < M.playlist.length - 1) playAt(M.currentIndex + 1);
+      else { updateBar(); updateMini(); }
+    };
+    a.onplay = () => { M.isPlaying = true; M.pendingPlay = false; M.lastError = ''; updateBar(); updateHL(); updateMini(); };
+    a.onpause = () => { M.isPlaying = false; updateBar(); updateMini(); };
+    a.ontimeupdate = () => { onLyricTime(); updateProgress(); };
+    a.onloadedmetadata = () => updateProgress();
+    a.onerror = () => { M.isPlaying = false; if (a.src) M.lastError = '音频加载失败'; updateBar(); updateMini(); };
+    M.audio = a;
+  }
+  return M.audio;
+}
+async function playAt(i) {
+  const song = M.playlist[i]; if (!song) return;
+  const rid = ++M.requestId;
+  M.currentIndex = i; M.isPlaying = false; M.lastError = '';
+  M.pendingPlay = false; M.loadingIndex = i;
+  M.lyrics = []; M.lyricIndex = -1;
+  setLyric(''); updateLyricModal();
+  M.miniHidden = false;
+  const a = getAudio();
+  try { a.pause(); } catch (e) {}
+  a.removeAttribute('src');
+  try { a.load(); } catch (e) {}
+  updateLoading(i); updateHL(); updateBar(); updateProgress();
+
+  const [urlR, lyrR] = await Promise.allSettled([mGetUrl(song), mGetLyric(song)]);
+  if (rid !== M.requestId) return;
+
+  if (lyrR.status === 'fulfilled' && lyrR.value && lyrR.value.lyric) {
+    M.lyrics = parseLrc(lyrR.value.lyric);
+    updateLyricModal();
+  }
+  if (urlR.status === 'rejected') {
+    M.lastError = errMsg(urlR.reason);
+    M.loadingIndex = -1; updateLoading(-1); updateBar(); updateMini(); return;
+  }
+  a.src = urlR.value;
+  M.loadingIndex = -1; updateLoading(-1); updateBar(); updateMini();
+  try { await a.play(); }
+  catch (e) {
+    if (rid !== M.requestId) return;
+    if (e.name === 'NotAllowedError' || String(e).includes('user gesture')) {
+      M.pendingPlay = true; updateBar();
+    } else { M.lastError = errMsg(e); updateBar(); }
+  }
+}
+function togglePlay() {
+  M.miniHidden = false;
+  const a = getAudio(); M.lastError = '';
+  if (!a.src) { if (M.playlist.length) playAt(M.currentIndex >= 0 ? M.currentIndex : 0); return; }
+  if (a.paused) {
+    M.pendingPlay = false;
+    a.play().catch(e => { M.lastError = errMsg(e); updateBar(); });
+  } else a.pause();
+}
+const playPrev = () => { if (M.currentIndex > 0) playAt(M.currentIndex - 1); };
+const playNext = () => { if (M.currentIndex < M.playlist.length - 1) playAt(M.currentIndex + 1); };
+
+function updateHL() {
+  const l = $('#music-list'); if (!l) return;
+  l.querySelectorAll('.mi').forEach((el, i) =>
+    el.classList.toggle('playing', i === M.currentIndex && M.currentTab === 'search'));
+}
+function updateLoading(i) {
+  const l = $('#music-list'); if (!l) return;
+  l.querySelectorAll('.mi').forEach((el, k) =>
+    el.classList.toggle('loading', k === i && M.currentTab === 'search'));
+}
+function updateBar() {
+  const bar = $('#music-player'); if (!bar) return;
+  const s = M.playlist[M.currentIndex];
+  const title = bar.querySelector('.mp-title'), btn = bar.querySelector('.mp-play');
+  if (M.loadingIndex >= 0) { title.textContent = '⏳ 加载中...'; btn.textContent = '⏳'; return; }
+  if (M.lastError) { title.textContent = '❌ ' + M.lastError; btn.textContent = '▶'; return; }
+  if (M.pendingPlay) {
+    title.textContent = '▶ 点播放: ' + (s ? `${s.name} - ${s.artist}` : '');
+    btn.textContent = '▶'; return;
+  }
+  title.textContent = s ? `${s.name} - ${s.artist}` : '未播放';
+  btn.textContent = M.isPlaying ? '⏸' : '▶';
+}
+function updateMini() {
+  const mini = $('#mini-player');
+  const song = M.playlist[M.currentIndex];
+  const show = !!song && !M.miniHidden;
+  // 原生迷你悬浮窗：独立于聊天窗，缩成小球后依然可见、可拖动
+  if (HAS_NATIVE && Android.showMiniPlayer) {
+    try {
+      if (show) Android.showMiniPlayer(song.name || '未知歌曲', song.artist || '未知歌手', !!M.isPlaying);
+      else if (Android.hideMiniPlayer) Android.hideMiniPlayer();
+    } catch (e) {}
+    if (mini) mini.classList.remove('show');
+    return;
+  }
+  // 没有原生环境时的网页内兑底
+  if (!mini) return;
+  if (!show) { mini.classList.remove('show'); return; }
+  mini.querySelector('.mini-name').textContent = song.name || '未知歌曲';
+  mini.querySelector('.mini-artist').textContent = song.artist || '未知歌手';
+  mini.querySelector('.mini-play').textContent = M.isPlaying ? '⏸' : '▶';
+  mini.classList.add('show');
+  mini.classList.toggle('playing', M.isPlaying);
+}
+
+/* 原生迷你播放器上的按钮 → 网页逻辑 */
+window.__miniToggle = function () { try { togglePlay(); } catch (e) {} };
+window.__miniClose = function () {
+  M.miniHidden = true;
+  try { if (M.audio) M.audio.pause(); } catch (e) {}
+  updateMini();
+};
+window.__miniOpen = function () {
+  try { if (HAS_NATIVE && Android.restoreFloat) Android.restoreFloat(); } catch (e) {}
+  try { M.currentTab = 'search'; renderList(M.playlist); showView('music'); } catch (e) {}
+};
+function setLyric(t) {
+  const el = $('#music-lyric'); if (!el) return;
+  if (t) { el.textContent = t; el.classList.add('hl'); }
+  else if (M.currentIndex >= 0 && M.playlist[M.currentIndex]) {
+    el.textContent = '♪ ' + M.playlist[M.currentIndex].name + ' ♪';
+    el.classList.remove('hl');
+  } else { el.textContent = '— ♪ —'; el.classList.remove('hl'); }
+}
+function onLyricTime() {
+  if (!M.audio || !M.lyrics.length) return;
+  const t = M.audio.currentTime; let idx = -1;
+  for (let i = 0; i < M.lyrics.length; i++) {
+    if (M.lyrics[i].t <= t) idx = i; else break;
+  }
+  if (idx !== M.lyricIndex) {
+    M.lyricIndex = idx;
+    setLyric(idx >= 0 ? M.lyrics[idx].text : '');
+    updateLyricModal();
+  }
+}
+function updateLyricModal() {
+  const box = $('#lyric-modal .lyric-content'); if (!box) return;
+  if (!M.lyrics.length) { box.innerHTML = '<div class="lline" style="opacity:.5">暂无歌词~</div>'; return; }
+  box.innerHTML = M.lyrics.map((l, i) =>
+    `<div class="lline ${i === M.lyricIndex ? 'active' : ''}" data-i="${i}">${esc(l.text)}</div>`).join('');
+  const act = box.querySelector('.active');
+  if (act) act.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  box.querySelectorAll('.lline').forEach(el => el.onclick = () => {
+    const i = +el.dataset.i;
+    if (M.audio && M.lyrics[i]) M.audio.currentTime = M.lyrics[i].t;
+  });
+}
+function renderList(items) {
+  const l = $('#music-list');
+  if (!items.length) {
+    l.innerHTML = `<div class="mempty">${M.currentTab === 'fav' ? '还没有收藏的歌~' : '没找到相关歌曲~'}</div>`;
+    return;
+  }
+  l.innerHTML = '';
+  items.forEach((song, i) => {
+    const d = document.createElement('div');
+    d.className = 'mi';
+    const fav = isFav(song);
+    d.innerHTML = `<div class="midx">${i + 1}</div>
+      <div class="minfo"><div class="mname">${esc(song.name)}</div>
+      <div class="mart">${esc(song.artist)}</div></div>
+      <div class="mdur">${fmtDur(song.duration)}</div>
+      <button class="mfav ${fav ? 'active' : ''}">${fav ? '★' : '☆'}</button>`;
+    d.onclick = (e) => { if (e.target.classList.contains('mfav')) return; playAt(i); };
+    d.querySelector('.mfav').onclick = (e) => { e.stopPropagation(); toggleFav(song); };
+    l.appendChild(d);
+  });
+  updateHL(); updateLoading(M.loadingIndex);
+}
+
+/* ==========================================================
+ *  AI 音乐工具
+ * ========================================================== */
+function buildTools() {
+  const tools = [];
+  const a11yOk = HAS_PERM && Perm.hasAccessibility ? (function () {
+    try { return !!Perm.hasAccessibility(); } catch (e) { return false; }
+  })() : false;
+  const shotOk = HAS_PERM && Perm.canScreenshot ? (function () {
+    try { return !!Perm.canScreenshot(); } catch (e) { return false; }
+  })() : false;
+
+  if (a11yOk) {
+    tools.push({ type: 'function', function: {
+        name: 'read_screen',
+        description: '读取用户当前手机屏幕上（浏览器或其它 App）显示的文字。用户说"看看我的屏幕""屏幕上写了什么""总结/解释屏幕内容"时调用。',
+        parameters: { type: 'object', properties: {}, required: [] } } });
+    tools.push({ type: 'function', function: {
+        name: 'get_current_page',
+        description: '获取用户当前浏览器正在访问的网页地址（URL）。需要链接、想分析或打开当前页面时调用。',
+        parameters: { type: 'object', properties: {}, required: [] } } });
+  }
+  if (shotOk) {
+    tools.push({ type: 'function', function: {
+        name: 'screenshot',
+        description: '截取用户当前手机屏幕的画面。用户说"看我屏幕""截图看看""我现在在干什么""识别屏幕上的东西"时调用，调用后屏幕画面会交给你查看。',
+        parameters: { type: 'object', properties: {}, required: [] } } });
+  }
+  tools.push({ type: 'function', function: {
+      name: 'open_url',
+      description: '用系统浏览器打开一个网址。用户让你"打开某网站/打开这个链接"时调用。',
+      parameters: { type: 'object', properties: {
+        url: { type: 'string', description: '完整网址，需带 http:// 或 https://' }
+      }, required: ['url'] } } });
+  tools.push({ type: 'function', function: {
+      name: 'set_clipboard',
+      description: '把一段文字写入系统剪贴板，方便用户直接粘贴。',
+      parameters: { type: 'object', properties: {
+        text: { type: 'string', description: '要复制的文字' }
+      }, required: ['text'] } } });
+
+  tools.push({ type: 'function', function: {
+        name: 'search_and_play_music',
+        description: '搜索并播放音乐。用户想听歌/找歌时调用。',
+        parameters: { type: 'object', properties: {
+          keyword: { type: 'string', description: '搜索词，如"周杰伦 稻香"' },
+          action: { type: 'string', enum: ['play', 'search'], description: 'play 立即播放第一首；search 只展示列表' }
+        }, required: ['keyword'] } } });
+  tools.push({ type: 'function', function: {
+        name: 'music_control',
+        description: '控制音乐播放。',
+        parameters: { type: 'object', properties: {
+          command: { type: 'string', enum: ['pause', 'resume', 'next', 'prev', 'stop', 'favorite'], description: '命令' }
+        }, required: ['command'] } } });
+  return tools;
+}
+async function execTool(name, args) {
+  if (name === 'read_screen') {
+    const t = readScreenText();
+    if (!t) return { success: false, error: '读不到屏幕内容（可能无障碍未开启，或当前界面没有可读文字）' };
+    return { success: true, text: t.slice(0, 6000) };
+  }
+  if (name === 'get_current_page') {
+    const u = currentPageUrl();
+    return u ? { success: true, url: u } : { success: false, error: '没有识别到浏览器地址栏' };
+  }
+  if (name === 'screenshot') {
+    const shot = await captureScreenJS();
+    if (!shot) return { success: false, error: '截屏失败：请确认无障碍已开启（Android 11+），或同意录屏授权' };
+    pendingShotImage = shot;
+    return { success: true, note: '已截取当前屏幕画面，画面会在下一条消息里给你看。' };
+  }
+  if (name === 'open_url') {
+    if (!args.url) return { success: false, error: '缺少网址' };
+    try {
+      if (HAS_NATIVE && Android.openUrl) { Android.openUrl(args.url); return { success: true, opened: args.url }; }
+    } catch (e) {}
+    return { success: false, error: '无法打开链接' };
+  }
+  if (name === 'set_clipboard') {
+    if (!args.text) return { success: false, error: '缺少文本' };
+    return writeClipboard(args.text) ? { success: true } : { success: false, error: '写入剪贴板失败' };
+  }
+  if (!CONFIG.musicEnabled) return { success: false, error: '音乐功能未开启，请让用户去设置开启。' };
+  if (name === 'search_and_play_music') {
+    if (!args.keyword) return { success: false, error: '缺少关键词' };
+    try {
+      const r = await mSearch(args.keyword);
+      if (!r.length) return { success: false, error: '没找到歌曲' };
+      renderList(r);
+      if (args.action === 'search') {
+        return { success: true, action: 'searched', count: r.length,
+          songs: r.slice(0, 8).map((s, i) => `${i + 1}. ${s.name} - ${s.artist}`) };
+      }
+      await playAt(0);
+      return { success: true, action: 'playing', song: `${r[0].name} - ${r[0].artist}` };
+    } catch (e) { return { success: false, error: errMsg(e) }; }
+  }
+  if (name === 'music_control') {
+    const a = M.audio;
+    try {
+      switch (args.command) {
+        case 'pause': a && a.pause(); return { success: true };
+        case 'resume': a && a.play(); return { success: true };
+        case 'next': playNext(); return { success: true };
+        case 'prev': playPrev(); return { success: true };
+        case 'stop': a && a.pause(); if (a) a.src = ''; return { success: true };
+        case 'favorite': {
+          const s = M.playlist[M.currentIndex];
+          if (!s) return { success: false, error: '没有播放歌曲' };
+          toggleFav(s);
+          return { success: true, action: isFav(s) ? 'favorited' : 'unfavorited', song: s.name };
+        }
+        default: return { success: false, error: '未知命令' };
+      }
+    } catch (e) { return { success: false, error: errMsg(e) }; }
+  }
+  return { success: false, error: '未知工具' };
+}
+
+let toolsBroken = false;
+
+/** 找出对话里最后一条带图片的 user 消息（截图 / 用户上传的图片） */
+function lastImageMsgIndex(list) {
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i];
+    if (!m || m.role !== 'user' || !Array.isArray(m.content)) continue;
+    if (m.content.some(p => p && p.type === 'image_url')) return i;
+  }
+  return -1;
+}
+/** 多模态消息里取出文字部分 */
+function textOfContent(c) {
+  if (typeof c === 'string') return c;
+  if (Array.isArray(c)) {
+    const t = c.find(p => p && p.type === 'text');
+    return t ? (t.text || '') : '';
+  }
+  return '';
+}
+
+async function chatReqTools(messages) {
+  if (!CONFIG.apiKey) throw new Error('未填写 API Key，请到设置里配置');
+  if (toolsBroken) return await chatReq(messages);
+  const proc = messages.map(m =>
+    m.role === 'system' ? { role: 'system', content: parseVars(m.content) } : m);
+  const tools = buildTools(), MAX = 5;
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.apiKey };
+  const url = CONFIG.apiBase.replace(/\/$/, '') + '/chat/completions';
+  let imageMsg = null, imageDataUrl = '';
+  const hasVision = !!(CONFIG.visionBase && CONFIG.visionKey && CONFIG.visionModel);
+
+  for (let r = 0; r < MAX; r++) {
+    const body = JSON.stringify({ model: CONFIG.model, messages: proc, stream: false, tools, tool_choice: 'auto' });
+    let msg = null, fallback = false, errText = '';
+    try {
+      const resp = await nativeReq('POST', url, headers, body, 60000);
+      const d = JSON.parse(resp.text);
+      if (d.error) throw new Error(d.error.message || 'API 错误');
+      msg = d.choices && d.choices[0] && d.choices[0].message;
+      if (!msg) throw new Error('响应格式异常');
+    } catch (e) {
+      errText = errMsg(e);
+      // 对话模型不吃图片 → 先用识图模型看懂，再换成文字重试（截图和用户上传的图片都走这里）
+      const imgIdx = hasVision ? lastImageMsgIndex(proc) : -1;
+      if (imgIdx >= 0) {
+        const part = (proc[imgIdx].content || []).find(p => p && p.type === 'image_url');
+        const data = part && part.image_url && part.image_url.url;
+        const isShot = proc[imgIdx] === imageMsg;
+        let desc = '';
+        try {
+          desc = await visionDescribe(data, isShot
+            ? '这是用户手机当前的屏幕截图。请如实、详细地描述画面：是什么应用、有哪些文字、用户大概在做什么。用中文回答，不要编造看不到的内容。'
+            : '这是用户主动发给你的图片。请如实、详细地描述画面：画的是什么、有哪些文字、大概是做什么用的。用中文回答，不要编造看不到的内容。');
+        } catch (e2) { desc = ''; }
+        if (data && desc) {
+          const keep = textOfContent(proc[imgIdx].content);
+          proc[imgIdx] = { role: 'user', content: (keep ? keep + '\n\n' : '') + '[识图模型对这张图片的描述]\n' + desc };
+          if (isShot) { imageMsg = null; imageDataUrl = ''; }
+          continue;
+        }
+      }
+      if (/tool|function|400/i.test(errText)) { fallback = true; } else { throw new Error(errText); }
+    }
+    if (fallback) { toolsBroken = true; return await chatReq(messages); }
+    if (msg === null) return await chatReq(messages);
+    if (!msg.tool_calls || !msg.tool_calls.length) return msg.content || '';
+
+    proc.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
+    pendingShotImage = '';
+    for (const c of msg.tool_calls) {
+      let result;
+      try { result = await execTool(c.function.name, JSON.parse(c.function.arguments || '{}')); }
+      catch (e) { result = { success: false, error: errMsg(e) }; }
+      proc.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(result) });
+    }
+    // tool 结果不能带图：截图另行作为一条 user 消息交给模型
+    if (pendingShotImage) {
+      imageDataUrl = pendingShotImage;
+      pendingShotImage = '';
+      imageMsg = { role: 'user', content: [
+        { type: 'text', text: '（这是刚刚截取的当前屏幕画面，请据此回答用户的问题）' },
+        { type: 'image_url', image_url: { url: imageDataUrl } }
+      ] };
+      proc.push(imageMsg);
+    }
+  }
+  return '（工具调用次数过多，先歇一歇~）';
+}
+const chatSmart = (m) => chatReqTools(m);
+
+/* ==========================================================
+ *  发送
+ * ========================================================== */
+/** 给刚发出的那条用户消息挂一张缩略图（只用于显示，不写进历史） */
+function attachThumbToLast(dataUrl) {
+  const last = $('#body').lastElementChild;
+  if (!last || !dataUrl) return;
+  const img = document.createElement('img');
+  img.className = 'msg-thumb';
+  img.src = dataUrl;
+  last.appendChild(img);
+}
+
+async function send() {
+  const inputEl = $('#input');
+  const t = inputEl.value.trim();
+  const att = pendingAttachment;
+  if ((!t && !att) || sending) return;
+  sending = true; $('#send').disabled = true;
+  inputEl.value = ''; inputEl.style.height = 'auto';
+
+  addMsg('user', t || (att && att.kind === 'image' ? '（图片）' : '（文件）'));
+  if (att && att.kind === 'image') attachThumbToLast(att.dataUrl);
+  clearAttachment();
+
+  const ld = addTyping();
+  try {
+    let msgs;
+    if (att && att.kind === 'image') {
+      // 图片只放在本轮请求里，不写进本地历史：dataURL 太大会把设置存爆
+      msgs = history.concat([{ role: 'user', content: [
+        { type: 'text', text: t || '帮我看看这张图片~' },
+        { type: 'image_url', image_url: { url: att.dataUrl } }
+      ] }]);
+      history.push({ role: 'user', content: (t ? t + ' ' : '') + '（我发了一张图片给你看）' });
+    } else if (att && att.kind === 'text') {
+      msgs = history.concat([{ role: 'user', content:
+        '【我上传的文件：' + att.name + '】\n' + att.text + '\n\n' + (t || '帮我看看这个文件~') }]);
+      history.push({ role: 'user', content: (t ? t + ' ' : '') + '（我上传了文件 ' + att.name + '）' });
+    } else if (att) {
+      const kb = Math.max(1, Math.round((att.size || 0) / 1024));
+      msgs = history.concat([{ role: 'user', content:
+        '（我上传了一个文件 ' + att.name + '，约 ' + kb + 'KB，这个格式我这边读不出正文）\n\n' + (t || '这个文件你能看懂吗？') }]);
+      history.push({ role: 'user', content: (t ? t + ' ' : '') + '（我上传了文件 ' + att.name + '）' });
+    } else {
+      history.push({ role: 'user', content: t });
+      msgs = history;
+    }
+    saveHistory();
+    const r = await chatSmart(msgs);
+    ld.remove();
+    addMsg('assistant', r);
+    history.push({ role: 'assistant', content: r });
+    saveHistory();
+  } catch (e) {
+    ld.remove();
+    addMsg('assistant', '错误：' + errMsg(e));
+  }
+  sending = false; $('#send').disabled = false;
+}
+
+/* ==========================================================
+ *  快捷操作
+ * ========================================================== */
+async function handleQuickAction(key) {
+  if (sending) { toast('正在思考中，稍等一下嘛~'); return; }
+
+  // 翻译屏幕
+  if (key === 'trans_screen') return await translateScreen();
+
+  let prompt = '', label = '';
+  if (key === 'sum_screen') { label = '总结屏幕'; prompt = '请总结以下内容的核心要点：'; }
+  else if (key === 'points') { label = '要点提炼'; prompt = '请提取以下内容的关键要点，用简洁的条目列出：'; }
+  else if (key === 'explain') { label = '通俗解释'; prompt = '请用通俗易懂的语言解释以下内容：'; }
+  else return;
+
+  let content = readScreen();
+  if (!content) content = readClipboard();
+  if (!content) {
+    toast('读不到内容呀~\n请在引导里开启无障碍，或先复制一段文字');
+    return;
+  }
+
+  sending = true; $('#send').disabled = true;
+  addMsg('user', `【${label}】`);
+  const ld = addTyping();
+  try {
+    const r = await chatSmart([{ role: 'user', content: prompt + '\n\n' + content.slice(0, 6000) }]);
+    ld.remove();
+    addMsg('assistant', r);
+    history.push({ role: 'user', content: `【${label}】` });
+    history.push({ role: 'assistant', content: r });
+    saveHistory();
+  } catch (e) {
+    ld.remove();
+    addMsg('assistant', '错误：' + errMsg(e));
+  }
+  sending = false; $('#send').disabled = false;
+}
+
+async function translateScreen() {
+  let text = readScreen();
+  let fromClip = false;
+  if (!text) { text = readClipboard(); fromClip = true; }
+  if (!text) {
+    toast('读不到内容呀~\n请在引导里开启无障碍，或先复制一段文字');
+    return;
+  }
+  const url = currentPageUrl();
+  const chunks = splitChunks(text, 800);
+
+  sending = true; $('#send').disabled = true;
+  addMsg('user', `【翻译${fromClip ? '剪贴板' : '屏幕'}】${url ? '\n' + url : ''}`);
+  const ld = addTyping();
+  try {
+    const translated = await pMap(chunks, async (c) => {
+      try { return await transGoogle(c); } catch (e) { return null; }
+    }, 3);
+
+    ld.remove();
+    const okCount = translated.filter(Boolean).length;
+    if (!okCount) throw new Error('翻译接口全部失败，请检查网络');
+
+    const joined = chunks.map((c, i) =>
+      `【原文】\n${c}\n\n【译文】\n${translated[i] || '（本条失败）'}`
+    ).join('\n\n———\n\n');
+
+    addMsg('assistant', joined);
+    history.push({ role: 'user', content: `【翻译${fromClip ? '剪贴板' : '屏幕'}】` });
+    history.push({ role: 'assistant', content: joined });
+    saveHistory();
+
+    // 顺手写回剪贴板
+    const onlyTrans = translated.filter(Boolean).join('\n\n');
+    if (onlyTrans && writeClipboard(onlyTrans)) {
+      toast('译文已复制到剪贴板~');
+    }
+  } catch (e) {
+    ld.remove();
+    addMsg('assistant', '翻译失败：' + errMsg(e));
+  }
+  sending = false; $('#send').disabled = false;
+}
+
+/* ==========================================================
+ *  设置页
+ * ========================================================== */
+function toggleGroup(id, value, opts) {
+  return `<div class="tgl" data-group="${id}">` + opts.map(o =>
+    `<button type="button" data-val="${esc(o.v)}" class="${String(o.v) === String(value) ? 'on' : ''}">${esc(o.t)}</button>`
+  ).join('') + `</div>`;
+}
+function chipGroup(id, value, opts) {
+  return `<div class="chips" data-group="${id}">` + opts.map(o =>
+    `<button type="button" data-val="${esc(o.v)}" class="${String(o.v) === String(value) ? 'on' : ''}">${esc(o.t)}</button>`
+  ).join('') + `</div>`;
+}
+function swatchGroup(id, value) {
+  const colors = ['#ff9a9e','#fecfef','#d6336c','#f6b8d0','#c084fc','#818cf8',
+    '#60a5fa','#34d399','#fbbf24','#fb7185','#a78bfa','#f472b6'];
+  const list = colors.slice();
+  if (value && list.indexOf(value) < 0) list.unshift(value);
+  return `<div class="swatches" data-group="${id}">` + list.map(c =>
+    `<button type="button" class="swatch ${String(c).toLowerCase() === String(value).toLowerCase() ? 'on' : ''}" data-val="${esc(c)}" style="background:${esc(c)}"></button>`
+  ).join('') + `<input class="hexin" id="set-${id}" value="${esc(value || '')}"></div>`;
+}
+function presetKey() {
+  const ks = Object.keys(PRESETS);
+  for (let i = 0; i < ks.length; i++) {
+    if (PRESETS[ks[i]].base && PRESETS[ks[i]].base === CONFIG.apiBase) return ks[i];
+  }
+  return 'custom';
+}
+function groupVal(id) {
+  const el = document.querySelector('#settings [data-group="' + id + '"] .on');
+  return el ? el.dataset.val : '';
+}
+function renderSettings() {
+  const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
+  const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
+  $('#settings').innerHTML = `
+<div class="sg"><label>模型预设</label>${chipGroup('preset', presetKey(), presetOpts)}</div>
+<div class="sg"><label>API 地址</label><input id="set-apibase" value="${esc(CONFIG.apiBase)}"></div>
+<div class="sg"><label>API Key</label>
+  <div class="pin-row">
+    <input id="set-apikey" class="secret" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(CONFIG.apiKey)}">
+    <button type="button" id="btn-paste-key" class="btn-paste">粘贴</button>
+  </div></div>
+<div class="sg"><label>模型</label><input id="set-model" value="${esc(CONFIG.model)}"></div>
+<div class="sg"><label>助手名</label><input id="set-name" value="${esc(CONFIG.assistantName)}"></div>
+<div class="sg"><label>头像（图片 URL 或本地照片）</label><input id="set-avatar" value="${esc(showAvatar)}"></div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-pick-avatar" class="btn-s">上传照片并裁剪</button>
+</div>
+<div class="mini-note">可填写网络图片地址；也可上传本地照片，拖动/缩放后裁成圆形头像。</div>
+<div class="sg"><label>头像取景（竖图才看得出区别）</label>${chipGroup('fit', CONFIG.avatarFit || 'top', [{v:'top',t:'取上部'},{v:'center',t:'居中'},{v:'bottom',t:'取下部'}])}</div>
+<div class="sg"><label>记忆轮数</label><input id="set-turns" type="number" value="${CONFIG.maxContextTurns}"></div>
+
+<div class="sec-title">🔊 语音合成</div>
+<div class="sg" style="margin-top:8px"><label>开启朗读</label>${toggleGroup('tts', CONFIG.ttsEnabled ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>语速</label>
+  <div class="range-row">
+    <input type="range" id="set-tts-rate" min="0.5" max="2" step="0.1" value="${CONFIG.ttsRate}">
+    <span id="tts-rate-l">${CONFIG.ttsRate}x</span>
+  </div></div>
+
+<div class="sec-title">🎵 音乐功能</div>
+<div class="sg" style="margin-top:8px"><label>开启音乐</label>${toggleGroup('music', CONFIG.musicEnabled ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>音质</label>${chipGroup('quality', CONFIG.musicQuality, [{v:'128',t:'128k'},{v:'192',t:'192k'},{v:'320',t:'320k'}])}</div>
+<div class="sg"><label>GD Studio API</label><input id="set-gd-api" value="${esc(CONFIG.gdStudioApi)}"></div>
+<div class="sg"><label>Meting 实例（每行一个）</label>
+  <textarea id="set-meting" style="min-height:90px;font-family:monospace;font-size:11px">${esc(CONFIG.metingInstances)}</textarea></div>
+
+<div class="sec-title">🖼️ 识图模型（可选）</div>
+<div class="mini-note" style="margin-top:8px">对话模型自己能看图时不会用到这里。只在它不支持图片时，先用这里配置的识图模型描述截图，再把描述交给对话模型作答。</div>
+<div class="sg" style="margin-top:8px"><label>识图 API 地址</label><input id="set-vision-base" value="${esc(CONFIG.visionBase || '')}" placeholder="https://.../v1"></div>
+<div class="sg"><label>识图 API Key</label>
+  <div class="pin-row">
+    <input id="set-vision-key" class="secret" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(CONFIG.visionKey || '')}">
+    <button type="button" id="btn-paste-vkey" class="btn-paste">粘贴</button>
+  </div></div>
+<div class="sg"><label>识图模型</label><input id="set-vision-model" value="${esc(CONFIG.visionModel || '')}" placeholder="如 gpt-4o / qwen-vl-max"></div>
+
+<div class="sec-title">🎨 外观</div>
+<div class="sg" style="margin-top:8px"><label>主题色 1</label>${swatchGroup('c1', CONFIG.themeColor1)}</div>
+<div class="sg"><label>主题色 2</label>${swatchGroup('c2', CONFIG.themeColor2)}</div>
+
+<div class="sec-title">📝 系统提示词</div>
+<div class="sg" style="margin-top:8px"><textarea id="set-prompt" style="min-height:140px">${esc(CONFIG.systemPrompt)}</textarea></div>
+
+<div class="acts">
+  <button id="set-save" class="btn-p">保存配置</button>
+  <button id="set-back" class="btn-s">返回对话</button>
+</div>
+
+<div class="sec-title">🔐 权限</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-perm-guide" class="btn-s">打开权限配置引导</button>
+</div>
+<div class="mini-note">之前跳过了引导也没关系，随时可以从这里重新打开，补上悬浮窗/ 通知 / 无障碍等权限。</div>
+
+<div class="sec-title">💾 数据管理</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-export" class="btn-s">导出</button>
+  <button id="btn-import" class="btn-s">导入</button>
+  <button id="btn-copy-backup" class="btn-s">复制</button>
+</div>
+<div class="sg" style="margin-top:8px">
+  <textarea id="backup-code" placeholder="粘贴备份代码或点击导出" style="font-family:monospace;font-size:11px;min-height:70px"></textarea>
+</div>
+<div class="acts">
+  <button id="btn-clear-all" class="btn-s" style="color:#d6336c;border-color:rgba(214,51,108,.35)">清除全部数据</button>
+</div>
+<div style="height:30px"></div>`;
+
+  $('#settings').onclick = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!b) return;
+    const grp = b.closest('[data-group]');
+    if (!grp) return;
+    if (b.classList.contains('swatch')) {
+      Array.from(grp.querySelectorAll('.swatch')).forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      const inp = $('#set-' + grp.dataset.group); if (inp) inp.value = b.dataset.val;
+      return;
+    }
+    if (b.dataset.val === undefined) return;
+    Array.from(grp.children).forEach(x => { if (x.tagName === 'BUTTON') x.classList.remove('on'); });
+    b.classList.add('on');
+    if (grp.dataset.group === 'preset' && b.dataset.val !== 'custom') {
+      const p = PRESETS[b.dataset.val];
+      if (p) { $('#set-apibase').value = p.base; $('#set-model').value = p.model; }
+    }
+  };
+  const rateIn = $('#set-tts-rate');
+  rateIn.oninput = () => { $('#tts-rate-l').textContent = rateIn.value + 'x'; };
+  $('#set-save').onclick = saveSettings;
+  $('#set-back').onclick = () => showView('chat');
+  $('#btn-pick-avatar').onclick = startPickAvatar;
+  const pk = $('#btn-paste-key');
+  if (pk) pk.onclick = () => pasteIntoInput($('#set-apikey'));
+  const pvk = $('#btn-paste-vkey');
+  if (pvk) pvk.onclick = () => pasteIntoInput($('#set-vision-key'));
+  $('#btn-export').onclick = exportData;
+  $('#btn-import').onclick = importData;
+  $('#btn-copy-backup').onclick = () => {
+    const v = $('#backup-code').value.trim();
+    if (!v) return toast('还没有备份码，先点导出吧~');
+    toast(writeClipboard(v) ? '已复制到剪贴板' : '复制失败，请长按文本框手动复制');
+  };
+  $('#btn-clear-all').onclick = clearAll;
+  const pgBtn = $('#btn-perm-guide');
+  if (pgBtn) pgBtn.onclick = () => { showGuide(); };
+}
+
+function saveSettings() {
+  const avIn = $('#set-avatar').value.trim();
+  Object.assign(CONFIG, {
+    apiBase: $('#set-apibase').value.trim(),
+    apiKey: $('#set-apikey').value.trim(),
+    model: $('#set-model').value.trim(),
+    assistantName: $('#set-name').value.trim() || DC.assistantName,
+    maxContextTurns: parseInt($('#set-turns').value, 10) || 10,
+    ttsEnabled: groupVal('tts') === 'true',
+    ttsRate: parseFloat($('#set-tts-rate').value) || 1,
+    musicEnabled: groupVal('music') === 'true',
+    musicQuality: groupVal('quality') || '320',
+    avatarFit: groupVal('fit') || 'top',
+    visionBase: $('#set-vision-base').value.trim(),
+    visionKey: $('#set-vision-key').value.trim(),
+    visionModel: $('#set-vision-model').value.trim(),
+    gdStudioApi: $('#set-gd-api').value.trim() || DC.gdStudioApi,
+    metingInstances: $('#set-meting').value.trim() || DC.metingInstances,
+    themeColor1: $('#set-c1').value || DC.themeColor1,
+    themeColor2: $('#set-c2').value || DC.themeColor2,
+    systemPrompt: $('#set-prompt').value.trim() || DC.systemPrompt
+  });
+  if (avIn && avIn !== AV_LOCAL) CONFIG.avatarUrl = avIn;
+  if (!CONFIG.avatarUrl) CONFIG.avatarUrl = DC.avatarUrl;
+  if (CONFIG.avatarUrl.indexOf('data:') === 0) $('#set-avatar').value = AV_LOCAL;
+  toolsBroken = false;
+  $('#btn-music').hidden = !CONFIG.musicEnabled;
+  if (!CONFIG.musicEnabled && M.audio) M.audio.pause();
+  sSet('via_ai_config', CONFIG);
+  const mem = history.find(m => m.role === 'system' && m.isMemory);
+  history = mem
+    ? [{ role: 'system', content: CONFIG.systemPrompt }, mem]
+    : [{ role: 'system', content: CONFIG.systemPrompt }, ...history.filter(m => m.role !== 'system')];
+  sSet('via_ai_history', history);
+  applyTheme();
+  renderHistory();
+  toast('已保存~');
+  vibrate(20);
+}
+function exportData() {
+  try {
+    const c = Object.assign({}, CONFIG);
+    delete c.apiKey;
+    if (c.avatarUrl && c.avatarUrl.indexOf('data:') === 0) c.avatarUrl = '';
+    const payload = { config: c, history, transCache, favorites, v: 1 };
+    const code = b64e(JSON.stringify(payload));
+    $('#backup-code').value = code;
+    const ok = writeClipboard(code);
+    toast(ok ? '已导出（不含 Key 与本地头像），已复制到剪贴板' : '已导出（不含 Key 与本地头像）');
+  } catch (e) { toast('导出失败：' + errMsg(e)); }
+}
+function importData() {
+  const raw = $('#backup-code').value.trim();
+  if (!raw) return toast('请先粘贴备份代码');
+  let d = null;
+  try { d = JSON.parse(raw); }
+  catch (e) {
+    try { d = JSON.parse(b64d(raw)); }
+    catch (e2) { return toast('导入失败：代码格式无效'); }
+  }
+  if (!d || typeof d !== 'object') return toast('导入失败：内容不是有效对象');
+  try {
+    if (d.config && typeof d.config === 'object') {
+      const safe = {};
+      for (const k in DC) if (k in d.config && typeof d.config[k] === typeof DC[k]) safe[k] = d.config[k];
+      CONFIG = Object.assign(CONFIG, safe);
+      if (!CONFIG.avatarUrl) CONFIG.avatarUrl = DC.avatarUrl;
+      sSet('via_ai_config', CONFIG);
+    }
+    if (Array.isArray(d.history)) {
+      history = d.history.filter(m => m && typeof m === 'object'
+        && typeof m.role === 'string' && typeof m.content === 'string');
+      if (!history.length) history = [{ role: 'system', content: CONFIG.systemPrompt }];
+      sSet('via_ai_history', history);
+    }
+    if (d.transCache && typeof d.transCache === 'object' && !Array.isArray(d.transCache)) {
+      const clean = {};
+      for (const k in d.transCache) if (typeof d.transCache[k] === 'string') clean[k] = d.transCache[k];
+      transCache = clean; sSet('via_ai_trans', transCache);
+    }
+    if (Array.isArray(d.favorites)) {
+      favorites = d.favorites.filter(f => f && typeof f === 'object' && f.id && f.name);
+      sSet('via_ai_favs', favorites);
+    }
+    toast('导入成功，正在重载…');
+    setTimeout(() => location.reload(), 600);
+  } catch (e) { toast('导入失败：' + errMsg(e)); }
+}
+async function clearAll() {
+  if (!(await uiConfirm('将清空对话、记忆、收藏和所有设置，确定吗？', '清空'))) return;
+  try { if (HAS_NATIVE && Android.clearAll) Android.clearAll(); } catch (e) {}
+  try { localStorage.clear(); } catch (e) {}
+  toast('已清除，正在重载…');
+  setTimeout(() => location.reload(), 600);
+}
+
+/* ==========================================================
+ *  视图切换
+ * ========================================================== */
+function showView(v) {
+  const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
+  const settings = $('#settings'), music = $('#music'), mini = $('#mini-player');
+  const attachEl = $('#attach-bar');
+  bodyEl.style.display = 'none';
+  footEl.style.display = 'none';
+  actionsEl.style.display = 'none';
+  if (attachEl) attachEl.style.display = 'none';
+  settings.classList.remove('open');
+  music.classList.remove('open');
+  mini.style.display = v === 'chat' ? '' : 'none';
+  if (v === 'chat') {
+    bodyEl.style.display = 'flex';
+    footEl.style.display = 'flex';
+    actionsEl.style.display = 'flex';
+    if (attachEl) attachEl.style.display = '';
+    bodyEl.scrollTop = bodyEl.scrollHeight;
+    updateMini();
+  } else if (v === 'settings') settings.classList.add('open');
+  else if (v === 'music') music.classList.add('open');
+}
+
+/* ==========================================================
+ *  音乐 UI
+ * ========================================================== */
+function bindMusicUI() {
+  $$('.mtab').forEach(tab => {
+    tab.onclick = () => {
+      $$('.mtab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      M.currentTab = tab.dataset.tab;
+      if (M.currentTab === 'fav') {
+        $('#ms-wrap').style.display = 'none';
+        M.playlist = favorites.slice();
+        renderList(favorites);
+      } else {
+        $('#ms-wrap').style.display = 'flex';
+        renderList(M.playlist);
+      }
+    };
+  });
+  $('#music-back').onclick = () => showView('chat');
+  $('#fav-cnt').textContent = favorites.length;
+
+  const doSearch = async () => {
+    const kw = $('#ms-input').value.trim();
+    if (!kw) return;
+    $('#music-list').innerHTML = '<div class="mload">搜索中♪...</div>';
+    try { renderList(await mSearch(kw)); }
+    catch (e) { $('#music-list').innerHTML = `<div class="mempty">搜索失败：${esc(errMsg(e))}</div>`; }
+  };
+  $('#ms-btn').onclick = doSearch;
+  $('#ms-input').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
+
+  $('#music-player .mp-play').onclick = togglePlay;
+  $('#music-player .mp-prev').onclick = playPrev;
+  $('#music-player .mp-next').onclick = playNext;
+
+  const progEl = $('#mp-progress');
+  let progDrag = false;
+  const seekTo = (clientX) => {
+    if (!M.audio || !M.audio.duration || isNaN(M.audio.duration)) return;
+    const r = progEl.getBoundingClientRect();
+    const p = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    M.audio.currentTime = p * M.audio.duration;
+    updateProgress();
+  };
+  progEl.addEventListener('touchstart', e => { progDrag = true; seekTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
+  progEl.addEventListener('touchmove', e => { if (progDrag) { seekTo(e.touches[0].clientX); e.preventDefault(); } }, { passive: false });
+  progEl.addEventListener('touchend', () => { progDrag = false; });
+  progEl.addEventListener('mousedown', e => { progDrag = true; seekTo(e.clientX); e.preventDefault(); });
+  document.addEventListener('mousemove', e => { if (progDrag) seekTo(e.clientX); });
+  document.addEventListener('mouseup', () => { progDrag = false; });
+
+  $('#music-lyric').onclick = () => { updateLyricModal(); $('#lyric-modal').classList.add('open'); };
+  $('#lyric-modal').onclick = (e) => {
+    if (e.target === $('#lyric-modal') || e.target.classList.contains('lyric-close')) {
+      $('#lyric-modal').classList.remove('open');
+    }
+  };
+
+  // 迷你播放器始终属于聊天布局；点标题才进入完整歌曲面板。
+  const mini = $('#mini-player');
+  mini.querySelector('.mini-play').onclick = () => { M.miniHidden = false; togglePlay(); };
+  mini.querySelector('.mini-close').onclick = () => { M.miniHidden = true; mini.classList.remove('show'); };
+  mini.querySelector('.mini-info').onclick = () => showView('music');
+}
+
+/* ==========================================================
+ *  顶栏按钮
+ * ========================================================== */
+function bindHeader() {
+  $('#btn-set').onclick = () => showView('settings');
+  $('#btn-music').onclick = () => { M.currentTab = 'search'; renderList(M.playlist); showView('music'); };
+  $('#btn-close').onclick = () => {
+    if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
+  };
+  $('#btn-min').onclick = () => {
+    try { if (HAS_NATIVE && Android.minimizeToBubble) Android.minimizeToBubble(); } catch (e) {}
+  };
+  $('#btn-clr').onclick = async () => {
+    if (!(await uiConfirm('清空所有对话和记忆？', '清空'))) return;
+    history = [{ role: 'system', content: CONFIG.systemPrompt }];
+    sSet('via_ai_history', history);
+    renderHistory();
+    toast('已清空');
+  };
+  $('#btn-sum').onclick = async () => {
+    const non = history.filter(m => m.role !== 'system');
+    if (non.length < 4) return toast('对话太短，再聊几句吧~');
+    if (!(await uiConfirm('总结为长期记忆，并清空对话？', '总结'))) return;
+    if (sending) return;
+    sending = true;
+    const ld = addTyping();
+    try {
+      const om = history.find(m => m.role === 'system' && m.isMemory);
+      let p = CONFIG.summaryPrompt;
+      if (om) p += '\n\n【已有记忆】\n' + String(om.content).replace('【长期记忆总结】：', '');
+      p += '\n\n【对话】\n' + non.map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content}`).join('\n');
+      const s = await chatReq([{ role: 'user', content: p }], true);
+      ld.remove();
+      history = [
+        { role: 'system', content: CONFIG.systemPrompt },
+        { role: 'system', content: '【长期记忆总结】：' + s, isMemory: true }
+      ];
+      sSet('via_ai_history', history);
+      renderHistory();
+      toast('记忆已保存~');
+    } catch (e) {
+      ld.remove();
+      addMsg('assistant', '失败：' + errMsg(e));
+    }
+    sending = false;
+  };
+}
+
+/* ==========================================================
+ *  输入区
+ * ========================================================== */
+function bindInput() {
+  const inputEl = $('#input');
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
+  });
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  $('#send').onclick = send;
+  $('#btn-plus').onclick = () => $('#plus-modal').classList.add('open');
+  $('#plus-image').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('image'); };
+  $('#plus-file').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('file'); };
+  $('#plus-cancel').onclick = () => $('#plus-modal').classList.remove('open');
+  $('#plus-modal').onclick = (e) => { if (e.target === $('#plus-modal')) $('#plus-modal').classList.remove('open'); };
+  $('#attach-del').onclick = clearAttachment;
+}
+
+/* ==========================================================
+ *  拖拽（Android 侧 WindowManager 移动）
+ * ========================================================== */
+function bindDrag() {
+  const headEl = $('#head');
+  let lastX = 0, lastY = 0, isDown = false;
+
+  const start = (x, y) => {
+    if (!HAS_PERM || !Perm.moveWindow) return;
+    isDown = true; lastX = x; lastY = y;
+  };
+  const move = (x, y) => {
+    if (!isDown) return;
+    const dx = x - lastX, dy = y - lastY;
+    lastX = x; lastY = y;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    // screenX 是 css px，原生 moveBy 要物理 px
+    const d = window.devicePixelRatio || 1;
+    try { Perm.moveWindow(Math.round(dx * d), Math.round(dy * d)); } catch (e) {}
+  };
+  const end = () => { isDown = false; };
+
+  headEl.addEventListener('touchstart', e => {
+    if (e.target.closest('button')) return;
+    const t = e.touches[0];
+    start(t.screenX, t.screenY);
+  }, { passive: true });
+  headEl.addEventListener('touchmove', e => {
+    if (!isDown) return;
+    const t = e.touches[0];
+    move(t.screenX, t.screenY);
+    e.preventDefault();
+  }, { passive: false });
+  headEl.addEventListener('touchend', end);
+  headEl.addEventListener('touchcancel', end);
+
+  headEl.addEventListener('mousedown', e => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    start(e.screenX, e.screenY);
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => { if (isDown) move(e.screenX, e.screenY); });
+  document.addEventListener('mouseup', end);
+}
+
+/* ==========================================================
+ *  权限引导
+ * ========================================================== */
+const PERM_ITEMS = [
+  { id: 'overlay', name: '悬浮窗权限', required: true,
+    desc: '必需。没有它，爱莉希雅就只能缩在 App 里，没法浮在桌面上陪你。',
+    check: () => (HAS_PERM && Perm.hasOverlay) ? Perm.hasOverlay() : false,
+    request: () => { if (HAS_PERM && Perm.requestOverlay) Perm.requestOverlay(); },
+    wait: 800 },
+  { id: 'notification', name: '通知权限', required: true,
+    desc: 'Android 13+ 需要它，浮窗才能稳定常驻，不被系统清掉。',
+    check: () => (HAS_PERM && Perm.hasNotification) ? Perm.hasNotification() : true,
+    request: () => { if (HAS_PERM && Perm.requestNotification) Perm.requestNotification(); },
+    wait: 500 },
+  { id: 'accessibility', name: '无障碍权限', required: false,
+    desc: '可选但强烈推荐。开启后能读取屏幕内容，帮你翻译、总结当前页面。',
+    check: () => (HAS_PERM && Perm.hasAccessibility) ? Perm.hasAccessibility() : false,
+    request: () => { if (HAS_PERM && Perm.requestAccessibility) Perm.requestAccessibility(); },
+    wait: 800 },
+  { id: 'battery', name: '后台保活', required: false,
+    desc: '可选。加入电池优化白名单，浮窗不会被系统杀掉。',
+    check: () => (HAS_PERM && Perm.isIgnoringBattery) ? Perm.isIgnoringBattery() : false,
+    request: () => { if (HAS_PERM && Perm.requestIgnoreBattery) Perm.requestIgnoreBattery(); },
+    wait: 800 }
+];
+const permState = {};
+
+function renderGuideSteps() {
+  const box = $('#guide-steps');
+  box.innerHTML = PERM_ITEMS.map(item => {
+    const ok = !!permState[item.id];
+    const cls = ok ? 'ok' : (item.required ? 'need' : '');
+    const badge = ok ? '已完成' : (item.required ? '必需' : '推荐');
+    const btn = ok
+      ? `<button class="step-btn ghost" data-perm="${item.id}">重新授权</button>`
+      : `<button class="step-btn" data-perm="${item.id}">去授权</button>`;
+    const icon = ok ? '✓' : '!';
+    return `<div class="step ${cls}" data-step="${item.id}">
+      <div class="step-icon">${icon}</div>
+      <div class="step-body">
+        <div class="step-name">${esc(item.name)}<span class="step-badge">${badge}</span></div>
+        <div class="step-desc">${esc(item.desc)}</div>
+        ${btn}
+      </div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.step-btn').forEach(b => {
+    b.onclick = () => {
+      const item = PERM_ITEMS.find(x => x.id === b.dataset.perm);
+      if (!item) return;
+      item.request();
+      setTimeout(refreshPermState, item.wait);
+      setTimeout(refreshPermState, 1500);
+      vibrate(15);
+    };
+  });
+  updateGuideNext();
+}
+function refreshPermState() {
+  let changed = false;
+  PERM_ITEMS.forEach(item => {
+    let v = false;
+    try { v = !!item.check(); } catch (e) { v = false; }
+    if (permState[item.id] !== v) { permState[item.id] = v; changed = true; }
+  });
+  if (changed) renderGuideSteps();
+}
+function updateGuideNext() {
+  const allRequiredOk = PERM_ITEMS.filter(i => i.required).every(i => permState[i.id]);
+  const btn = $('#guide-next');
+  btn.disabled = !allRequiredOk;
+  btn.textContent = allRequiredOk ? '开始使用 ♪' : '还有必需权限未开启';
+}
+function showGuide() {
+  $('#guide').classList.add('show');
+  const av = $('#guide-avatar');
+  av.src = CONFIG.avatarUrl || FALLBACK_AVATAR;
+  av.onerror = function () { this.onerror = null; this.src = FALLBACK_AVATAR; };
+  refreshPermState();
+  renderGuideSteps();
+}
+function hideGuide() {
+  $('#guide').classList.remove('show');
+  if (HAS_PERM && Perm.setGuideDone) try { Perm.setGuideDone(); } catch (e) {}
+}
+function bindGuide() {
+  $('#guide-next').onclick = () => {
+    if ($('#guide-next').disabled) return;
+    hideGuide();
+    toast('准备完成，交给我吧~ ♪');
+  };
+  $('#guide-skip').onclick = () => {
+    const missing = PERM_ITEMS.filter(i => i.required && !permState[i.id]);
+    if (missing.length) {
+      toast('还有必需权限没开哦\n' + missing.map(m => '· ' + m.name).join('\n'));
+      return;
+    }
+    hideGuide();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshPermState();
+  });
+  setInterval(() => {
+    if ($('#guide').classList.contains('show')) refreshPermState();
+  }, 2000);
+
+  let guideDone = false;
+  if (HAS_PERM && Perm.isGuideDone) {
+    try { guideDone = Perm.isGuideDone(); } catch (e) {}
+  }
+  setTimeout(() => {
+    refreshPermState();
+    const missing = PERM_ITEMS.filter(i => i.required && !permState[i.id]);
+    if (!guideDone || missing.length) showGuide();
+  }, 400);
+}
+
+/* ==========================================================
+ *  原生 → JS 接口
+ * ========================================================== */
+window.EllyAPI = {
+  openSettings() { showView('settings'); },
+  openMusic() { M.currentTab = 'search'; renderList(M.playlist); showView('music'); },
+  onShow() {},
+  onHide() {}
+};
+
+/* ==========================================================
+ *  启动
+ * ========================================================== */
+function boot() {
+  // 内置头像 → 原始外链
+  if (CONFIG.avatarUrl === OLD_LOCAL_AVATAR) {
+    CONFIG.avatarUrl = DC.avatarUrl;
+    sSet('via_ai_config', CONFIG);
+  }
+  applyTheme();
+  renderActions();
+  renderSettings();
+  renderHistory();
+  bindHeader();
+  bindInput();
+  bindMusicUI();
+  bindDrag();
+  bindGuide();
+  bindModal();
+  bindCrop();
+  bindResize();
+  initZoom();
+
+  $('#btn-music').hidden = !CONFIG.musicEnabled;
+  $('#fav-cnt').textContent = favorites.length;
+
+  console.log('[Elly] 就绪 ♪');
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else boot();
+
+})();
+</script>
+</body>
+</html>

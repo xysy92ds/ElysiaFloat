@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">爱莉希雅</string>
+    <string name="acc_label">爱莉希雅读屏</string>
+    <string name="acc_desc">爱莉希雅需要读取屏幕内容来帮你翻译和总结当前页面。所有内容仅在本地处理，不会上传。</string>
+</resources>
