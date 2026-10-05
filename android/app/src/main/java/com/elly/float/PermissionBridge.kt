@@ -114,6 +114,26 @@ class PermissionBridge(private val ctx: Context) {
         EllyAccessibilityService.instance?.guessBrowserUrl() ?: ""
     } catch (e: Exception) { "" }
 
+    /**
+     * 「文字 + 坐标」一次性拿走，屏幕翻译原位覆盖就靠它。
+     * 返回 JSON 数组：[{t,x,y,w,h}]，单位屏幕物理像素；拿不到返回 []。
+     */
+    @JavascriptInterface
+    fun getScreenNodes(): String = try {
+        EllyAccessibilityService.instance?.dumpScreenNodes() ?: "[]"
+    } catch (e: Exception) { "[]" }
+
+    /** 屏幕物理像素尺寸（覆盖层定位用）。 */
+    @JavascriptInterface
+    fun getScreenSize(): String = try {
+        val dm = ctx.resources.displayMetrics
+        org.json.JSONObject().apply {
+            put("w", dm.widthPixels)
+            put("h", dm.heightPixels)
+            put("density", dm.density.toDouble())
+        }.toString()
+    } catch (e: Exception) { "{}" }
+
     /* ---------- 截屏 ---------- */
     @JavascriptInterface
     fun canScreenshot(): Boolean = try {

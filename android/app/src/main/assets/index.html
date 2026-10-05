@@ -202,8 +202,32 @@ input.secret.reveal{-webkit-text-security:none}
   color:var(--text);margin:10px 0}
 .mem-switch input{width:16px;height:16px;accent-color:var(--c1)}
 
+/* ===== 屏幕翻译 ===== */
+#trans{display:none;flex-direction:column;flex:1;overflow:hidden;background:#fff5f7}
+#trans.open{display:flex}
+.ttop{display:flex;align-items:center;gap:6px;padding:8px 12px;
+  background:#fff5f7;border-bottom:1px solid rgba(255,154,158,.15);flex-shrink:0}
+.ttop .grow{flex:1}
+.tmeta{padding:6px 12px;font-size:11px;color:var(--muted);flex-shrink:0;
+  background:#fff5f7;border-bottom:1px solid rgba(255,154,158,.1)}
+.tmeta b{color:var(--accent);font-weight:600}
+#trans-list{flex:1;overflow-y:auto;padding:8px;-webkit-overflow-scrolling:touch}
+#trans-list::-webkit-scrollbar{width:4px}
+#trans-list::-webkit-scrollbar-thumb{background:var(--c1);border-radius:4px}
+.tcard{background:var(--card);border:1px solid rgba(255,154,158,.22);
+  border-radius:12px;padding:8px 10px;margin-bottom:7px}
+.ttsrc{font-size:11px;color:var(--muted);line-height:1.45;word-break:break-word;
+  text-decoration:underline;text-decoration-color:#d6336c;
+  text-decoration-thickness:1px;text-underline-offset:2px}
+.ttdst{font-size:13px;color:#d6336c;line-height:1.5;margin-top:4px;
+  word-break:break-word;user-select:text}
+.ttok{color:#2e9e5b}
+.tterr{color:#d6336c}
+#trans-empty{padding:40px 24px;text-align:center;color:var(--muted);
+  font-size:13px;line-height:1.7}
+
 #music{display:none;flex-direction:column;flex:1;overflow:hidden;
-  background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%)
+  background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%)}
 #music.open{display:flex}
 .mtop{display:flex;align-items:center;gap:8px;padding:8px 12px;
   background:#fff5f7;border-bottom:1px solid rgba(255,154,158,.15);flex-shrink:0}
@@ -424,7 +448,7 @@ input.secret.reveal{-webkit-text-security:none}
     <button id="btn-set">设置</button>
     <button id="btn-mem">记忆</button>
     <button id="btn-clr">清空</button>
-    <button id="btn-min" title="缩成小球">－</button>
+    <button id="btn-min" title="收成悬浮小窗">－</button>
     <button id="btn-close">×</button>
   </div>
 
@@ -479,6 +503,18 @@ input.secret.reveal{-webkit-text-security:none}
   </div>
 
   <div id="mem-edit" class="mem-edit"></div>
+
+  <div id="trans">
+    <div class="ttop">
+      <button class="mback" id="trans-back">← 返回对话</button>
+      <span class="grow"></span>
+      <button class="mback" id="trans-pin">贴到屏幕上</button>
+      <button class="mback" id="trans-copy">复制译文</button>
+      <button class="mback" id="trans-redo">重翻</button>
+    </div>
+    <div class="tmeta" id="trans-meta"></div>
+    <div id="trans-list"></div>
+  </div>
 
   <div id="music">
     <div class="mtop">
@@ -1046,6 +1082,11 @@ const DC = {
   visionKey: '',
   visionModel: '',
   gdStudioApi: 'https://music-api.gdstudio.xyz/api.php',
+  /* 屏幕翻译 */
+  transEngine: 'free',        // free = 微软免费；ai = 你的对话模型（耗 Token）
+  transMode: 'translated',    // translated = 仅译文（贴原位置）；bilingual = 双语（粉色下划线 + 译文小牌）
+  transAutoCapsule: true,     // 点完自动收成小胶囊，不挡屏幕
+  transSkipChinese: true,     // 已经是中文的段落不再翻（省免费额度 / Token）
   metingInstances: 'https://meting.mikus.ink\nhttps://meting-api-omega.vercel.app\nhttps://meting-dd.2333332.xyz/api',
   themeColor1: '#ff9a9e',
   themeColor2: '#fecfef',
@@ -1950,22 +1991,304 @@ let pendingShotImage = '';
 /* ==========================================================
  *  微软翻译
  * ========================================================== */
+/* ==========================================================
+ *  屏幕翻译
+ *  文字来源：无障碍节点树（自带精确坐标）→ 不需要任何 OCR
+ *  引擎：free = 微软免费 / ai = 自己的对话模型
+ *  显示：translated = 仅译文（盖掉原文）/ bilingual = 双语（粉下划线 + 译文小牌）
+ * ========================================================== */
+const TRANS = {
+  busy: false, items: [], engine: 'free', note: '',
+  pending: 'chat', pinned: false, source: ''
+};
+
+/* ---- 一句话要不要翻 ---- */
+function transHasWord(s) {
+  return /[A-Za-z\u00c0-\u024f\u0370-\u03ff\u0400-\u04ff\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]/.test(s);
+}
+function transIsChinese(s) {
+  const cjk = (s.match(/[\u4e00-\u9fff]/g) || []).length;
+  const all = (s.match(/[A-Za-z\u00c0-\u024f\u0370-\u03ff\u0400-\u04ff\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]/g) || []).length;
+  return all > 0 && cjk / all > 0.5;
+}
+function transNeed(s) {
+  const t = String(s == null ? '' : s).trim();
+  if (t.length < 2 || t.length > 1200) return false;
+  if (!transHasWord(t)) return false;                              // 纯数字 / 符号 / emoji
+  if (CONFIG.transSkipChinese !== false && transIsChinese(t)) return false;
+  return true;
+}
+
+/* ---- 译文缓存（带上限，别把本地存储撞爆） ---- */
+function transCachePut(k, v) {
+  transCache[k] = v;
+  const ks = Object.keys(transCache);
+  if (ks.length > 1200) {
+    for (let i = 0; i < ks.length - 900; i++) delete transCache[ks[i]];
+  }
+  sSet('via_ai_trans', transCache);
+}
+
 async function transGoogle(text) {
   if (transCache[text]) return transCache[text];
   const url = 'https://edge.microsoft.com/translate/translatetext?from=&to=zh-Hans&isEnterpriseClient=false';
   const headers = { 'Content-Type': 'application/json' };
   const body = JSON.stringify([text]);
   const r = await nativeReq('POST', url, headers, body, 12000);
-  const d = JSON.parse(r.text);
+  let d = JSON.parse(r.text);
+  // 这个接口对 [x] 有时回 [{translations:[...]}]，有时回 [[{translations:[...]}]]，两种都吃
+  if (Array.isArray(d) && d.length === 1 && Array.isArray(d[0])) d = d[0];
   const t = d[0] && d[0].translations && d[0].translations[0] && d[0].translations[0].text
     ? d[0].translations[0].text : d[0];
   if (t && typeof t === 'string') {
-    transCache[text] = t;
-    sSet('via_ai_trans', transCache);
+    transCachePut(text, t);
     return t;
   }
   throw new Error('无译文');
 }
+
+/** 一次翻一组，返回同长的数组（顺序一定对齐）。 */
+async function transFreeMany(texts) {
+  return await pMap(texts, async (t) => {
+    try { return await transGoogle(t); } catch (e) { return t; }
+  }, 4);
+}
+
+/** 把一批文字打包成 JSON 数组丢给对话模型，让它只回一个 JSON 数组。 */
+async function transAI(texts) {
+  if (!CONFIG.apiKey) throw new Error('未配置 API Key');
+  const base = String(CONFIG.apiBase || '').replace(/\/+$/, '');
+  const prompt = '把下面这个 JSON 数组里的每一条翻译成简体中文。'
+    + '必须只返回一个同样长度、同样顺序的 JSON 字符串数组，不要解释、不要加 ``` 代码块标记。'
+    + '已经是中文的条目原样返回。\n' + JSON.stringify(texts);
+  const r = await nativeReq('POST', base + '/chat/completions',
+    { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.apiKey },
+    JSON.stringify({
+      model: CONFIG.model, temperature: 0.1, stream: false,
+      messages: [{ role: 'user', content: prompt }]
+    }), 60000);
+  let txt = '';
+  try { txt = JSON.parse(r.text).choices[0].message.content || ''; } catch (e) { throw new Error('AI 返回的不是合法 JSON'); }
+  txt = String(txt).replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+  const a = txt.indexOf('['), b = txt.lastIndexOf(']');
+  if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
+  let arr;
+  try { arr = JSON.parse(txt); } catch (e) { throw new Error('AI 没按格式返回数组'); }
+  if (!Array.isArray(arr)) throw new Error('AI 没按格式返回数组');
+  return texts.map((t, i) => (typeof arr[i] === 'string' && arr[i]) ? arr[i] : t);
+}
+
+/** 按当前引擎翻一组（带缓存）。 */
+async function transBatch(list) {
+  const need = list.filter(t => transCache[t] === undefined);
+  if (need.length) {
+    let got;
+    if (CONFIG.transEngine === 'ai') {
+      got = await transAI(need);
+    } else {
+      got = await transFreeMany(need);
+    }
+    for (let i = 0; i < need.length; i++) {
+      if (got[i] && got[i] !== need[i]) transCachePut(need[i], got[i]);
+      else if (got[i] !== undefined) transCachePut(need[i], got[i]);
+    }
+  }
+  return list.map(t => (transCache[t] === undefined ? t : transCache[t]));
+}
+
+/* ---- 从无障碍节点树做成待翻清单（带坐标） ---- */
+function transItemsFromNodes(nodes) {
+  const out = [];
+  const seen = [];
+  for (let i = 0; i < nodes.length && out.length < 150; i++) {
+    const n = nodes[i];
+    if (!n || !transNeed(n.t)) continue;
+    const x = parseInt(n.x, 10), y = parseInt(n.y, 10);
+    const w = parseInt(n.w, 10), h = parseInt(n.h, 10);
+    if (!(w > 6 && h > 6) || w > 4000 || h > 600) continue;
+    // 同一段文字的父子节点会重复出现，只留最外层那个
+    let dup = false;
+    for (let j = 0; j < seen.length; j++) {
+      const s = seen[j];
+      if (s.t !== n.t) continue;
+      const inside = (x >= s.x && y >= s.y && x + w <= s.x + s.w && y + h <= s.y + s.h);
+      const outside = (x <= s.x && y <= s.y && x + w >= s.x + s.w && y + h >= s.y + s.h);
+      if (inside || outside) { dup = true; break; }
+    }
+    if (dup) continue;
+    seen.push({ t: n.t, x: x, y: y, w: w, h: h });
+    out.push({ src: n.t, dst: '', x: x, y: y, w: w, h: h });
+  }
+  return out;
+}
+
+/* ---- 拿不到节点树时的退化路径：只有文字、没有坐标 ---- */
+function transItemsFromText() {
+  const txt = readScreen();
+  if (!txt) return [];
+  const out = [];
+  const seen = {};
+  const lines = txt.split('\n');
+  for (let i = 0; i < lines.length && out.length < 90; i++) {
+    const t = String(lines[i]).trim();
+    if (!transNeed(t) || seen[t]) continue;
+    seen[t] = 1;
+    out.push({ src: t, dst: '', x: null, y: null, w: null, h: null });
+  }
+  return out;
+}
+
+/** 读当前屏幕 → 收集 → 翻译 → 渲染到「屏幕翻译」页。 */
+async function doTranslateScreen() {
+  if (TRANS.busy) { toast('正在翻译中，稍等一下嘛~'); return; }
+
+  const useCapsule = capsuleOn('正在读屏幕…');
+  TRANS.busy = true;
+  TRANS.pending = 'translate';
+
+  try {
+    let nodes = [];
+    if (HAS_PERM && Perm.getScreenNodes) {
+      try { nodes = JSON.parse(Perm.getScreenNodes() || '[]') || []; } catch (e) { nodes = []; }
+    }
+
+    let items = transItemsFromNodes(nodes);
+    TRANS.source = items.length ? 'nodes' : 'text';
+    if (!items.length) items = transItemsFromText();
+
+    if (!items.length) {
+      TRANS.items = [];
+      TRANS.note = '没读到可翻译的文字';
+      TRANS.engine = CONFIG.transEngine;
+      renderTrans();
+      prepareResult('翻译屏幕', useCapsule);
+      return;
+    }
+
+    const uniq = [];
+    for (let i = 0; i < items.length; i++) if (uniq.indexOf(items[i].src) < 0) uniq.push(items[i].src);
+
+    const batches = [];
+    for (let i = 0; i < uniq.length; i += 20) batches.push(uniq.slice(i, i + 20));
+
+    if (useCapsule && HAS_NATIVE && Android.capsuleState) {
+      try { Android.capsuleState('正在翻译 ' + uniq.length + ' 段…', 'busy'); } catch (e) {}
+    }
+
+    const results = await pMap(batches, async (b) => {
+      try { return await transBatch(b); } catch (e) { return null; }
+    }, 2);
+
+    let failedBatches = 0;
+    const fixed = {};
+    for (let i = 0; i < batches.length; i++) {
+      const r = results[i];
+      if (!r) { failedBatches++; continue; }
+      for (let j = 0; j < batches[i].length; j++) fixed[batches[i][j]] = r[j];
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const t = fixed[items[i].src];
+      items[i].dst = (t === undefined || t === null) ? '' : t;
+    }
+    const okCount = items.filter(x => x.dst && x.dst !== x.src).length;
+    if (!okCount) throw new Error(failedBatches ? '翻译接口全部失败，检查一下网络？' : '什么都没翻出来');
+
+    TRANS.items = items;
+    TRANS.engine = CONFIG.transEngine;
+    TRANS.note = (failedBatches ? '有 ' + failedBatches + ' 组失败 · ' : '')
+      + (TRANS.source === 'nodes' ? '带坐标，可以贴到屏幕上' : '没拿到坐标，只能在这里看');
+    renderTrans();
+    prepareResult('翻译好了 ♪ 点我看结果', useCapsule);
+  } catch (e) {
+    TRANS.items = [];
+    TRANS.note = '翻译失败：' + errMsg(e);
+    renderTrans();
+    prepareResult('翻译失败啦', useCapsule);
+    toast('翻译失败：' + errMsg(e));
+  } finally {
+    TRANS.busy = false;
+  }
+}
+
+/** 处理完了：如果确实收成了胶囊就亮红点；否则窗口本来就开着，直接展示。 */
+function prepareResult(capsuleText, useCapsule) {
+  if (useCapsule && capsuleFinish(capsuleText)) return;
+  showView(TRANS.pending || 'chat');
+}
+
+function capsuleOn(text) {
+  if (!HAS_NATIVE || !Android.toCapsule) return false;
+  if (CONFIG.transAutoCapsule === false) return false;
+  try { Android.toCapsule(text || '正在处理…'); return true; } catch (e) { return false; }
+}
+function capsuleFinish(text) {
+  if (!HAS_NATIVE || !Android.capsuleDone) return false;
+  try { return !!Android.capsuleDone(text || '好啦~'); } catch (e) { return false; }
+}
+
+/* ---- 渲染「屏幕翻译」页 ---- */
+function renderTrans() {
+  const list = $('#trans-list');
+  if (!list) return;
+  if (!TRANS.items.length) {
+    list.innerHTML = '<div id="trans-empty">这次没读到可翻译的文字…<br>'
+      + '确认一下无障碍服务开着，或者换个页面再试试？</div>';
+  } else {
+    list.innerHTML = TRANS.items.map(it =>
+      '<div class="tcard">'
+      + '<div class="ttsrc">' + esc(it.src) + '</div>'
+      + '<div class="ttdst">' + esc(it.dst || '（这段没翻出来）') + '</div>'
+      + '</div>').join('');
+  }
+  const ok = TRANS.items.filter(x => x.dst && x.dst !== x.src).length;
+  const meta = $('#trans-meta');
+  if (meta) {
+    meta.innerHTML = '引擎 <b>' + (TRANS.engine === 'ai' ? 'AI' : '微软免费') + '</b> · '
+      + '方式 <b>' + (CONFIG.transMode === 'bilingual' ? '双语' : '仅译文') + '</b> · '
+      + '共 <b>' + TRANS.items.length + '</b> 段，翻出 <b>' + ok + '</b> 段'
+      + (TRANS.note ? '<br>' + esc(TRANS.note) : '');
+  }
+}
+
+/* ---- 把译文贴到屏幕上（原位覆盖） ---- */
+function pinTransToScreen() {
+  const items = TRANS.items.filter(it => it.x !== null && it.x !== undefined && it.dst && it.dst !== it.src);
+  if (!items.length) { toast('还没有可以贴的译文哦~'); return; }
+  if (!HAS_NATIVE || !Android.showTranslateOverlay) { toast('只有 App 里才能贴到屏幕上~'); return; }
+  try {
+    Android.showTranslateOverlay(JSON.stringify({
+      mode: CONFIG.transMode === 'bilingual' ? 'bilingual' : 'translated',
+      items: items.map(it => ({ x: it.x, y: it.y, w: it.w, h: it.h, t: it.dst }))
+    }));
+  } catch (e) { toast('贴上去失败了：' + errMsg(e)); return; }
+  TRANS.pinned = true;
+  if (HAS_NATIVE && Android.toCapsule && CONFIG.transAutoCapsule !== false) {
+    try { Android.toCapsule('译文已贴上 · 点我还原'); } catch (e) {}
+  }
+  toast('译文贴上去了~ 点「还原屏幕」可以撤掉');
+}
+
+function bindTransUI() {
+  $('#trans-back').onclick = () => { showView('chat'); };
+  $('#trans-pin').onclick = pinTransToScreen;
+  $('#trans-redo').onclick = () => { doTranslateScreen(); };
+  $('#trans-copy').onclick = () => {
+    const txt = TRANS.items.filter(x => x.dst && x.dst !== x.src)
+      .map(x => x.src + '\n' + x.dst).join('\n\n');
+    if (!txt) { toast('还没有译文哦~'); return; }
+    if (writeClipboard(txt)) toast('译文已经复制啦~'); else toast('复制失败，长按文字试试~');
+  };
+}
+
+window.__capsuleClick = function () {
+  if (TRANS.pinned && HAS_NATIVE && Android.hideTranslateOverlay) {
+    try { Android.hideTranslateOverlay(); } catch (e) {}
+    TRANS.pinned = false;
+  }
+  showView(TRANS.pending || 'chat');
+};
+window.__transOverlayClosed = function () { TRANS.pinned = false; };
 
 function splitChunks(text, limit) {
   const paras = String(text).split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
@@ -2812,8 +3135,8 @@ async function send() {
 async function handleQuickAction(key) {
   if (sending) { toast('正在思考中，稍等一下嘛~'); return; }
 
-  // 翻译屏幕
-  if (key === 'trans_screen') return await translateScreen();
+  // 翻译屏幕走自己的路：直接读节点树，发到「屏幕翻译」页，不进对话历史。
+  if (key === 'trans_screen') return await doTranslateScreen();
 
   let prompt = '', label = '';
   if (key === 'sum_screen') { label = '总结屏幕'; prompt = '请总结以下内容的核心要点：'; }
@@ -2828,6 +3151,9 @@ async function handleQuickAction(key) {
     return;
   }
 
+  // 先把浮窗收成小胶囊：屏幕不被挡，她也能看到干净画面。
+  const useCapsule = capsuleOn(label + '中…');
+
   sending = true; $('#send').disabled = true;
   addMsg('user', `【${label}】`);
   const ld = addTyping();
@@ -2838,53 +3164,13 @@ async function handleQuickAction(key) {
     history.push({ role: 'user', content: `【${label}】` });
     history.push({ role: 'assistant', content: r });
     saveHistory();
+    TRANS.pending = 'chat';
+    prepareResult(label + '好了 ♪ 点我看结果', useCapsule);
   } catch (e) {
     ld.remove();
     addMsg('assistant', '错误：' + errMsg(e));
-  }
-  sending = false; $('#send').disabled = false;
-}
-
-async function translateScreen() {
-  let text = readScreen();
-  let fromClip = false;
-  if (!text) { text = readClipboard(); fromClip = true; }
-  if (!text) {
-    toast('读不到内容呀~\n请在引导里开启无障碍，或先复制一段文字');
-    return;
-  }
-  const url = currentPageUrl();
-  const chunks = splitChunks(text, 800);
-
-  sending = true; $('#send').disabled = true;
-  addMsg('user', `【翻译${fromClip ? '剪贴板' : '屏幕'}】${url ? '\n' + url : ''}`);
-  const ld = addTyping();
-  try {
-    const translated = await pMap(chunks, async (c) => {
-      try { return await transGoogle(c); } catch (e) { return null; }
-    }, 3);
-
-    ld.remove();
-    const okCount = translated.filter(Boolean).length;
-    if (!okCount) throw new Error('翻译接口全部失败，请检查网络');
-
-    const joined = chunks.map((c, i) =>
-      `【原文】\n${c}\n\n【译文】\n${translated[i] || '（本条失败）'}`
-    ).join('\n\n———\n\n');
-
-    addMsg('assistant', joined);
-    history.push({ role: 'user', content: `【翻译${fromClip ? '剪贴板' : '屏幕'}】` });
-    history.push({ role: 'assistant', content: joined });
-    saveHistory();
-
-    // 顺手写回剪贴板
-    const onlyTrans = translated.filter(Boolean).join('\n\n');
-    if (onlyTrans && writeClipboard(onlyTrans)) {
-      toast('译文已复制到剪贴板~');
-    }
-  } catch (e) {
-    ld.remove();
-    addMsg('assistant', '翻译失败：' + errMsg(e));
+    TRANS.pending = 'chat';
+    prepareResult(label + '失败了', useCapsule);
   }
   sending = false; $('#send').disabled = false;
 }
@@ -2983,6 +3269,14 @@ function renderSettings() {
   </div></div>
 <div class="sg"><label>向量模型</label><input id="set-vec-model" value="${esc(MEMCFG.vecModel || '')}" placeholder="如 text-embedding-3-small / bge-m3"></div>
 
+<div class="sec-title">🔎 屏幕翻译</div>
+<div class="mini-note" style="margin-top:8px">点「翻译屏幕」后，她会先把浮窗收成小胶囊（不挡屏幕），读完屏幕上的文字再翻。文字和坐标都是从无障碍节点树里直接拿的，不需要额外 OCR。</div>
+<div class="sg" style="margin-top:8px"><label>翻译引擎</label>${toggleGroup('transEngine', CONFIG.transEngine || 'free', [{v:'free',t:'微软免费'},{v:'ai',t:'AI（耗Token）'}])}</div>
+<div class="sg"><label>翻译方式</label>${toggleGroup('transMode', CONFIG.transMode || 'translated', [{v:'translated',t:'仅译文'},{v:'bilingual',t:'双语'}])}</div>
+<div class="mini-note">仅译文：用粉色把原文盖掉，整页直接变成中文。双语：原文不动，只给它加一条粉色下划线，译文用小粉牌贴在下面。</div>
+<div class="sg"><label>点完自动收成小胶囊</label>${toggleGroup('transCap', CONFIG.transAutoCapsule === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>跳过已经是中文的段落</label>${toggleGroup('transSkip', CONFIG.transSkipChinese === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+
 <div class="sec-title">🎨 外观</div>
 <div class="sg" style="margin-top:8px"><label>主题色 1</label>${swatchGroup('c1', CONFIG.themeColor1)}</div>
 <div class="sg"><label>主题色 2</label>${swatchGroup('c2', CONFIG.themeColor2)}</div>
@@ -3079,6 +3373,10 @@ function saveSettings() {
     metingInstances: $('#set-meting').value.trim() || DC.metingInstances,
     themeColor1: $('#set-c1').value || DC.themeColor1,
     themeColor2: $('#set-c2').value || DC.themeColor2,
+    transEngine: groupVal('transEngine') || DC.transEngine,
+    transMode: groupVal('transMode') || DC.transMode,
+    transAutoCapsule: groupVal('transCap') !== 'false',
+    transSkipChinese: groupVal('transSkip') !== 'false',
     systemPrompt: $('#set-prompt').value.trim() || DC.systemPrompt
   });
   if (avIn && avIn !== AV_LOCAL) CONFIG.avatarUrl = avIn;
@@ -3168,7 +3466,7 @@ async function clearAll() {
 function showView(v) {
   const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
   const settings = $('#settings'), music = $('#music'), mini = $('#mini-player'),
-    memory = $('#memory'), memEdit = $('#mem-edit');
+    memory = $('#memory'), memEdit = $('#mem-edit'), trans = $('#trans');
   const attachEl = $('#attach-bar');
   bodyEl.style.display = 'none';
   footEl.style.display = 'none';
@@ -3178,6 +3476,7 @@ function showView(v) {
   music.classList.remove('open');
   if (memory) memory.classList.remove('open');
   if (memEdit) memEdit.classList.remove('open');
+  if (trans) trans.classList.remove('open');
   mini.style.display = v === 'chat' ? '' : 'none';
   if (v === 'chat') {
     bodyEl.style.display = 'flex';
@@ -3193,6 +3492,10 @@ function showView(v) {
     const s = $('#mem-search');
     if (s) s.value = MEMUI.keyword;
     renderMemory();
+  }
+  else if (v === 'translate' && trans) {
+    trans.classList.add('open');
+    renderTrans();
   }
 }
 
@@ -3272,17 +3575,27 @@ function bindHeader() {
   $('#btn-close').onclick = () => {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };
-  $('#btn-min').onclick = () => {
-    try { if (HAS_NATIVE && Android.minimizeToBubble) Android.minimizeToBubble(); } catch (e) {}
-  };
-  $('#btn-clr').onclick = async () => {
-    if (!(await uiConfirm('清空当前对话？（记忆库会保留）', '清空'))) return;
+  bindMinButton();
+  $('#btn-clr').onclick = async () => {    if (!(await uiConfirm('清空当前对话？（记忆库会保留）', '清空'))) return;
     history = [{ role: 'system', content: CONFIG.systemPrompt }];
     sSet('via_ai_history', history);
     renderHistory();
     toast('已清空对话，记忆还在~');
   };
-  $('#btn-mem').onclick = () => showView('memory');
+}
+
+/**
+ * 顶栏的「－」：收成悬浮小球（原来那个小窗，与聊天窗互相切换）。
+ * 注意：小胶囊（capsule）**不是**这个按钮做的事情——
+ * 小胶囊只用于「读屏类快捷指令」（翻译屏幕 / 总结屏幕 / 要点 / 解释），
+ * 目的是把浮窗挪开、不挡屏幕；音乐迷你条又是另一个完全独立的东西。
+ */
+function bindMinButton() {
+  const b = $('#btn-min');
+  if (!b) return;
+  b.onclick = () => {
+    try { if (HAS_NATIVE && Android.minimizeToBubble) Android.minimizeToBubble(); } catch (e) {}
+  };
 }
 
 /* ==========================================================
@@ -3497,6 +3810,7 @@ function boot() {
   bindInput();
   bindMusicUI();
   bindMemory();
+  bindTransUI();
   bindDrag();
   bindGuide();
   bindModal();

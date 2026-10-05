@@ -7,6 +7,8 @@ import android.os.Build
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.regex.Pattern
 
 class EllyAccessibilityService : AccessibilityService() {
@@ -15,6 +17,7 @@ class EllyAccessibilityService : AccessibilityService() {
         @Volatile var instance: EllyAccessibilityService? = null
             private set
         private const val MAX_LEN = 8000
+        private const val MAX_NODES = 400
     }
 
     override fun onServiceConnected() {
@@ -85,6 +88,42 @@ class EllyAccessibilityService : AccessibilityService() {
 
     /** 当前设备能不能用无障碍截屏 */
     fun canShot(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
+    /**
+     * 屏幕翻译（原位覆盖）的命根子：不只拿文字，还要拿**精确坐标**。
+     * 无障碍节点树自带 getBoundsInScreen，等于免费得到「文字 + 位置」，
+     * 不需要任何 OCR。返回 JSON 数组字符串：[{t,x,y,w,h}, ...]，单位是屏幕物理像素。
+     */
+    fun dumpScreenNodes(): String {
+        val root = externalRoot() ?: return "[]"
+        val arr = JSONArray()
+        try { collectNodes(root, arr, 0) } catch (_: Exception) { }
+        return arr.toString()
+    }
+
+    private fun collectNodes(node: AccessibilityNodeInfo?, arr: JSONArray, depth: Int) {
+        if (node == null || depth > 40 || arr.length() >= MAX_NODES) return
+        val pkg = node.packageName?.toString() ?: ""
+        // 自己浮窗里的文字必须排除，否则会把译文再翻一遍（滚雪球）
+        if (pkg == applicationContext.packageName) return
+        val txt = node.text?.toString()?.trim().orEmpty()
+        if (txt.isNotEmpty() && txt.length <= 400) {
+            val r = android.graphics.Rect()
+            try { node.getBoundsInScreen(r) } catch (_: Exception) { r.setEmpty() }
+            if (!r.isEmpty && r.width() > 0 && r.height() > 0) {
+                try {
+                    arr.put(JSONObject().apply {
+                        put("t", txt)
+                        put("x", r.left)
+                        put("y", r.top)
+                        put("w", r.width())
+                        put("h", r.height())
+                    })
+                } catch (_: Exception) { }
+            }
+        }
+        for (i in 0 until node.childCount) collectNodes(node.getChild(i), arr, depth + 1)
+    }
 
     /** 抓取浏览器等其它窗口的可见文本 */
     fun dumpScreenText(): String {

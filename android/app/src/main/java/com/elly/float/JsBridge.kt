@@ -65,6 +65,44 @@ class JsBridge(private val ctx: Context, private val webView: WebView) {
         (ctx as? FloatService)?.restoreFromBubble()
     }
 
+    /* ---------- 状态胶囊（收起成小窗 / 红点提醒） ---------- */
+
+    /** 收起成小胶囊并进入「处理中」。翻译 / AI 总结前调用。 */
+    @JavascriptInterface
+    fun toCapsule(text: String) {
+        (ctx as? FloatService)?.minimizeToCapsule(text)
+    }
+
+    @JavascriptInterface
+    fun capsuleState(text: String, state: String) {
+        (ctx as? FloatService)?.updateCapsule(text, state)
+    }
+
+    /** 处理完了：如果确实处于胶囊状态就亮红点，返回 true；否则（窗口本来就是开的）不打扰。 */
+    @JavascriptInterface
+    fun capsuleDone(text: String): Boolean {
+        val s = ctx as? FloatService ?: return false
+        if (!s.isCapsuleMode()) return false
+        s.updateCapsule(text, "done")
+        return true
+    }
+
+    @JavascriptInterface
+    fun capsuleHide() {
+        (ctx as? FloatService)?.restoreFromCapsule()
+    }
+
+    /* ---------- 屏幕翻译：原位覆盖 ---------- */
+    @JavascriptInterface
+    fun showTranslateOverlay(json: String) {
+        (ctx as? FloatService)?.showTranslateOverlay(json)
+    }
+
+    @JavascriptInterface
+    fun hideTranslateOverlay() {
+        (ctx as? FloatService)?.hideTranslateOverlay()
+    }
+
     /* ---------- 迷你播放器悬浮窗 ---------- */
     @JavascriptInterface
     fun showMiniPlayer(name: String, artist: String, playing: Boolean) {

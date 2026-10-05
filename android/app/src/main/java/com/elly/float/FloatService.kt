@@ -15,6 +15,7 @@ import android.graphics.Matrix
 import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
@@ -41,6 +42,7 @@ import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -62,6 +64,9 @@ class FloatService : Service() {
 
         private const val CHANNEL_ID = "elly_float"
         private const val NOTI_ID = 1
+
+        /** 截屏前藏悬浮层后，留给合成器生效的时间。 */
+        private const val SHOT_HIDE_DELAY_MS = 180L
     }
 
     private var wm: WindowManager? = null
@@ -81,6 +86,30 @@ class FloatService : Service() {
     private var miniPlay: TextView? = null
     private var miniParams: WindowManager.LayoutParams? = null
     private var miniVisible = false
+    private var bubbleParams: WindowManager.LayoutParams? = null
+
+    /* 状态胶囊：处理中（转圈）/ 有新消息（右上角红点） */
+    private var capsule: View? = null
+    private var capsuleParams: WindowManager.LayoutParams? = null
+    private var capsuleText: TextView? = null
+    private var capsuleSpinner: Ring? = null
+    private var capsuleDot: View? = null
+    private var capsuleMode = false
+
+    /* 屏幕翻译：原位覆盖层（穿透不挡操作） + 「还原」小按钮（可点） */
+    private var transOverlay: View? = null
+    private var transOverlayParams: WindowManager.LayoutParams? = null
+    private var transChip: View? = null
+    private var transChipParams: WindowManager.LayoutParams? = null
+
+    /** 截屏前临时藏起来的悬浮窗，用完要原样放回去。 */
+    private class SavedWin(
+        val v: View,
+        val p: WindowManager.LayoutParams,
+        val x: Int,
+        val y: Int,
+        val a: Float
+    )
 
     private val main = Handler(Looper.getMainLooper())
 
@@ -281,22 +310,41 @@ class FloatService : Service() {
         try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
     }
 
-    /* ---------------- 最小化成悬浮小球 ---------------- */
-    fun minimizeToBubble() = runOnMain {
-        if (minimized) return@runOnMain
-        val p = params ?: return@runOnMain
-        val wv = webView ?: return@runOnMain
-        minimized = true
-        // 不 removeView（会丢 surface），改成：移出屏幕 + 全透明 + 不可触摸。
-        // 三重保证一定能藏起来，且 WebView 和音乐播放状态都不中断。
-        savedFlags = p.flags
-        savedRect = intArrayOf(p.x, p.y, p.width, p.height)
+    /* ---------------- 隐藏 / 恢复聊天窗（小球与胶囊共用） ---------------- */
+
+    /** 把聊天窗藏起来：alpha=0 + 移出屏幕 + 不可触摸，三重保证一定不在截屏里。 */
+    private fun hideWebView() {
+        val p = params ?: return
+        val wv = webView ?: return
+        if (!minimized && !capsuleMode) {
+            savedFlags = p.flags
+            savedRect = intArrayOf(p.x, p.y, p.width, p.height)
+        }
         p.alpha = 0f
         p.x = -p.width - 500
         p.flags = p.flags or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
+    }
+
+    private fun showWebView() {
+        val p = params ?: return
+        val wv = webView ?: return
+        savedRect?.let { p.x = it[0]; p.y = it[1]; p.width = it[2]; p.height = it[3] }
+        p.alpha = 1f
+        p.flags = savedFlags
+        try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
+        try { wv.requestLayout(); wv.invalidate() } catch (_: Exception) { }
+    }
+
+    /* ---------------- 最小化成悬浮小球 ---------------- */
+    fun minimizeToBubble() = runOnMain {
+        if (minimized) return@runOnMain
+        minimized = true
+        hideCapsuleInternal()
+        capsuleMode = false
+        hideWebView()
         addBubble()
     }
 
@@ -304,13 +352,7 @@ class FloatService : Service() {
         if (!minimized) return@runOnMain
         minimized = false
         removeBubble()
-        val p = params ?: return@runOnMain
-        val wv = webView ?: return@runOnMain
-        savedRect?.let { p.x = it[0]; p.y = it[1]; p.width = it[2]; p.height = it[3] }
-        p.alpha = 1f
-        p.flags = savedFlags
-        try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
-        try { wv.requestLayout(); wv.invalidate() } catch (_: Exception) { }
+        if (!capsuleMode) showWebView()
     }
 
     private fun addBubble() {
@@ -350,7 +392,8 @@ class FloatService : Service() {
         }
         attachBubbleTouch(iv, p, dm)
         bubble = iv
-        try { wm?.addView(iv, p) } catch (_: Exception) { bubble = null }
+        bubbleParams = p
+        try { wm?.addView(iv, p) } catch (_: Exception) { bubble = null; bubbleParams = null }
     }
 
     private fun attachBubbleTouch(v: View, p: WindowManager.LayoutParams, dm: android.util.DisplayMetrics) {
@@ -388,6 +431,407 @@ class FloatService : Service() {
         val b = bubble ?: return
         try { wm?.removeView(b) } catch (_: Exception) { }
         bubble = null
+        bubbleParams = null
+    }
+
+    /* ---------------- 状态胶囊（处理中 / 有新消息） ---------------- */
+
+    /**
+     * 收起成小胶囊。翻译 / AI 总结这类「需要看干净屏幕」的操作先叫它，
+     * 用户就不会被浮窗遮住，处理完再在胶囊右上角冒红点提醒。
+     */
+    fun minimizeToCapsule(text: String) = runOnMain {
+        if (minimized) { minimized = false; removeBubble() }
+        capsuleMode = true
+        hideWebView()
+        showCapsuleInternal(text, "busy")
+    }
+
+    fun restoreFromCapsule() = runOnMain {
+        if (!capsuleMode) return@runOnMain
+        capsuleMode = false
+        hideCapsuleInternal()
+        showWebView()
+    }
+
+    /** 从 JS 更新胶囊文案 / 状态。state: busy | done | idle */
+    fun updateCapsule(text: String, state: String) = runOnMain {
+        if (!capsuleMode) return@runOnMain
+        applyCapsule(text, state)
+        if (state == "done") vibrateShort()
+    }
+
+    /** 当前是不是已经收成了胶囊（JS 用来决定要不要亮红点）。 */
+    fun isCapsuleMode(): Boolean = capsuleMode
+
+    private fun showCapsuleInternal(text: String, state: String) = runOnMain {
+        if (capsule == null) {
+            val built = buildCapsule() ?: return@runOnMain
+            capsule = built.first
+            attachDrag(built.first, built.second) { restoreFromCapsuleWithNotify() }
+            capsuleParams = built.second
+            try { wm?.addView(built.first, built.second) } catch (_: Exception) {
+                capsule = null; capsuleParams = null; return@runOnMain
+            }
+        } else {
+            capsuleParams?.let { p ->
+                try { wm?.updateViewLayout(capsule!!, p) } catch (_: Exception) { }
+            }
+        }
+        applyCapsule(text, state)
+    }
+
+    private fun applyCapsule(text: String, state: String) {
+        capsuleText?.text = if (text.isBlank()) "正在处理…" else text
+        val busy = state == "busy"
+        capsuleSpinner?.visibility = if (busy) View.VISIBLE else View.GONE
+        if (busy) capsuleSpinner?.start() else capsuleSpinner?.stop()
+        capsuleDot?.visibility = if (state == "done") View.VISIBLE else View.GONE
+    }
+
+    private fun hideCapsuleInternal() = runOnMain {
+        val c = capsule ?: return@runOnMain
+        capsuleSpinner?.stop()
+        try { wm?.removeView(c) } catch (_: Exception) { }
+        capsule = null
+        capsuleParams = null
+        capsuleText = null
+        capsuleSpinner = null
+        capsuleDot = null
+    }
+
+    /** 点胶囊 → 展开浮窗，并告诉 JS 把结果展示出来。 */
+    private fun restoreFromCapsuleWithNotify() {
+        restoreFromCapsule()
+        js("window.__capsuleClick&&window.__capsuleClick()")
+    }
+
+    /** 构建胶囊：圆角粉底 + 头像/转圈 + 文案，右上角留一个红点位。 */
+    private fun buildCapsule(): Pair<View, WindowManager.LayoutParams>? {
+        val dm = resources.displayMetrics
+        val d = dm.density
+        fun dp(v: Int) = (v * d).toInt()
+
+        val root = android.widget.FrameLayout(this)
+
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(7), dp(6), dp(14), dp(6))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(0xF7FFF0F5.toInt())
+                setStroke(dp(1), 0x66FF9A9E)
+            }
+            elevation = dp(8).toFloat()
+        }
+
+        val iconBox = android.widget.FrameLayout(this)
+        val disc = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setOval(0, 0, view.width, view.height)
+                }
+            }
+            bubbleBmp?.let { setImageBitmap(it) } ?: run {
+                try { setImageResource(android.R.drawable.sym_def_app_icon) } catch (_: Exception) { }
+            }
+        }
+        iconBox.addView(disc, android.widget.FrameLayout.LayoutParams(dp(24), dp(24)))
+
+        val ring = Ring(dp(24)).apply { visibility = View.VISIBLE }
+        iconBox.addView(ring, android.widget.FrameLayout.LayoutParams(dp(24), dp(24)))
+        capsuleSpinner = ring
+        bar.addView(iconBox, LinearLayout.LayoutParams(dp(24), dp(24)))
+
+        val label = TextView(this).apply {
+            setTextColor(0xFF7A4358.toInt())
+            textSize = 12f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            text = "正在处理…"
+        }
+        val lp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        lp.leftMargin = dp(8)
+        bar.addView(label, lp)
+        capsuleText = label
+
+        root.addView(bar, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+        ))
+
+        val dot = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xFFE8365D.toInt())
+                setStroke(dp(1), 0xFFFFFFFF.toInt())
+            }
+            visibility = View.GONE
+        }
+        val dotLp = android.widget.FrameLayout.LayoutParams(dp(11), dp(11))
+        dotLp.gravity = Gravity.TOP or Gravity.END
+        dotLp.topMargin = dp(1)
+        dotLp.rightMargin = dp(1)
+        root.addView(dot, dotLp)
+        capsuleDot = dot
+
+        val width = min((210 * d).toInt(), dm.widthPixels - (24 * d).toInt())
+            .coerceAtLeast((110 * d).toInt())
+        val p = WindowManager.LayoutParams(
+            width,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = (dm.widthPixels - width - (10 * d).toInt()).coerceAtLeast(0)
+            y = (dm.heightPixels * 0.74).toInt()
+        }
+        return root to p
+    }
+
+    /** 通用拖动 + 单击（胶囊、覆盖层等复用）。 */
+    private fun attachDrag(v: View, p: WindowManager.LayoutParams, onClick: () -> Unit) {
+        val dm = resources.displayMetrics
+        var downX = 0f; var downY = 0f
+        var startX = 0; var startY = 0
+        var moved = false
+        v.setOnTouchListener { _, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = ev.rawX; downY = ev.rawY
+                    startX = p.x; startY = p.y; moved = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.rawX - downX
+                    val dy = ev.rawY - downY
+                    if (abs(dx) > 10 || abs(dy) > 10) moved = true
+                    val vw = if (v.width > 0) v.width else p.width
+                    val vh = if (v.height > 0) v.height else (40 * dm.density).toInt()
+                    p.x = (startX + dx).toInt().coerceIn(0, (dm.widthPixels - vw).coerceAtLeast(0))
+                    p.y = (startY + dy).toInt().coerceIn(0, (dm.heightPixels - vh).coerceAtLeast(0))
+                    try { wm?.updateViewLayout(v, p) } catch (_: Exception) { }
+                    true
+                }
+                MotionEvent.ACTION_UP -> { if (!moved) onClick(); true }
+                MotionEvent.ACTION_CANCEL -> true
+                else -> false
+            }
+        }
+    }
+
+    /** 胶囊上的转圈（自己画，不依赖任何库）。 */
+    private inner class Ring(sizePx: Int) : View(this) {
+        private val stroke = (sizePx / 8f).coerceAtLeast(2f)
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = stroke
+            strokeCap = Paint.Cap.ROUND
+            color = 0xFFD6336C.toInt()
+        }
+        private var angle = 0f
+        private val tick = object : Runnable {
+            override fun run() {
+                angle = (angle + 14f) % 360f
+                invalidate()
+                postDelayed(this, 33)
+            }
+        }
+        fun start() { removeCallbacks(tick); post(tick) }
+        fun stop() { removeCallbacks(tick) }
+        override fun onDetachedFromWindow() { stop(); super.onDetachedFromWindow() }
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val r = min(width, height) / 2f - stroke
+            if (r <= 0f) return
+            val box = RectF(width / 2f - r, height / 2f - r, width / 2f + r, height / 2f + r)
+            canvas.drawArc(box, angle, 265f, false, paint)
+        }
+    }
+
+    private fun vibrateShort() {
+        try {
+            val v = getSystemService(VIBRATOR_SERVICE) as android.os.Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(android.os.VibrationEffect.createOneShot(35, 60))
+            } else {
+                @Suppress("DEPRECATION") v.vibrate(35L)
+            }
+        } catch (_: Exception) { }
+    }
+
+    private fun js(code: String) {
+        try { webView?.evaluateJavascript(code, null) } catch (_: Exception) { }
+    }
+
+    /* ---------------- 屏幕翻译：原位覆盖 ---------------- */
+
+    /**
+     * 把译文直接贴在原文位置上。
+     * json: {mode:'translated'|'bilingual', items:[{x,y,w,h,t}]}，坐标是屏幕物理像素。
+     */
+    fun showTranslateOverlay(json: String) = runOnMain {
+        removeTranslateOverlay()
+        val dm = resources.displayMetrics
+        val d = dm.density
+        fun dp(v: Int) = (v * d).toInt()
+
+        val mode: String
+        val items: JSONArray
+        try {
+            val o = JSONObject(json)
+            mode = o.optString("mode", "translated")
+            items = o.optJSONArray("items") ?: JSONArray()
+        } catch (_: Exception) {
+            return@runOnMain
+        }
+        if (items.length() == 0) return@runOnMain
+
+        val root = android.widget.FrameLayout(this)
+        root.isClickable = false
+        root.isFocusable = false
+
+        val bilingual = mode == "bilingual"
+
+        for (i in 0 until items.length()) {
+            val it = items.optJSONObject(i) ?: continue
+            val x = it.optInt("x"); val y = it.optInt("y")
+            val w = it.optInt("w"); val h = it.optInt("h")
+            val t = it.optString("t", "")
+            if (w <= 0 || h <= 0 || t.isBlank()) continue
+
+            if (bilingual) {
+                // 双语：原文保留不动，只给它加一条粉色下划线做标记，
+                // 译文做成小牌子贴在下面（原文仍然看得见）。
+                val line = View(this).apply { setBackgroundColor(0xD9D6336C.toInt()) }
+                val lineLp = android.widget.FrameLayout.LayoutParams(w, dp(2).coerceAtLeast(1))
+                lineLp.leftMargin = x
+                lineLp.topMargin = (y + h - dp(2)).coerceAtLeast(0)
+                lineLp.gravity = Gravity.TOP or Gravity.START
+                root.addView(line, lineLp)
+
+                val chip = TextView(this).apply {
+                    text = t
+                    setTextColor(0xFFD6336C.toInt())
+                    textSize = ((h / d) * 0.62f).coerceIn(8f, 14f)
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(4).toFloat()
+                        setColor(0xF2FFF5F8.toInt())
+                    }
+                    setPadding(dp(3), dp(1), dp(3), dp(1))
+                    maxLines = 3
+                    ellipsize = TextUtils.TruncateAt.END
+                }
+                val chipW = min((w * 1.6f).toInt() + dp(8), dm.widthPixels - x - dp(4))
+                    .coerceAtLeast(dp(40))
+                val chipLp = android.widget.FrameLayout.LayoutParams(
+                    chipW, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+                )
+                chipLp.leftMargin = x
+                chipLp.topMargin = y + h + dp(1)
+                chipLp.gravity = Gravity.TOP or Gravity.START
+                root.addView(chip, chipLp)
+            } else {
+                // 仅译文：用近乎不透明的暖白底把原文盖掉，换成粉色译文。
+                val tv = TextView(this).apply {
+                    text = t
+                    setTextColor(0xFFD6336C.toInt())
+                    textSize = ((h / d) * 0.70f).coerceIn(9f, 20f)
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(3).toFloat()
+                        setColor(0xF7FFF0F5.toInt())
+                    }
+                    setPadding(dp(2), dp(1), dp(2), dp(1))
+                    maxLines = 3
+                    ellipsize = TextUtils.TruncateAt.END
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                val lp = android.widget.FrameLayout.LayoutParams(w, h)
+                lp.leftMargin = x
+                lp.topMargin = y
+                lp.gravity = Gravity.TOP or Gravity.START
+                root.addView(tv, lp)
+            }
+        }
+
+        val p = WindowManager.LayoutParams(
+            dm.widthPixels, dm.heightPixels, overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0; y = 0
+        }
+        transOverlay = root
+        transOverlayParams = p
+        try { wm?.addView(root, p) } catch (_: Exception) {
+            transOverlay = null; transOverlayParams = null; return@runOnMain
+        }
+        addTranslateChip()
+    }
+
+    /** 覆盖层是「穿透」的（不挡你滑动），所以单独给一个能点的「还原」。 */
+    private fun addTranslateChip() {
+        val dm = resources.displayMetrics
+        val d = dm.density
+        fun dp(v: Int) = (v * d).toInt()
+        val chip = TextView(this).apply {
+            text = "还原屏幕"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                colors = intArrayOf(0xFFD6336C.toInt(), 0xFFFF9A9E.toInt())
+                orientation = GradientDrawable.Orientation.LEFT_RIGHT
+                gradientType = GradientDrawable.LINEAR_GRADIENT
+            }
+            elevation = dp(6).toFloat()
+        }
+        val p = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = dp(48)
+        }
+        chip.setOnClickListener { hideTranslateOverlayWithNotify() }
+        attachDrag(chip, p) { hideTranslateOverlayWithNotify() }
+        transChip = chip
+        transChipParams = p
+        try { wm?.addView(chip, p) } catch (_: Exception) { transChip = null; transChipParams = null }
+    }
+
+    fun hideTranslateOverlay() = runOnMain { hideTranslateOverlayWithNotify() }
+
+    private fun hideTranslateOverlayWithNotify() {
+        removeTranslateOverlay()
+        js("window.__transOverlayClosed&&window.__transOverlayClosed()")
+    }
+
+    private fun removeTranslateOverlay() {
+        transOverlay?.let { try { wm?.removeView(it) } catch (_: Exception) { } }
+        transChip?.let { try { wm?.removeView(it) } catch (_: Exception) { } }
+        transOverlay = null
+        transOverlayParams = null
+        transChip = null
+        transChipParams = null
     }
 
     /* ---------------- 迷你播放器悬浮窗 ---------------- */
@@ -702,10 +1146,50 @@ class FloatService : Service() {
 
     private var pendingShotCb: ((String?) -> Unit)? = null
 
-    /** JS 入口：结果通过 window.__shotDone(dataUrl|null) 回传 */
+    /** JS 入口：结果通过 window.__shotDone(dataUrl|null) 回传。
+     *  截之前先把所有悬浮层藏起来，不然拍进去的就是她自己。 */
     fun requestScreenshot() {
-        captureScreenInternal { data ->
-            main.post { deliverShot(data) }
+        runOnMain {
+            captureScreenInternal { data ->
+                main.post { deliverShot(data) }
+            }
+        }
+    }
+
+    /**
+     * 截一帧之前，把「聊天窗 + 小球 + 胶囊 + 音乐条 + 译文覆盖层」全部藏掉，
+     * 抓完立即恢复。返回的 lambda 是恢复函数（幂等）。
+     */
+    private fun hideOverlaysForShot(): () -> Unit {
+        val dm = resources.displayMetrics
+        val list = ArrayList<SavedWin>()
+
+        fun stash(v: View?, p: WindowManager.LayoutParams?) {
+            if (v == null || p == null || v.parent == null) return
+            list.add(SavedWin(v, p, p.x, p.y, p.alpha))
+            p.alpha = 0f
+            p.x = -dm.widthPixels - 800
+            try { wm?.updateViewLayout(v, p) } catch (_: Exception) { }
+        }
+
+        stash(webView, params)
+        stash(bubble, bubbleParams)
+        stash(miniBar, miniParams)
+        stash(capsule, capsuleParams)
+        stash(transOverlay, transOverlayParams)
+        stash(transChip, transChipParams)
+
+        var restored = false
+        return {
+            if (!restored) {
+                restored = true
+                for (s in list) {
+                    s.p.alpha = s.a
+                    s.p.x = s.x
+                    s.p.y = s.y
+                    try { wm?.updateViewLayout(s.v, s.p) } catch (_: Exception) { }
+                }
+            }
         }
     }
 
@@ -724,7 +1208,7 @@ class FloatService : Service() {
         upgradeForegroundForProjection()
         val cb = pendingShotCb
         pendingShotCb = null
-        if (cb != null) main.post { doProjectionShot(cb) }
+        if (cb != null) main.post { shootHidden({ done -> doProjectionShot(done) }, cb) }
     }
 
     fun onProjectionDenied() {
@@ -737,13 +1221,24 @@ class FloatService : Service() {
     private fun captureScreenInternal(cb: (String?) -> Unit) {
         val svc = EllyAccessibilityService.instance
         if (svc != null && svc.canShot()) {
-            svc.takeScreenShot { data ->
+            shootHidden({ done -> svc.takeScreenShot { d -> done(d) } }) { data ->
                 // 无障碍失败（部分系统界面/安全限制）→ 回退到录屏通道
                 if (!data.isNullOrBlank()) cb(data) else projectionShot(cb)
             }
             return
         }
         projectionShot(cb)
+    }
+
+    /** 藏好悬浮层 → 等一下让合成器真正生效 → 抓一帧 → 立刻恢复。 */
+    private fun shootHidden(grab: ((String?) -> Unit) -> Unit, cb: (String?) -> Unit) {
+        val restore = hideOverlaysForShot()
+        main.postDelayed({
+            grab { data ->
+                restore()
+                cb(data)
+            }
+        }, SHOT_HIDE_DELAY_MS)
     }
 
     private fun projectionShot(cb: (String?) -> Unit) {
@@ -768,7 +1263,7 @@ class FloatService : Service() {
             }, 60000)
             return
         }
-        doProjectionShot(cb)
+        shootHidden({ done -> doProjectionShot(done) }, cb)
     }
 
     private fun doProjectionShot(cb: (String?) -> Unit) {
@@ -862,6 +1357,14 @@ class FloatService : Service() {
         miniBar = null
         miniParams = null
         miniVisible = false
+        capsuleSpinner?.stop()
+        capsule?.let { c -> try { wm?.removeView(c) } catch (_: Exception) { } }
+        capsule = null
+        capsuleParams = null
+        capsuleText = null
+        capsuleSpinner = null
+        capsuleDot = null
+        removeTranslateOverlay()
         webView?.let { wv ->
             try { wm?.removeView(wv) } catch (_: Exception) { }
             try { wv.destroy() } catch (_: Exception) { }
