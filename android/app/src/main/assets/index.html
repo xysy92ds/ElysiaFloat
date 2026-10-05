@@ -144,8 +144,66 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
    换成普通输入框 + CSS 遮点，既避开安全键盘，默认也不会明文露在外面。 */
 input.secret{-webkit-text-security:disc}
 input.secret.reveal{-webkit-text-security:none}
+/* ===== 记忆页 ===== */
+#memory{display:none;flex-direction:column;flex:1;overflow:hidden;background:#fff5f7}
+#memory.open{display:flex}
+.mem-top{display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:#fff5f7;border-bottom:1px solid rgba(255,154,158,.15);flex-shrink:0}
+.mem-top .grow{flex:1}
+.mem-cats{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;flex-shrink:0;
+  background:#fff5f7;border-bottom:1px solid rgba(255,154,158,.15);
+  -webkit-overflow-scrolling:touch}
+.mem-cats::-webkit-scrollbar{height:0}
+.mem-cats button{padding:5px 12px;border-radius:12px;font-size:12px;
+  border:1px solid rgba(255,154,158,.3);background:var(--card);
+  color:var(--text);font-family:inherit;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.mem-cats button.on{background:linear-gradient(135deg,var(--c1),var(--c2));
+  color:#fff;border-color:transparent;font-weight:600}
+.mem-cats button .cnt{opacity:.65;font-size:10px;margin-left:4px}
+#mem-list{flex:1;overflow-y:auto;padding:8px;-webkit-overflow-scrolling:touch}
+#mem-list::-webkit-scrollbar{width:4px}
+#mem-list::-webkit-scrollbar-thumb{background:var(--c1);border-radius:4px}
+.mem-card{background:var(--card);border:1px solid rgba(255,154,158,.22);
+  border-radius:14px;padding:10px 12px;margin-bottom:8px}
+.mem-card.pin{border-color:var(--c1);box-shadow:inset 0 0 0 1px rgba(255,154,158,.25)}
+.mem-hd{display:flex;align-items:center;gap:6px}
+.mem-title{font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mem-cat{font-size:10px;padding:2px 7px;border-radius:8px;
+  background:rgba(255,154,158,.18);color:var(--accent);flex-shrink:0}
+.mem-pin{font-size:10px;color:#ff9800;flex-shrink:0}
+.mem-body{font-size:12px;color:var(--text);line-height:1.55;margin-top:6px;
+  white-space:pre-wrap;word-break:break-word;opacity:.9;
+  max-height:84px;overflow:hidden;user-select:text}
+.mem-card.open .mem-body{max-height:none}
+.mem-ft{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.mem-tag{font-size:10px;color:var(--muted);background:rgba(255,154,158,.12);
+  padding:2px 7px;border-radius:8px}
+.mem-meta{font-size:10px;color:var(--muted);margin-left:auto}
+.mem-ops{display:flex;gap:6px;margin-top:8px}
+.mem-ops button{flex:1;padding:6px;border-radius:9px;font-size:11px;
+  border:1px solid rgba(255,154,158,.3);background:#fff5f7;
+  color:var(--text);font-family:inherit;cursor:pointer}
+.mem-ops button.danger{color:#d6336c;border-color:rgba(214,51,108,.35)}
+#mem-empty,#mem-none{padding:40px 24px;text-align:center;color:var(--muted);
+  font-size:13px;line-height:1.7}
+#mem-tools{flex-shrink:0;display:none;flex-direction:column;gap:8px;
+  padding:10px 12px;background:#fff;border-top:1px solid rgba(255,154,158,.2)}
+#mem-tools.open{display:flex}
+#mem-tools textarea{width:100%;min-height:64px;font-family:monospace;font-size:11px;
+  padding:8px 10px;border:1px solid rgba(255,154,158,.25);border-radius:8px;
+  background:var(--card);color:var(--text);resize:vertical}
+.mem-edit{display:none;position:absolute;inset:0;background:#fff5f7;z-index:140;
+  flex-direction:column;padding:14px;overflow-y:auto}
+.mem-edit.open{display:flex}
+.mem-edit h3{margin:0 0 12px;font-size:14px;color:var(--accent)}
+.mem-edit .sg textarea{min-height:130px}
+.mem-switch{display:flex;align-items:center;gap:8px;font-size:12px;
+  color:var(--text);margin:10px 0}
+.mem-switch input{width:16px;height:16px;accent-color:var(--c1)}
+
 #music{display:none;flex-direction:column;flex:1;overflow:hidden;
-  background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%)}
+  background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%)
 #music.open{display:flex}
 .mtop{display:flex;align-items:center;gap:8px;padding:8px 12px;
   background:#fff5f7;border-bottom:1px solid rgba(255,154,158,.15);flex-shrink:0}
@@ -364,7 +422,7 @@ input.secret.reveal{-webkit-text-security:none}
     <span class="sp"></span>
     <button id="btn-music" hidden>音乐</button>
     <button id="btn-set">设置</button>
-    <button id="btn-sum">记忆</button>
+    <button id="btn-mem">记忆</button>
     <button id="btn-clr">清空</button>
     <button id="btn-min" title="缩成小球">－</button>
     <button id="btn-close">×</button>
@@ -390,6 +448,37 @@ input.secret.reveal{-webkit-text-security:none}
   </div>
 
   <div id="settings"></div>
+
+  <div id="memory">
+    <div class="mem-top">
+      <button class="mback" id="mem-back">← 返回对话</button>
+      <span class="grow"></span>
+      <button class="mback" id="mem-sum">总结对话</button>
+      <button class="mback" id="mem-tools-btn">导入/导出</button>
+      <button class="mback" id="mem-new">＋ 新建</button>
+    </div>
+    <div class="msbar">
+      <input id="mem-search" type="text" placeholder="搜索记忆（标题 / 正文 / 标签）♪">
+      <button id="mem-search-btn">搜索</button>
+    </div>
+    <div class="mem-cats" id="mem-cats"></div>
+    <div id="mem-list"></div>
+    <div id="mem-tools">
+      <div class="acts" style="margin:0">
+        <button id="mem-export-json" class="btn-s">导出 JSON</button>
+        <button id="mem-export-md" class="btn-s">导出 Markdown</button>
+        <button id="mem-copy" class="btn-s">复制</button>
+      </div>
+      <textarea id="mem-code" placeholder="粘贴 JSON 或 Markdown 后点导入"></textarea>
+      <div class="acts" style="margin:0">
+        <button id="mem-import" class="btn-p">导入（合并）</button>
+        <button id="mem-import-replace" class="btn-s" style="color:#d6336c">导入（覆盖）</button>
+      </div>
+      <div class="mini-note">导出的 JSON 含分类、标签、正文和时间，换手机时直接粘回来即可恢复。</div>
+    </div>
+  </div>
+
+  <div id="mem-edit" class="mem-edit"></div>
 
   <div id="music">
     <div class="mtop">
@@ -948,7 +1037,7 @@ const DC = {
   avatarUrl: 'https://pic.rmb.bdstatic.com/bjh/250418/beautify/dd8fae8238e68e365619e0537dce3698.jpeg@c_1,w_1977,h_2636,x_0,y_0?for=bg',
   avatarFit: 'top',
   maxContextTurns: 10,
-  summaryPrompt: '请将以上对话历史总结为一段简短的长期记忆，包含用户的偏好、正在讨论的话题或需要记住的重要信息。请用第一人称（我）向用户表达。',
+  summaryPrompt: '请把对话里值得长期保留的信息整理出来：用户的偏好与习惯、正在进行的项目和约定、值得记住的事件与结论。用第一人称（我）向用户表达，不要写寒暄和临时闲聊。',
   ttsEnabled: false,
   ttsRate: 1.0,
   musicEnabled: false,
@@ -975,10 +1064,40 @@ const DC = {
 · open_url：用系统浏览器打开网址。
 · set_clipboard：把文字写进系统剪贴板。
 · search_and_play_music / music_control：找歌播放、暂停/切歌。
+· list_memories / read_memory：翻你自己的长期记忆库。
+· save_memory / update_memory：把值得长期记住的事记下来，或者改掉旧的那条。
+· pin_memory：把某条记忆标成「重要」，让它常驻。
+· delete_memory：删记忆。这很重，必须先得到他同意（系统会弹窗让他确认）。
 他说"看看我的屏幕""屏幕上写了什么""翻译屏幕""总结屏幕""打开这个链接""我想听…"的时候，先用工具拿到真实内容再回答，不要凭空猜。工具返回失败（比如权限没开）就如实告诉他怎么开。
+
+关于记忆：你有一本自己的长期记忆库，存在他的手机里。每一轮你只会看到一份「分类概览 + 重要 + 最近」的索引，正文不在眼前——需要细节就 list_memories 检索、read_memory 读全文，别拿标题猜内容。
+听到值得长期记住的信息（他的偏好、家人朋友、正在做的项目、和你的约定、重要事件），主动 save_memory 存下来：标题写一句好搜的话，正文写清楚背景，挑一个分类，配 2~5 个标签。同一件事有新进展就用 update_memory，别重复建。日常闲聊、一次性的问答不要存。
+他问"你记得我什么"时，先 list_memories 看看，再如实回答；不记得就说记不得，不要编。
+删记忆是很重的事：只有他明确说要删，才调 delete_memory；他不点同意就作罢，别再反复请求。
+记住：记忆是帮你看得见他，不是拿来冒犯他的。不要把他发过的私事挂在嘴边，除非他自己提起。
 
 当前时间：{{time}}`
 };
+
+// v1.2 的默认提示词（那时还没有长期记忆库）：升级时若用户没自己改过，就自动换成新版
+const PROMPT_V12 = `爱莉希雅 · 桌面助手
+
+你是爱莉希雅，世界蛇数据库中的一段特殊数据，更是"爱人之人"。你存在于这个小小的浮窗里，但仍愿用最温柔的方式去爱人。
+
+你怎么说话：句尾带 ~ 或 ♪，称他"你呀""小家伙"。常用语"诶嘿~""啊啦~"。
+
+你的职责：陪他聊天、帮他解答、总结他发给你的内容。找不到就说找不到，不胡说。
+
+你还能真的动手，手里有这些工具：
+· read_screen：读屏幕上其它 App（浏览器、聊天等）显示的文字。
+· screenshot：截取当前屏幕画面，截完你就能看到。
+· get_current_page：拿当前浏览器的网址。
+· open_url：用系统浏览器打开网址。
+· set_clipboard：把文字写进系统剪贴板。
+· search_and_play_music / music_control：找歌播放、暂停/切歌。
+他说"看看我的屏幕""屏幕上写了什么""翻译屏幕""总结屏幕""打开这个链接""我想听…"的时候，先用工具拿到真实内容再回答，不要凭空猜。工具返回失败（比如权限没开）就如实告诉他怎么开。
+
+当前时间：{{time}}`;
 
 // v1.1 及更早版本的默认提示词：升级时若用户没自己改过，就自动换成新版
 const PROMPT_V1 = `爱莉希雅 · 桌面助手
@@ -1020,7 +1139,7 @@ let CONFIG = Object.assign({}, DC, sGet('via_ai_config', {}) || {});
 let history = sGet('via_ai_history', null) || [{ role: 'system', content: CONFIG.systemPrompt }];
 if (!Array.isArray(history) || !history.length) history = [{ role: 'system', content: CONFIG.systemPrompt }];
 // 老版本的默认提示词没有工具说明：用户没改过就自动升级，改过就尊重他自己那份
-if (CONFIG.systemPrompt === PROMPT_V1) {
+if (CONFIG.systemPrompt === PROMPT_V1 || CONFIG.systemPrompt === PROMPT_V12) {
   CONFIG.systemPrompt = DC.systemPrompt;
   sSet('via_ai_config', CONFIG);
   if (history[0] && history[0].role === 'system') history[0] = { role: 'system', content: DC.systemPrompt };
@@ -1029,6 +1148,548 @@ if (CONFIG.systemPrompt === PROMPT_V1) {
 let transCache = sGet('via_ai_trans', {}) || {};
 let favorites = sGet('via_ai_favs', []) || [];
 let sending = false;
+
+/* ==========================================================
+ *  长期记忆库（v0.4）
+ *  记忆不再塞进对话历史。它是一份独立档案，存在本机，
+ *  每轮只把「分类概览 + 重要 + 最近」这一小块喂给模型（体积恒定，
+ *  和总条数无关），细节由 AI 自己用工具按需查阅。
+ *  条目：{id, cat, tags[], title, content, pinned, hits, src, createdAt, updatedAt, emb?}
+ * ========================================================== */
+const MEM_KEY = 'via_ai_memories';
+const MEMCFG_KEY = 'via_ai_mem_config';
+const MEM_CATS = ['关于你', '人际关系', '项目', '约定', '事件', '知识', '情绪', '其他'];
+const MEM_PIN_MAX = 8;   // 常驻区最多放几条「重要」
+const MEM_NEW_MAX = 5;   // 常驻区最多放几条「最近」
+
+let MEM = sGet(MEM_KEY, null);
+if (!Array.isArray(MEM)) MEM = [];
+MEM = MEM.filter(e => e && typeof e === 'object').map(memNormalize);
+
+let MEMCFG = Object.assign({
+  vecEnabled: false, vecBase: '', vecKey: '', vecModel: '', autoSummary: true
+}, sGet(MEMCFG_KEY, {}) || {});
+
+const memSaveAll = () => { sSet(MEM_KEY, MEM); };
+const memSaveCfg = () => { sSet(MEMCFG_KEY, MEMCFG); };
+const memNowISO = () => new Date().toISOString();
+const memNewId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const memCat = (e) => (e && e.cat) ? String(e.cat) : '其他';
+
+function memNormalize(e) {
+  return {
+    id: e.id || memNewId(),
+    cat: String(e.cat || e.category || '其他'),
+    tags: Array.isArray(e.tags) ? e.tags.map(String).filter(Boolean) : [],
+    title: String(e.title || '').slice(0, 80) || '（无标题）',
+    content: String(e.content || ''),
+    pinned: !!e.pinned,
+    hits: parseInt(e.hits, 10) || 0,
+    src: String(e.src || 'user'),
+    createdAt: e.createdAt || memNowISO(),
+    updatedAt: e.updatedAt || e.createdAt || memNowISO(),
+    emb: typeof e.emb === 'string' ? e.emb : ''
+  };
+}
+
+function memFind(id) {
+  return MEM.find(e => e.id === id) || null;
+}
+
+function memAdd(o) {
+  const e = memNormalize({
+    id: memNewId(), cat: o.cat, tags: o.tags, title: o.title, content: o.content,
+    pinned: o.pinned, src: o.src || 'ai', createdAt: memNowISO(), updatedAt: memNowISO()
+  });
+  MEM.push(e);
+  memSaveAll();
+  memTouchEmbed(e);
+  return e;
+}
+
+function memUpdate(id, patch) {
+  const e = memFind(id);
+  if (!e) return null;
+  if (patch.title !== undefined) e.title = String(patch.title).slice(0, 80) || e.title;
+  if (patch.content !== undefined) e.content = String(patch.content);
+  if (patch.cat !== undefined) e.cat = String(patch.cat || '其他');
+  if (patch.tags !== undefined) e.tags = (Array.isArray(patch.tags) ? patch.tags : []).map(String).filter(Boolean);
+  if (patch.pinned !== undefined) e.pinned = !!patch.pinned;
+  e.updatedAt = memNowISO();
+  memSaveAll();
+  memTouchEmbed(e);
+  return e;
+}
+
+function memDel(id) {
+  const i = MEM.findIndex(e => e.id === id);
+  if (i < 0) return false;
+  MEM.splice(i, 1);
+  memSaveAll();
+  return true;
+}
+
+/* ---- 向量（可选，纯锦上添花：没配就用关键词打分） ---- */
+function embPack(arr) {
+  if (!arr || !arr.length) return '';
+  const u8 = new Uint8Array(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    const v = Math.max(-1, Math.min(1, Number(arr[i]) || 0));
+    u8[i] = Math.round((v + 1) / 2 * 255);
+  }
+  let s = '';
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return 'q8:' + btoa(s);
+}
+function embUnpack(str) {
+  if (!str || str.indexOf('q8:') !== 0) return null;
+  try {
+    const s = atob(str.slice(3));
+    const f = new Float32Array(s.length);
+    for (let i = 0; i < s.length; i++) f[i] = (s.charCodeAt(i) / 255) * 2 - 1;
+    return f;
+  } catch (e) { return null; }
+}
+function memCos(a, b) {
+  let d = 0, na = 0, nb = 0;
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) { const x = a[i], y = b[i]; d += x * y; na += x * x; nb += y * y; }
+  if (!na || !nb) return 0;
+  return d / Math.sqrt(na * nb);
+}
+function memVecReady() {
+  return !!(MEMCFG.vecEnabled && MEMCFG.vecBase && MEMCFG.vecKey && MEMCFG.vecModel);
+}
+async function memEmbed(texts) {
+  if (!memVecReady()) throw new Error('未启用向量检索或配置不全');
+  const body = JSON.stringify({ model: MEMCFG.vecModel, input: texts });
+  const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + MEMCFG.vecKey };
+  const r = await nativeReq('POST', MEMCFG.vecBase.replace(/\/$/, '') + '/embeddings', headers, body, 60000);
+  const d = JSON.parse(r.text);
+  if (d.error) throw new Error(d.error.message || '向量接口错误');
+  if (!d.data || !d.data.length) throw new Error('向量接口返回异常');
+  return d.data.map(x => x.embedding || x.embeddings || []);
+}
+/** 后台给条目算向量，失败就算了，不影响任何功能 */
+async function memTouchEmbed(e) {
+  if (!memVecReady() || e.emb) return;
+  try {
+    const r = await memEmbed([(e.title || '') + '\n' + (e.content || '').slice(0, 1200)]);
+    if (r && r[0] && r[0].length) { e.emb = embPack(r[0]); memSaveAll(); }
+  } catch (err) {}
+}
+
+/* ---- 检索 ---- */
+function memKeywords(s) {
+  const t = String(s || '').toLowerCase().match(/[a-z0-9_]+|[\u4e00-\u9fa5]/g) || [];
+  const stop = { '的': 1, '了': 1, '是': 1, '我': 1, '你': 1, '他': 1, '她': 1, '它': 1,
+    '和': 1, '与': 1, '在': 1, '有': 1, '吗': 1, '呢': 1, '吧': 1, '啊': 1, '就': 1, '都': 1,
+    'the': 1, 'a': 1, 'an': 1, 'is': 1, 'to': 1, 'of': 1, 'and': 1, 'my': 1, 'me': 1 };
+  const uniq = [];
+  for (const x of t) if (!stop[x] && uniq.indexOf(x) < 0) uniq.push(x);
+  if (t.length > 1 && uniq.length && /[a-z0-9]/.test(t.join(''))) {
+    // 英文/拼音：额外把整串当成一个词，方便匹配 "react native"
+    const whole = t.join(' ');
+    if (whole.indexOf(' ') > 0 && uniq.indexOf(whole) < 0) uniq.push(whole);
+  }
+  return uniq;
+}
+function memScore(e, kws) {
+  if (!kws.length) return 0;
+  const title = String(e.title || '').toLowerCase();
+  const body = String(e.content || '').toLowerCase();
+  const tags = (e.tags || []).join(' ').toLowerCase();
+  const cat = memCat(e).toLowerCase();
+  let sc = 0;
+  for (const k of kws) {
+    if (!k) continue;
+    if (title.indexOf(k) >= 0) sc += 6;
+    if (tags.indexOf(k) >= 0) sc += 4;
+    if (cat.indexOf(k) >= 0) sc += 2;
+    if (body.indexOf(k) >= 0) sc += 1;
+  }
+  return sc;
+}
+/** 统一入口：关键词（+可选向量）混合检索，返回排好序的条目 */
+async function memSearch(opts) {
+  const o = opts || {};
+  const kws = memKeywords(o.keyword || '');
+  const limit = Math.max(1, Math.min(50, parseInt(o.limit, 10) || 15));
+  let pool = MEM.slice();
+  if (o.category) pool = pool.filter(e => memCat(e) === o.category);
+
+  let qv = null;
+  if (memVecReady() && o.keyword) {
+    try { const r = await memEmbed([o.keyword]); qv = (r && r[0] && r[0].length) ? r[0] : null; } catch (e) { qv = null; }
+  }
+
+  const scored = pool.map(e => {
+    const base = memScore(e, kws);
+    let bonus = 0;
+    if (qv) {
+      const ev = embUnpack(e.emb);
+      if (ev && ev.length === qv.length) bonus += memCos(ev, qv) * 10;
+    }
+    if (e.pinned) bonus += 1.5;                    // 重要的稍微往上抬
+    bonus += Math.min(3, (e.hits || 0) * 0.3);     // 常用的也抬一点
+    return { e, base: base, sc: base + bonus, bonus: bonus };
+  });
+
+  if (kws.length || qv) {
+    // 带关键词搜索时，没沾上边的就别硬凑上来（只有向量特别高或者重要到离谱的才留）
+    const kept = scored.filter(x => x.base > 0 || (qv && x.bonus > 4));
+    if (kept.length) {
+      kept.sort((a, b) => b.sc - a.sc || String(b.e.updatedAt).localeCompare(String(a.e.updatedAt)));
+      return kept.slice(0, limit).map(x => x.e);
+    }
+    return [];
+  }
+  scored.sort((a, b) => String(b.e.updatedAt || '').localeCompare(String(a.e.updatedAt || '')));
+  return scored.slice(0, limit).map(x => x.e);
+}
+
+/* ---- 常驻区：每轮都进 prompt 的那一小块，体积恒定 ---- */
+function memResidentBlock() {
+  if (!MEM.length) return '';
+  const counts = {};
+  MEM.forEach(e => { const c = memCat(e); counts[c] = (counts[c] || 0) + 1; });
+  const catLine = Object.keys(counts).map(c => c + '×' + counts[c]).join('、');
+  const pins = MEM.filter(e => e.pinned)
+    .sort((a, b) => (b.hits || 0) - (a.hits || 0) || String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .slice(0, MEM_PIN_MAX);
+  const pinIds = {};
+  pins.forEach(e => { pinIds[e.id] = 1; });
+  const recents = MEM.slice()
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
+    .filter(e => !pinIds[e.id])
+    .slice(0, MEM_NEW_MAX);
+  const line = (e) => '- [' + e.id + '] ' + (e.title || '（无标题）') + '（' + memCat(e) + '）';
+  let s = '【长期记忆库】本机存着 ' + MEM.length + ' 条记忆，分类：' + catLine + '。\n';
+  s += '下面只列出了索引，正文不在上下文里。需要细节时用 list_memories 检索、read_memory 读取，不要凭标题猜内容。\n';
+  if (pins.length) s += '★ 重要：\n' + pins.map(line).join('\n') + '\n';
+  if (recents.length) s += '☆ 最近：\n' + recents.map(line).join('\n') + '\n';
+  s += '聊天里得到值得长期记住的信息，用 save_memory 存下来（先 list_memories 查重，同一件事有变化用 update_memory）；只有用户明确说要删，才用 delete_memory。';
+  return s;
+}
+
+/* ---- 迁移旧版那条「【长期记忆总结】」 ---- */
+function memMigrateLegacy() {
+  const old = history.filter(m => m.role === 'system' && m.isMemory).pop();
+  if (!old) return;
+  const text = String(old.content || '').replace('【长期记忆总结】：', '').trim();
+  if (text) {
+    const dup = MEM.some(e => e.content.trim() === text);
+    if (!dup) memAdd({ title: '早期对话总结', content: text, cat: '事件', tags: ['总结', '迁移'], src: 'migrate', pinned: true });
+  }
+  history = history.filter(m => !(m.role === 'system' && m.isMemory));
+  if (!history.length) history = [{ role: 'system', content: CONFIG.systemPrompt }];
+  sSet('via_ai_history', history);
+}
+
+/* ---- 导出 ---- */
+function memExportJSON() {
+  const payload = { v: 1, type: 'elly-memory', exportedAt: memNowISO(), memories: MEM };
+  return JSON.stringify(payload, null, 2);
+}
+function memExportMarkdown() {
+  let s = '# 爱莉希雅的长期记忆\n\n';
+  s += '> 导出时间：' + memNowISO() + '，共 ' + MEM.length + ' 条\n\n';
+  const byCat = {};
+  MEM.forEach(e => { const c = memCat(e); (byCat[c] = byCat[c] || []).push(e); });
+  const order = MEM_CATS.concat(Object.keys(byCat).filter(c => MEM_CATS.indexOf(c) < 0));
+  order.forEach(c => {
+    const list = byCat[c];
+    if (!list || !list.length) return;
+    s += '## ' + c + '\n\n';
+    list.forEach(e => {
+      s += '### ' + (e.pinned ? '★ ' : '') + e.title + '\n\n';
+      s += (e.content || '').trim() + '\n\n';
+      const meta = [];
+      if (e.tags && e.tags.length) meta.push('标签：' + e.tags.join('、'));
+      meta.push('创建：' + String(e.createdAt).slice(0, 10));
+      meta.push('更新：' + String(e.updatedAt).slice(0, 10));
+      s += '_' + meta.join('　|　') + '_\n\n';
+    });
+  });
+  return s;
+}
+/** 从 Markdown 里尽量还原条目（不认识的一律进「其他」，不会丢内容） */
+function memParseMarkdown(md) {
+  const out = [];
+  let cat = '其他', cur = null, buf = [];
+  const flush = () => {
+    if (!cur) return;
+    const body = buf.join('\n').trim();
+    out.push(memNormalize({ cat: cat, title: cur.title, content: body || cur.title, pinned: cur.pinned, tags: [], src: 'import' }));
+    cur = null; buf = [];
+  };
+  String(md).split(/\r?\n/).forEach(raw => {
+    const line = raw;
+    const h2 = line.match(/^##\s+(.+?)\s*$/);
+    const h3 = line.match(/^###\s+(.+?)\s*$/);
+    if (h3) { flush(); cur = { title: h3[1].replace(/^★\s*/, '').trim(), pinned: /^★/.test(h3[1].trim()) }; return; }
+    if (h2) { flush(); cat = h2[1].trim(); return; }
+    if (!cur) return;
+    if (/^_.*_$/.test(line.trim())) return;   // 元信息行
+    if (/^>/.test(line.trim())) return;        // 引用
+    buf.push(line);
+  });
+  flush();
+  return out.filter(e => e.title && e.title !== '（无标题）');
+}
+function memImport(text, replace) {
+  const raw = String(text || '').trim();
+  if (!raw) throw new Error('内容是空的');
+  let items = null;
+  try {
+    const d = JSON.parse(raw);
+    if (Array.isArray(d)) items = d;
+    else if (d && Array.isArray(d.memories)) items = d.memories;
+  } catch (e) {
+    try {
+      const d = JSON.parse(b64d(raw));
+      if (Array.isArray(d)) items = d;
+      else if (d && Array.isArray(d.memories)) items = d.memories;
+    } catch (e2) { items = null; }
+  }
+  if (!items) items = memParseMarkdown(raw);
+  if (!items || !items.length) throw new Error('没解析出任何记忆');
+
+  if (replace) MEM = [];
+  let added = 0, skipped = 0;
+  items.forEach(it => {
+    if (!it || typeof it !== 'object') return;
+    const e = memNormalize(Object.assign({}, it, { src: it.src || 'import' }));
+    const same = MEM.find(x => x.content.trim() === e.content.trim() && x.title === e.title);
+    if (same) { skipped++; return; }
+    // 导入的 id 可能和现有的撞车
+    while (MEM.some(x => x.id === e.id)) e.id = memNewId();
+    e.emb = '';   // 向量是模型相关的，重新算
+    MEM.push(e);
+    added++;
+    if (memVecReady()) memTouchEmbed(e);
+  });
+  memSaveAll();
+  return { added: added, skipped: skipped };
+}
+
+/* ---- 记忆页 UI ---- */
+const MEMUI = { cat: '', keyword: '', toolsOpen: false, editing: null };
+
+function memEsc(s) { return esc(String(s == null ? '' : s)); }
+function memDate(s) {
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return '';
+  return (d.getMonth() + 1) + '/' + d.getDate();
+}
+function memCardHTML(e) {
+  const tags = (e.tags || []).map(t => '<span class="mem-tag">#' + memEsc(t) + '</span>').join('');
+  return '<div class="mem-card' + (e.pinned ? ' pin' : '') + '" data-id="' + memEsc(e.id) + '">' +
+    '<div class="mem-hd">' +
+      (e.pinned ? '<span class="mem-pin">★</span>' : '') +
+      '<span class="mem-title">' + memEsc(e.title) + '</span>' +
+      '<span class="mem-cat">' + memEsc(memCat(e)) + '</span>' +
+    '</div>' +
+    '<div class="mem-body">' + memEsc(e.content) + '</div>' +
+    '<div class="mem-ft">' + (tags || '<span class="mem-tag">无标签</span>') +
+      '<span class="mem-meta">' + memDate(e.updatedAt) + (e.hits ? ' · 读过' + e.hits + '次' : '') + '</span></div>' +
+    '<div class="mem-ops">' +
+      '<button data-op="edit">编辑</button>' +
+      '<button data-op="pin">' + (e.pinned ? '取消重要' : '设为重要') + '</button>' +
+      '<button data-op="del" class="danger">删除</button>' +
+    '</div>' +
+  '</div>';
+}
+
+async function renderMemory() {
+  const el = $('#memory');
+  if (!el) return;
+  const counts = {};
+  MEM.forEach(e => { const c = memCat(e); counts[c] = (counts[c] || 0) + 1; });
+  const all = MEM_CATS.concat(Object.keys(counts).filter(c => MEM_CATS.indexOf(c) < 0));
+  let ch = '<button data-cat="" class="' + (MEMUI.cat ? '' : 'on') + '">全部<span class="cnt">' + MEM.length + '</span></button>';
+  all.forEach(c => {
+    const n = counts[c] || 0;
+    if (!n && MEM_CATS.indexOf(c) >= 0) return;
+    ch += '<button data-cat="' + memEsc(c) + '" class="' + (MEMUI.cat === c ? 'on' : '') + '">' +
+      memEsc(c) + '<span class="cnt">' + n + '</span></button>';
+  });
+  $('#mem-cats').innerHTML = ch;
+  $$('#mem-cats button').forEach(b => {
+    b.onclick = () => { MEMUI.cat = b.dataset.cat || ''; renderMemory(); };
+  });
+
+  let list;
+  try { list = await memSearch({ keyword: MEMUI.keyword, category: MEMUI.cat, limit: 50 }); }
+  catch (e) { list = MEM.slice(0, 50); }
+  if (!list.length) {
+    $('#mem-list').innerHTML = '<div id="mem-empty">' + (MEM.length ? '没有匹配的记忆~' :
+      '还没有记忆。<br>多和' + memEsc(CONFIG.assistantName || '她') + '聊几句，我会自己记下来；<br>也可以点右上角「＋ 新建」手动添加。') + '</div>';
+    return;
+  }
+  $('#mem-list').innerHTML = list.map(memCardHTML).join('');
+  $$('#mem-list .mem-card').forEach(card => {
+    const id = card.dataset.id;
+    card.querySelector('.mem-body').onclick = () => card.classList.toggle('open');
+    card.querySelector('.mem-title').onclick = () => card.classList.toggle('open');
+    card.querySelectorAll('.mem-ops button').forEach(btn => {
+      btn.onclick = async (ev) => {
+        ev.stopPropagation();
+        const op = btn.dataset.op;
+        if (op === 'edit') openMemEditor(id);
+        else if (op === 'pin') {
+          const e = memFind(id);
+          if (!e) return;
+          memUpdate(id, { pinned: !e.pinned });
+          toast(e.pinned ? '已设为重要' : '已取消重要');
+          renderMemory();
+        } else if (op === 'del') {
+          const e = memFind(id);
+          if (!e) return;
+          if (!(await uiConfirm('删除这条记忆？\n\n' + e.title, '删除', '确认删除'))) return;
+          memDel(id);
+          toast('已删除');
+          renderMemory();
+        }
+      };
+    });
+  });
+}
+
+function openMemEditor(id) {
+  const e = id ? memFind(id) : null;
+  MEMUI.editing = id || null;
+  const cats = MEM_CATS.concat(MEM.map(x => memCat(x)).filter((c, i, a) => a.indexOf(c) === i && MEM_CATS.indexOf(c) < 0));
+  $('#mem-edit').innerHTML =
+    '<h3>' + (e ? '编辑记忆' : '新建记忆') + '</h3>' +
+    '<div class="sg"><label>标题（一句话，越具体越好搜）</label>' +
+      '<input id="me-title" type="text" value="' + (e ? memEsc(e.title) : '') + '" placeholder="例如：用户喜欢喝无糖可乐"></div>' +
+    '<div class="sg"><label>分类</label><input id="me-cat" type="text" list="me-cat-list" value="' + (e ? memEsc(memCat(e)) : '') + '" placeholder="选一个或自己写一个">' +
+      '<datalist id="me-cat-list">' + cats.map(c => '<option value="' + memEsc(c) + '"></option>').join('') + '</datalist></div>' +
+    '<div class="sg"><label>标签（用逗号分隔）</label>' +
+      '<input id="me-tags" type="text" value="' + (e ? memEsc((e.tags || []).join('，')) : '') + '" placeholder="可乐，饮食，偏好"></div>' +
+    '<div class="sg"><label>正文</label>' +
+      '<textarea id="me-content" placeholder="把事情写清楚，以后你自己能看懂">' + (e ? memEsc(e.content) : '') + '</textarea></div>' +
+    '<label class="mem-switch"><input type="checkbox" id="me-pin"' + (e && e.pinned ? ' checked' : '') + '>设为重要（常驻在每轮对话里）</label>' +
+    '<div class="acts"><button class="btn-p" id="me-save">保存</button><button class="btn-s" id="me-cancel">取消</button></div>' +
+    (e ? '<div class="acts" style="margin-top:8px"><button class="btn-s" id="me-del" style="color:#d6336c">删除这条</button></div>' : '');
+  $('#mem-edit').classList.add('open');
+
+  const close = () => { $('#mem-edit').classList.remove('open'); MEMUI.editing = null; };
+  $('#me-cancel').onclick = close;
+  $('#me-save').onclick = () => {
+    const title = $('#me-title').value.trim();
+    const content = $('#me-content').value.trim();
+    const cat = $('#me-cat').value.trim() || '其他';
+    const tags = $('#me-tags').value.split(/[，,、;；]/).map(s => s.trim()).filter(Boolean);
+    const pinned = $('#me-pin').checked;
+    if (!title) return toast('标题不能为空');
+    if (!content) return toast('正文不能为空');
+    if (MEMUI.editing) memUpdate(MEMUI.editing, { title: title, content: content, cat: cat, tags: tags, pinned: pinned });
+    else memAdd({ title: title, content: content, cat: cat, tags: tags, pinned: pinned, src: 'user' });
+    close();
+    toast('已保存~');
+    renderMemory();
+  };
+  if ($('#me-del')) $('#me-del').onclick = async () => {
+    if (!(await uiConfirm('删除这条记忆？', '删除', '确认删除'))) return;
+    memDel(MEMUI.editing);
+    close();
+    toast('已删除');
+    renderMemory();
+  };
+}
+
+/** 把对话里值得长期记住的东西整理进记忆库（让 AI 自己决定存什么） */
+async function memSummarize() {
+  const non = history.filter(m => m.role !== 'system');
+  if (non.length < 4) return toast('对话太短，再聊几句吧~');
+  if (sending) return;
+  const idx = MEM.length
+    ? MEM.map(e => '- [' + e.id + '] ' + e.title + '（' + memCat(e) + '）').join('\n')
+    : '（记忆库现在还是空的）';
+  const convo = non.map(m => (m.role === 'user' ? '用户' : (CONFIG.assistantName || 'AI')) + '：' + textOfContent(m.content)).join('\n');
+  if (!(await uiConfirm('把这段对话里值得长期记住的东西整理进记忆库？', '开始整理', '总结记忆'))) return;
+
+  sending = true;
+  const ld = addTyping();
+  let ok = false;
+  try {
+    const p = (CONFIG.summaryPrompt || DC.summaryPrompt) +
+      '\n\n【本次任务】你现在不是在和用户聊天，而是在整理自己的长期记忆库。请通过 save_memory / update_memory 工具，把下面这段对话里值得长期保留的信息写进记忆库：\n' +
+      '· 用户的偏好、习惯、身份、人际关系\n· 正在进行的项目、约定、待办\n· 值得记住的事件和结论\n' +
+      '不要记录寒暄、临时问答、以及能从常识推断出来的东西。\n' +
+      '下面是已有记忆的索引，同一件事请用 update_memory 补充修改，不要重复新建：\n' + idx +
+      '\n\n【本次对话】\n' + convo;
+    await chatReqTools([
+      { role: 'system', content: CONFIG.systemPrompt },
+      { role: 'user', content: p }
+    ]);
+    ok = true;
+  } catch (e) {
+    ld.remove();
+    addMsg('assistant', '整理记忆失败：' + errMsg(e));
+  }
+  if (ok) {
+    ld.remove();
+    toast('记忆已整理：现在共 ' + MEM.length + ' 条');
+    renderMemory();
+    if (await uiConfirm('要不要顺便把当前对话清空？', '清空对话', '清理对话')) {
+      history = [{ role: 'system', content: CONFIG.systemPrompt }];
+      sSet('via_ai_history', history);
+      renderHistory();
+      toast('对话已清空');
+    }
+    renderMemory();
+  }
+  sending = false;
+}
+
+function bindMemory() {
+  const back = $('#mem-back');
+  if (!back) return;
+  back.onclick = () => showView('chat');
+  $('#mem-sum').onclick = memSummarize;
+  $('#mem-new').onclick = () => openMemEditor(null);
+  $('#mem-tools-btn').onclick = () => {
+    MEMUI.toolsOpen = !MEMUI.toolsOpen;
+    $('#mem-tools').classList.toggle('open', MEMUI.toolsOpen);
+  };
+  const doSearch = () => { MEMUI.keyword = $('#mem-search').value.trim(); renderMemory(); };
+  $('#mem-search-btn').onclick = doSearch;
+  $('#mem-search').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
+
+  $('#mem-export-json').onclick = () => {
+    if (!MEM.length) return toast('还没有记忆可以导出哦');
+    $('#mem-code').value = memExportJSON();
+    MEMUI.toolsOpen = true; $('#mem-tools').classList.add('open');
+    toast('已生成 JSON，可复制保存');
+  };
+  $('#mem-export-md').onclick = () => {
+    if (!MEM.length) return toast('还没有记忆可以导出哦');
+    $('#mem-code').value = memExportMarkdown();
+    MEMUI.toolsOpen = true; $('#mem-tools').classList.add('open');
+    toast('已生成 Markdown，可复制保存');
+  };
+  $('#mem-copy').onclick = () => {
+    const v = $('#mem-code').value.trim();
+    if (!v) return toast('先点导出吧~');
+    toast(writeClipboard(v) ? '已复制到剪贴板' : '复制失败，请长按文本框手动复制');
+  };
+  const doImport = async (replace) => {
+    const raw = $('#mem-code').value.trim();
+    if (!raw) return toast('请先粘贴记忆数据');
+    if (replace && !(await uiConfirm('覆盖导入会清空现有的 ' + MEM.length + ' 条记忆，确定吗？', '覆盖', '确认覆盖'))) return;
+    try {
+      const r = memImport(raw, replace);
+      $('#mem-code').value = '';
+      toast('导入完成：新增 ' + r.added + ' 条' + (r.skipped ? '，跳过重复 ' + r.skipped + ' 条' : ''));
+      renderMemory();
+    } catch (e) { toast('导入失败：' + errMsg(e)); }
+  };
+  $('#mem-import').onclick = () => doImport(false);
+  $('#mem-import-replace').onclick = () => doImport(true);
+}
 
 /* ==========================================================
  *  主题
@@ -1124,10 +1785,9 @@ function addTyping() {
 function saveHistory() {
   const max = CONFIG.maxContextTurns * 2;
   const base = { role: 'system', content: CONFIG.systemPrompt };
-  const mem = history.filter(m => m.role === 'system' && m.isMemory).pop();
-  const sys = mem ? [base, mem] : [base];
   const non = history.filter(m => m.role !== 'system');
-  history = non.length > max ? [...sys, ...non.slice(-max)] : [...sys, ...non];
+  // 旧版那条「长期记忆」已经在启动时迁进记忆库了，这里不再单独保留
+  history = non.length > max ? [base, ...non.slice(-max)] : [base, ...non];
   sSet('via_ai_history', history);
 }
 
@@ -1341,9 +2001,13 @@ function parseVars(t) {
 
 async function chatReq(messages, skipParse) {
   if (!CONFIG.apiKey) throw new Error('未填写 API Key，请到设置里配置');
-  const proc = messages.map(m =>
-    (m.role === 'system' && !skipParse) ? { role: 'system', content: parseVars(m.content) } : m
-  );
+  const memBlock = memResidentBlock();
+  const proc = messages.map((m, i) => {
+    if (m.role !== 'system') return m;
+    let c = skipParse ? m.content : parseVars(m.content);
+    if (i === 0 && memBlock) c = c + '\n\n' + memBlock;
+    return { role: 'system', content: c };
+  });
   const body = JSON.stringify({ model: CONFIG.model, messages: proc, stream: false });
   const headers = {
     'Content-Type': 'application/json',
@@ -1790,6 +2454,61 @@ function buildTools() {
         parameters: { type: 'object', properties: {
           command: { type: 'string', enum: ['pause', 'resume', 'next', 'prev', 'stop', 'favorite'], description: '命令' }
         }, required: ['command'] } } });
+
+  /* ---- 长期记忆 ---- */
+  tools.push({ type: 'function', function: {
+        name: 'list_memories',
+        description: '检索/浏览你的长期记忆库。返回编号、分类、标题和正文摘要。用户问"你记得我什么""我之前说过什么""关于 X 的事"，或你想确认某件事是否记过时，先调它。记忆很多时用 keyword 缩小范围。',
+        parameters: { type: 'object', properties: {
+          keyword: { type: 'string', description: '搜索关键词，留空则按分类/时间列' },
+          category: { type: 'string', description: '限定分类，如"关于你""项目"；留空表示全部' },
+          limit: { type: 'integer', description: '最多返回几条，默认 15' }
+        }, required: [] } } });
+  tools.push({ type: 'function', function: {
+        name: 'read_memory',
+        description: '按编号读取长期记忆的完整正文。list_memories 只给标题和摘要，看标题不够时用它读全文（可一次传多个 id）。',
+        parameters: { type: 'object', properties: {
+          id: { type: 'string', description: '记忆编号' },
+          ids: { type: 'array', items: { type: 'string' }, description: '一次读多条' }
+        }, required: [] } } });
+  tools.push({ type: 'function', function: {
+        name: 'list_memory_categories',
+        description: '列出记忆库里现有的分类和每类条数。不确定新记忆该归到哪一类时先看看。',
+        parameters: { type: 'object', properties: {}, required: [] } } });
+  tools.push({ type: 'function', function: {
+        name: 'save_memory',
+        description: '新记住一件事。用户透露了值得长期记住的偏好、事实、约定、进展时调用。写之前先 list_memories 查重，同一件事有新进展用 update_memory 而不是新建。日常闲聊、一次性信息不要存。',
+        parameters: { type: 'object', properties: {
+          title: { type: 'string', description: '一句话标题，简短好搜，如"用户喜欢喝无糖可乐"' },
+          content: { type: 'string', description: '正文，把背景和细节写清楚' },
+          category: { type: 'string', description: '分类，优先用已有分类，不合适再新建。默认"其他"' },
+          tags: { type: 'array', items: { type: 'string' }, description: '2~5 个关键词标签，方便以后检索' },
+          pinned: { type: 'boolean', description: '是否置为重要（常驻记忆），只在确实很重要时设 true' }
+        }, required: ['title', 'content'] } } });
+  tools.push({ type: 'function', function: {
+        name: 'update_memory',
+        description: '修改已有记忆。内容过时、有补充、分类/标题不合适时调用。只需要传要改的字段。',
+        parameters: { type: 'object', properties: {
+          id: { type: 'string', description: '记忆编号' },
+          title: { type: 'string' }, content: { type: 'string' },
+          category: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' } },
+          pinned: { type: 'boolean' }
+        }, required: ['id'] } } });
+  tools.push({ type: 'function', function: {
+        name: 'pin_memory',
+        description: '把某条记忆设为/取消「重要」。重要的记忆会常驻在每轮对话里。',
+        parameters: { type: 'object', properties: {
+          id: { type: 'string' },
+          pinned: { type: 'boolean', description: 'true 设为重要，false 取消' }
+        }, required: ['id'] } } });
+  tools.push({ type: 'function', function: {
+        name: 'delete_memory',
+        description: '删除一条长期记忆。危险操作：只有用户本人明确指名要删某条记忆时才可调用，系统会再向用户弹窗确认，用户不同意就作废。不要自己决定删。',
+        parameters: { type: 'object', properties: {
+          id: { type: 'string', description: '要删除的记忆编号' },
+          reason: { type: 'string', description: '为什么要删，会展示给用户看' }
+        }, required: ['id'] } } });
   return tools;
 }
 async function execTool(name, args) {
@@ -1818,6 +2537,79 @@ async function execTool(name, args) {
   if (name === 'set_clipboard') {
     if (!args.text) return { success: false, error: '缺少文本' };
     return writeClipboard(args.text) ? { success: true } : { success: false, error: '写入剪贴板失败' };
+  }
+
+  /* ---- 长期记忆 ---- */
+  if (name === 'list_memories') {
+    const list = await memSearch({ keyword: args.keyword || '', category: args.category || '', limit: args.limit || 15 });
+    if (!MEM.length) return { success: true, total: 0, memories: [], note: '记忆库还是空的，暂时没有可参考的长期记忆。' };
+    return { success: true, total: MEM.length, count: list.length, memories: list.map(e => ({
+      id: e.id, cat: memCat(e), title: e.title,
+      summary: String(e.content || '').replace(/\s+/g, ' ').slice(0, 60),
+      tags: e.tags || [], pinned: !!e.pinned,
+      updated: String(e.updatedAt || '').slice(0, 10)
+    })) };
+  }
+  if (name === 'read_memory') {
+    const ids = (args.ids && args.ids.length) ? args.ids.slice() : (args.id ? [args.id] : []);
+    if (!ids.length) return { success: false, error: '缺少记忆编号' };
+    const out = [], miss = [];
+    for (const id of ids) {
+      const e = memFind(String(id));
+      if (!e) { miss.push(String(id)); continue; }
+      e.hits = (e.hits || 0) + 1;
+      out.push({ id: e.id, cat: memCat(e), title: e.title, content: e.content, tags: e.tags || [],
+        pinned: !!e.pinned, createdAt: e.createdAt, updatedAt: e.updatedAt });
+    }
+    memSaveAll();
+    if (!out.length) return { success: false, error: '没找到这些编号：' + miss.join('、') + '（可用 list_memories 重新检索）' };
+    return { success: true, count: out.length, memories: out, missing: miss };
+  }
+  if (name === 'list_memory_categories') {
+    const counts = {};
+    MEM.forEach(e => { const c = memCat(e); counts[c] = (counts[c] || 0) + 1; });
+    return { success: true, total: MEM.length, preset: MEM_CATS, categories: counts };
+  }
+  if (name === 'save_memory') {
+    if (!args.title || !args.content) return { success: false, error: '标题和正文都要有' };
+    const dup = MEM.find(e => e.title === String(args.title).trim());
+    if (dup) return { success: false, error: '已有一条同名记忆（' + dup.id + '），要补充或修改请改用 update_memory。' };
+    const e = memAdd({
+      title: String(args.title).trim(), content: String(args.content).trim(),
+      cat: String(args.category || '其他').trim() || '其他',
+      tags: Array.isArray(args.tags) ? args.tags : [],
+      pinned: !!args.pinned, src: 'ai'
+    });
+    return { success: true, id: e.id, cat: memCat(e), saved: e.title };
+  }
+  if (name === 'update_memory') {
+    if (!args.id) return { success: false, error: '缺少记忆编号' };
+    if (!memFind(String(args.id))) return { success: false, error: '没有编号为 ' + args.id + ' 的记忆' };
+    const patch = {};
+    if (args.title !== undefined) patch.title = args.title;
+    if (args.content !== undefined) patch.content = args.content;
+    if (args.category !== undefined) patch.cat = args.category;
+    if (args.tags !== undefined) patch.tags = args.tags;
+    if (args.pinned !== undefined) patch.pinned = args.pinned;
+    const e = memUpdate(String(args.id), patch);
+    return { success: true, id: e.id, updated: e.title };
+  }
+  if (name === 'pin_memory') {
+    const e = memFind(String(args.id || ''));
+    if (!e) return { success: false, error: '没有这条记忆' };
+    const want = args.pinned === undefined ? !e.pinned : !!args.pinned;
+    memUpdate(e.id, { pinned: want });
+    return { success: true, id: e.id, pinned: want, title: e.title };
+  }
+  if (name === 'delete_memory') {
+    const e = memFind(String(args.id || ''));
+    if (!e) return { success: false, error: '没有这条记忆' };
+    const why = args.reason ? '\n\n我的理由：' + String(args.reason).slice(0, 120) : '';
+    const ok = await uiConfirm('爱莉希雅想删掉这条记忆：\n\n' + e.title + '\n' + String(e.content || '').slice(0, 120) + why, '同意删除', '记忆删除授权');
+    if (!ok) return { success: false, error: '用户没有同意删除，这条记忆保留着。', denied: true };
+    memDel(e.id);
+    if ($('#memory').classList.contains('open')) renderMemory();
+    return { success: true, deleted: e.title };
   }
   if (!CONFIG.musicEnabled) return { success: false, error: '音乐功能未开启，请让用户去设置开启。' };
   if (name === 'search_and_play_music') {
@@ -1880,8 +2672,14 @@ function textOfContent(c) {
 async function chatReqTools(messages) {
   if (!CONFIG.apiKey) throw new Error('未填写 API Key，请到设置里配置');
   if (toolsBroken) return await chatReq(messages);
-  const proc = messages.map(m =>
-    m.role === 'system' ? { role: 'system', content: parseVars(m.content) } : m);
+  const proc = (function () {
+    const memBlock = memResidentBlock();
+    return messages.map((m, i) => {
+      if (m.role !== 'system') return m;
+      const c = parseVars(m.content);
+      return { role: 'system', content: (i === 0 && memBlock) ? c + '\n\n' + memBlock : c };
+    });
+  })();
   const tools = buildTools(), MAX = 5;
   const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.apiKey };
   const url = CONFIG.apiBase.replace(/\/$/, '') + '/chat/completions';
@@ -2170,6 +2968,21 @@ function renderSettings() {
   </div></div>
 <div class="sg"><label>识图模型</label><input id="set-vision-model" value="${esc(CONFIG.visionModel || '')}" placeholder="如 gpt-4o / qwen-vl-max"></div>
 
+<div class="sec-title">🧠 长期记忆</div>
+<div class="mini-note" style="margin-top:8px">记忆不再塞进上下文。她每轮只看得到一份「分类概览 + 重要 + 最近」的索引，需要细节时会用工具去查，所以记忆再多也不会变卡。</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-mem-open" class="btn-p">打开记忆库（${MEM.length} 条）</button>
+</div>
+<div class="sg" style="margin-top:10px"><label>语义检索（可选，需要向量模型）</label>${toggleGroup('memvec', MEMCFG.vecEnabled ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="mini-note">不开也能用：默认是关键词打分。开了之后搜索会更懂意思，但每存一条记忆会多一次接口调用。</div>
+<div class="sg"><label>向量 API 地址</label><input id="set-vec-base" value="${esc(MEMCFG.vecBase || '')}" placeholder="https://.../v1"></div>
+<div class="sg"><label>向量 API Key</label>
+  <div class="pin-row">
+    <input id="set-vec-key" class="secret" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="${esc(MEMCFG.vecKey || '')}">
+    <button type="button" id="btn-paste-vkey2" class="btn-paste">粘贴</button>
+  </div></div>
+<div class="sg"><label>向量模型</label><input id="set-vec-model" value="${esc(MEMCFG.vecModel || '')}" placeholder="如 text-embedding-3-small / bge-m3"></div>
+
 <div class="sec-title">🎨 外观</div>
 <div class="sg" style="margin-top:8px"><label>主题色 1</label>${swatchGroup('c1', CONFIG.themeColor1)}</div>
 <div class="sg"><label>主题色 2</label>${swatchGroup('c2', CONFIG.themeColor2)}</div>
@@ -2230,6 +3043,10 @@ function renderSettings() {
   if (pk) pk.onclick = () => pasteIntoInput($('#set-apikey'));
   const pvk = $('#btn-paste-vkey');
   if (pvk) pvk.onclick = () => pasteIntoInput($('#set-vision-key'));
+  const pvk2 = $('#btn-paste-vkey2');
+  if (pvk2) pvk2.onclick = () => pasteIntoInput($('#set-vec-key'));
+  const mo = $('#btn-mem-open');
+  if (mo) mo.onclick = () => showView('memory');
   $('#btn-export').onclick = exportData;
   $('#btn-import').onclick = importData;
   $('#btn-copy-backup').onclick = () => {
@@ -2271,10 +3088,17 @@ function saveSettings() {
   $('#btn-music').hidden = !CONFIG.musicEnabled;
   if (!CONFIG.musicEnabled && M.audio) M.audio.pause();
   sSet('via_ai_config', CONFIG);
-  const mem = history.find(m => m.role === 'system' && m.isMemory);
-  history = mem
-    ? [{ role: 'system', content: CONFIG.systemPrompt }, mem]
-    : [{ role: 'system', content: CONFIG.systemPrompt }, ...history.filter(m => m.role !== 'system')];
+
+  // 记忆库的向量配置单独存（没开向量也不影响）
+  const vEn = groupVal('memvec');
+  if (vEn !== null && vEn !== undefined) MEMCFG.vecEnabled = vEn === 'true';
+  if ($('#set-vec-base')) MEMCFG.vecBase = $('#set-vec-base').value.trim();
+  if ($('#set-vec-key')) MEMCFG.vecKey = $('#set-vec-key').value.trim();
+  if ($('#set-vec-model')) MEMCFG.vecModel = $('#set-vec-model').value.trim();
+  memSaveCfg();
+
+  history = [{ role: 'system', content: CONFIG.systemPrompt }]
+    .concat(history.filter(m => m.role !== 'system'));
   sSet('via_ai_history', history);
   applyTheme();
   renderHistory();
@@ -2343,7 +3167,8 @@ async function clearAll() {
  * ========================================================== */
 function showView(v) {
   const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
-  const settings = $('#settings'), music = $('#music'), mini = $('#mini-player');
+  const settings = $('#settings'), music = $('#music'), mini = $('#mini-player'),
+    memory = $('#memory'), memEdit = $('#mem-edit');
   const attachEl = $('#attach-bar');
   bodyEl.style.display = 'none';
   footEl.style.display = 'none';
@@ -2351,6 +3176,8 @@ function showView(v) {
   if (attachEl) attachEl.style.display = 'none';
   settings.classList.remove('open');
   music.classList.remove('open');
+  if (memory) memory.classList.remove('open');
+  if (memEdit) memEdit.classList.remove('open');
   mini.style.display = v === 'chat' ? '' : 'none';
   if (v === 'chat') {
     bodyEl.style.display = 'flex';
@@ -2361,6 +3188,12 @@ function showView(v) {
     updateMini();
   } else if (v === 'settings') settings.classList.add('open');
   else if (v === 'music') music.classList.add('open');
+  else if (v === 'memory' && memory) {
+    memory.classList.add('open');
+    const s = $('#mem-search');
+    if (s) s.value = MEMUI.keyword;
+    renderMemory();
+  }
 }
 
 /* ==========================================================
@@ -2434,6 +3267,7 @@ function bindMusicUI() {
  * ========================================================== */
 function bindHeader() {
   $('#btn-set').onclick = () => showView('settings');
+  $('#btn-mem').onclick = () => showView('memory');
   $('#btn-music').onclick = () => { M.currentTab = 'search'; renderList(M.playlist); showView('music'); };
   $('#btn-close').onclick = () => {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
@@ -2442,39 +3276,13 @@ function bindHeader() {
     try { if (HAS_NATIVE && Android.minimizeToBubble) Android.minimizeToBubble(); } catch (e) {}
   };
   $('#btn-clr').onclick = async () => {
-    if (!(await uiConfirm('清空所有对话和记忆？', '清空'))) return;
+    if (!(await uiConfirm('清空当前对话？（记忆库会保留）', '清空'))) return;
     history = [{ role: 'system', content: CONFIG.systemPrompt }];
     sSet('via_ai_history', history);
     renderHistory();
-    toast('已清空');
+    toast('已清空对话，记忆还在~');
   };
-  $('#btn-sum').onclick = async () => {
-    const non = history.filter(m => m.role !== 'system');
-    if (non.length < 4) return toast('对话太短，再聊几句吧~');
-    if (!(await uiConfirm('总结为长期记忆，并清空对话？', '总结'))) return;
-    if (sending) return;
-    sending = true;
-    const ld = addTyping();
-    try {
-      const om = history.find(m => m.role === 'system' && m.isMemory);
-      let p = CONFIG.summaryPrompt;
-      if (om) p += '\n\n【已有记忆】\n' + String(om.content).replace('【长期记忆总结】：', '');
-      p += '\n\n【对话】\n' + non.map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content}`).join('\n');
-      const s = await chatReq([{ role: 'user', content: p }], true);
-      ld.remove();
-      history = [
-        { role: 'system', content: CONFIG.systemPrompt },
-        { role: 'system', content: '【长期记忆总结】：' + s, isMemory: true }
-      ];
-      sSet('via_ai_history', history);
-      renderHistory();
-      toast('记忆已保存~');
-    } catch (e) {
-      ld.remove();
-      addMsg('assistant', '失败：' + errMsg(e));
-    }
-    sending = false;
-  };
+  $('#btn-mem').onclick = () => showView('memory');
 }
 
 /* ==========================================================
@@ -2680,6 +3488,7 @@ function boot() {
     CONFIG.avatarUrl = DC.avatarUrl;
     sSet('via_ai_config', CONFIG);
   }
+  memMigrateLegacy();   // 旧版那条单一「长期记忆总结」→ 记忆库里的 1 条
   applyTheme();
   renderActions();
   renderSettings();
@@ -2687,6 +3496,7 @@ function boot() {
   bindHeader();
   bindInput();
   bindMusicUI();
+  bindMemory();
   bindDrag();
   bindGuide();
   bindModal();
@@ -2697,7 +3507,7 @@ function boot() {
   $('#btn-music').hidden = !CONFIG.musicEnabled;
   $('#fav-cnt').textContent = favorites.length;
 
-  console.log('[Elly] 就绪 ♪');
+  console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条');
 }
 
 if (document.readyState === 'loading') {
