@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="@string/ime_label"
+    android:settingsActivity="com.elly.assistant.MainActivity">
+    <subtype
+        android:label="@string/ime_subtype"
+        android:imeSubtypeLocale="zh_CN"
+        android:imeSubtypeMode="keyboard" />
+</input-method>

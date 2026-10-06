@@ -151,7 +151,18 @@ class FloatService : Service() {
     private var capsuleText: TextView? = null
     private var capsuleSpinner: Ring? = null
     private var capsuleDot: View? = null
+    private var capsuleDots: TextView? = null
+    private var capsuleDotsPhase = 0
     private var capsuleMode = false
+
+    private val capsuleDotsTick = object : Runnable {
+        override fun run() {
+            if (!capsuleMode || capsuleDots == null) return
+            capsuleDotsPhase = (capsuleDotsPhase % 3) + 1
+            capsuleDots?.text = "·".repeat(capsuleDotsPhase)
+            main.postDelayed(this, 420L)
+        }
+    }
 
     /* 屏幕翻译：原位覆盖层（穿透不挡操作） + 「还原」小按钮（可点） */
     private var transOverlay: View? = null
@@ -721,7 +732,13 @@ class FloatService : Service() {
         capsuleText?.text = if (text.isBlank()) "正在处理…" else text
         val busy = state == "busy"
         capsuleSpinner?.visibility = if (busy) View.VISIBLE else View.GONE
-        if (busy) capsuleSpinner?.start() else capsuleSpinner?.stop()
+        if (busy) {
+            capsuleSpinner?.start()
+            startCapsuleDots()
+        } else {
+            capsuleSpinner?.stop()
+            stopCapsuleDots()
+        }
         capsuleDot?.visibility = if (state == "done") View.VISIBLE else View.GONE
     }
 
@@ -734,6 +751,19 @@ class FloatService : Service() {
         capsuleText = null
         capsuleSpinner = null
         capsuleDot = null
+        capsuleDots = null
+        stopCapsuleDots()
+    }
+
+    private fun startCapsuleDots() {
+        main.removeCallbacks(capsuleDotsTick)
+        capsuleDotsPhase = 0
+        capsuleDotsTick.run()
+    }
+
+    private fun stopCapsuleDots() {
+        main.removeCallbacks(capsuleDotsTick)
+        capsuleDots?.text = ""
     }
 
     /** 点胶囊 → 展开浮窗，并告诉 JS 把结果展示出来。 */
@@ -796,6 +826,22 @@ class FloatService : Service() {
         lp.leftMargin = dp(8)
         bar.addView(label, lp)
         capsuleText = label
+
+        val dots = TextView(this).apply {
+            setTextColor(0xFFD6336C.toInt())
+            textSize = 13f
+            // 点数变化时不能让 TextView 换行，否则胶囊会在第三个点出现时变高。
+            // 固定单行、固定宽高，并关闭字体额外留白，让加载动画只改变内容而不改变胶囊尺寸。
+            setSingleLine(true)
+            maxLines = 1
+            setHorizontallyScrolling(true)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            minWidth = dp(18)
+            text = "·"
+        }
+        bar.addView(dots, LinearLayout.LayoutParams(dp(18), dp(18)))
+        capsuleDots = dots
 
         root.addView(bar, android.widget.FrameLayout.LayoutParams(
             android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -1548,6 +1594,9 @@ class FloatService : Service() {
             }
         }
     }
+
+    /** 允许 PermissionBridge 在原生策略拒绝截屏时结束 JS 等待。 */
+    fun deliverScreenshot(dataUrl: String?) = runOnMain { deliverShot(dataUrl) }
 
     private fun deliverShot(dataUrl: String?) {
         val js = if (dataUrl.isNullOrBlank()) {

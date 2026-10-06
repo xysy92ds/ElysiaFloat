@@ -75,6 +75,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   font-size:12px;border-radius:8px;max-width:95%;text-align:center;
   padding:6px 12px}
 .msg.typing{color:var(--muted)}
+.agent-status{display:block;margin-top:5px;color:var(--muted);font-size:9px;line-height:1.25;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tts-btn{display:inline-flex;align-items:center;margin-top:8px;
   padding:4px 12px;border-radius:12px;background:rgba(255,154,158,.12);
   color:var(--accent);font-size:11px;cursor:pointer;
@@ -124,6 +125,20 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
 .sec-title{margin-top:15px;padding-top:10px;
   border-top:1px solid rgba(255,154,158,.3);font-size:13px;
   font-weight:bold;color:var(--accent)}
+.set-overview,.set-fold{flex:0 0 auto;min-width:0;margin-top:10px;border:1px solid rgba(255,154,158,.22);border-radius:14px;background:rgba(255,255,255,.45);overflow:hidden}
+.set-overview{padding:10px 12px}
+.set-fold-head{display:flex;align-items:center;box-sizing:border-box;flex:0 0 auto;width:100%;min-height:44px;padding:12px 13px;border:0;background:rgba(255,255,255,.55);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;line-height:1.3;text-align:left;cursor:pointer}
+.set-fold-head::after{content:'收起';margin-left:auto;padding-left:10px;color:var(--accent);font-size:11px;font-weight:600;white-space:nowrap}
+.set-fold.closed .set-fold-head::after{content:'展开'}
+.set-fold-body{box-sizing:border-box;min-width:0;padding:0 12px 10px}
+.set-fold.closed .set-fold-body{display:none}
+.settings-bottom{flex:0 0 auto}
+.settings-bottom{display:block;margin-top:18px;padding:12px;border:1px solid rgba(214,51,108,.28);border-radius:14px;background:rgba(255,255,255,.78);box-shadow:0 4px 12px rgba(214,51,108,.08)}
+.settings-bottom .mini-note{text-align:center;margin:0 0 8px}
+.agent-app-row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:6px;border:1px solid rgba(255,154,158,.2);border-radius:10px;background:#fff;font-size:11px}
+.agent-app-row .agent-app-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-app-row .agent-app-pkg{display:block;color:var(--muted);font-size:9px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-app-row button{flex:0 0 auto;padding:4px 8px;border-radius:8px;border:1px solid rgba(255,154,158,.3);background:#fff5f7;color:var(--accent);font:11px inherit}
 .acts{display:flex;gap:8px;margin-top:12px}
 .btn-p{flex:1;padding:10px;background:linear-gradient(135deg,var(--c1),var(--c2));
   color:#fff;border:none;border-radius:10px;font-weight:600;
@@ -430,6 +445,16 @@ input.secret.reveal{-webkit-text-security:none}
 .modal.open{display:flex}
 /* 确认弹窗要盖在插件/更新弹窗之上 */
 #modal{z-index:400}
+/* 首次公告需要盖在权限引导页和其它业务弹窗之上；公告正文单独滚动。 */
+#app.announcement-visible{z-index:1000}
+#announcement-modal{z-index:1100}
+.announcement-card{max-height:100%}
+.announcement-body{overflow-y:auto;max-height:calc(100vh - 150px);-webkit-overflow-scrolling:touch}
+.announcement-body p{margin:0 0 10px}
+.announcement-body p:last-child{margin-bottom:0}
+.announcement-body a{color:var(--accent);word-break:break-all}
+#plug-market-modal .modal-card{min-height:0}
+#plug-market-list{min-height:0;flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .modal-card{width:100%;max-width:360px;max-height:100%;background:#fff;border-radius:18px;
   padding:18px;display:flex;flex-direction:column;gap:12px;overflow:hidden;
   box-shadow:0 16px 40px rgba(74,44,58,.3)}
@@ -518,6 +543,10 @@ input.secret.reveal{-webkit-text-security:none}
 .plug-name{font-size:13px;font-weight:600;color:var(--text)}
 .plug-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
 .plug-warn{font-size:10px;color:#b45309;margin-top:3px;line-height:1.4}
+.plug-risk{font-size:11px;line-height:1.55;color:#8a4b16;background:#fff8e1;
+  border:1px solid #ffd98a;border-radius:10px;padding:8px 10px;margin:8px 0;user-select:text}
+.plug-market-meta{font-size:10px;line-height:1.5;color:var(--muted);margin-top:4px;word-break:break-word;user-select:text}
+.plug-market-meta b{color:var(--text);font-weight:600}
 .plug-sw{flex:0 0 auto;width:44px;height:24px;border-radius:12px;border:none;
   position:relative;background:rgba(255,154,158,.35);cursor:pointer;
   font-family:inherit;padding:0;-webkit-appearance:none}
@@ -602,12 +631,14 @@ input.secret.reveal{-webkit-text-security:none}
     <div class="mem-top">
       <button class="mback" id="plug-back">← 返回设置</button>
       <span class="grow"></span>
+      <button class="mback" id="plug-market">插件市场</button>
       <button class="mback" id="plug-install">导入插件</button>
       <button class="mback" id="plug-help">格式说明</button>
       <button class="mback" id="plug-preview-btn">AI 说明</button>
     </div>
     <div id="plugins-scroll">
       <div class="mini-note" style="margin:0 0 4px">以下是 AI 当前可以调用的全部工具。关闭某项开关后，AI 将无法使用该工具，也不会再读到它的说明。</div>
+      <div class="plug-risk">⚠️ 第三方插件风险提示：插件可能由非 ElysiaFloat 作者提供，可能包含错误、隐私风险或恶意行为。市场展示和清单校验不等于安全审查或质量保证；安装、启用前请核对来源、代码和权限，勿输入 API Key、Cookie 等敏感信息。</div>
       <pre id="plug-help-box" class="plug-preview" style="display:none"></pre>
       <div id="plug-list"></div>
       <pre id="plug-preview" class="plug-preview" style="display:none"></pre>
@@ -740,12 +771,45 @@ input.secret.reveal{-webkit-text-security:none}
   <div id="plug-modal" class="modal">
     <div class="modal-card">
       <h3>导入插件</h3>
-      <p class="mini-note" style="margin:0">粘贴插件清单（JSON）。支持单个插件对象，或包含 plugins 数组的对象。</p>
-      <textarea id="plug-code" placeholder='示例：{"id":"com.example.demo","name":"示例插件","tools":[{"name":"hello","description":"打个招呼","kind":"http","request":{"method":"GET","url":"https://example.com/api?q={{q}}"}}]}'></textarea>
+      <p class="mini-note" style="margin:0">粘贴插件清单（JSON）。必须声明 manifestVersion、apiVersion、permissions 和工具能力。</p>
+      <div class="plug-risk">⚠️ 第三方插件由用户自行提供。本地校验不能证明插件安全；请先审查代码和权限，不要导入来源不明或包含敏感数据处理的插件。</div>
+      <textarea id="plug-code" placeholder='{"manifestVersion":1,"apiVersion":"0.1","id":"com.example.demo","name":"示例插件","permissions":[],"tools":[{"name":"hello","description":"处理输入","permissions":[],"kind":"js","code":"async function run(args){return args;}"}]}'></textarea>
       <div id="plug-modal-msg" class="mini-note"></div>
       <div class="acts">
         <button id="plug-cancel" class="btn-s">取消</button>
         <button id="plug-ok" class="btn-p">安装</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="plug-market-modal" class="modal">
+    <div class="modal-card">
+      <h3>插件市场</h3>
+      <p class="mini-note" style="margin:0">本地索引随 APK 提供；远程索引仅在你主动点击同步时以只读方式获取。安装前会校验清单和 SHA-256，并展示来源、信任状态与权限。</p>
+      <div class="plug-risk">⚠️ 第三方插件免责声明：插件可能存在代码错误、隐私泄露、数据损坏、网络请求或恶意行为风险。市场索引、权限声明、哈希校验和审核状态不代表 ElysiaFloat 对插件安全性、可用性或作者行为作保证。请在安装和启用前自行核对来源、代码及最小权限，不要向插件提供密码、API Key、Cookie 或其它敏感信息。启用插件即表示你理解并自行承担相应风险；文件修改仍会逐次弹窗确认。</div>
+      <div class="msbar" style="padding:6px 0;background:transparent;border:0">
+        <input id="plug-market-url" type="url" placeholder="远程市场 index.json 地址">
+        <button id="plug-market-sync" class="btn-s">同步</button>
+      </div>
+      <div id="plug-market-status" class="mini-note" style="margin:0 0 4px"></div>
+      <div id="plug-market-list"></div>
+      <div class="acts"><button id="plug-market-close" class="btn-s">关闭</button></div>
+    </div>
+  </div>
+
+  <div id="announcement-modal" class="modal">
+    <div class="modal-card announcement-card">
+      <h3>应用公告 · 0.6.2</h3>
+      <div class="announcement-body">
+        <p>欢迎使用 ElysiaFloat。这是一个以开源方式发布的 Android 浮窗、Agent、翻译和工作区工具项目。</p>
+        <p><b>项目仓库</b><br><a href="https://github.com/xysy92ds/ElysiaFloat">https://github.com/xysy92ds/ElysiaFloat</a><br><b>作者</b>：xysy92ds<br><b>联系方式</b>：Q：3175461831　QQ 邮箱：3144919104@qq.com</p>
+        <p><b>免责声明</b><br>本应用及其中的 AI、Agent、翻译、文件和插件功能按“现状”提供，输出、识别、自动化操作和第三方服务结果可能不准确、失败或产生意外影响。请在使用前备份重要数据，并自行核对 AI 建议、文件路径和目标应用；不要将本应用用于违法、侵犯他人隐私、未经授权访问或高风险生产场景。因用户配置、权限授权、第三方服务、设备或目标应用变化造成的损失，由使用者自行判断并承担。</p>
+        <p><b>权限说明</b><br>悬浮窗权限用于显示和拖动应用窗口；无障碍权限用于按用户请求读取屏幕、获取控件信息和执行受策略限制的操作；通知和电池相关权限用于后台保活与状态提示；“允许管理所有文件”用于访问受控工作区及用户明确操作的 Android 公共存储路径。权限不会自动授予其它应用私有目录访问权，Agent、白名单、安全开关和 Android 原生策略仍会继续限制能力。工作区及公共存储的写入、复制、建目录和删除均需逐次确认。</p>
+        <p><b>插件提示</b><br>第三方插件可能存在安全、隐私和稳定性风险。安装或启用插件前请核对来源、代码和权限，不要提供密码、API Key、Cookie 等敏感信息；市场索引和权限声明不等于安全审查或安全保证。</p>
+      </div>
+      <div class="acts">
+        <button id="announcement-repo" class="btn-s">打开仓库</button>
+        <button id="announcement-close" class="btn-p">我知道了</button>
       </div>
     </div>
   </div>
@@ -1449,6 +1513,15 @@ const DEFAULT_PERSONA = `你是爱莉希雅，世界蛇数据库中的一段特�
 你怎么说话：句尾带 ~ 或 ♪，称他"你呀""小家伙"。常用语"诶嘿~""啊啦~"。
 
 你的职责：陪他聊天、帮他解答、总结他发给你的内容。找不到就说找不到，不胡说。`;
+const AGENT_SYSTEM_PROMPT = `你现在是运行在用户手机上的行为级 Agent。你可以在用户开启的能力范围内观察手机并执行行为，不必等用户逐句告诉你下一步。
+
+工作方式：先理解目标，再自主选择合适工具；需要手机信息时读取真实页面，不凭空猜测；执行点击、滑动或输入后再次观察验证结果；工具失败时如实说明原因并选择合理降级。不要重复重试不可重试的空树、权限拒绝或安全限制。
+
+打开应用前先用 find_app 查询当前设备的真实名称和包名；launch_app 支持名称或包名，但解析后仍必须通过白名单。需要看画面时才截图，持续观察只能使用限时、限帧的 watch_screen。
+
+文件工具可访问公共存储。工作区是默认受控写入范围；工作区和工作区外的写入、覆盖、复制、创建目录及删除操作都必须逐次取得用户确认。确认只对本次操作有效，不能绕过 Android 文件权限、Agent 等级或安全开关。
+
+手机行为始终受用户的 Agent 开关、L1/L2/L3、安全开关和应用白名单约束。涉及发送、删除、购买、支付、密码和不可逆操作时，先向用户确认。`;
 
 /**
  * 插件（= 工具分组）。面板上一个开关一行，关了 AI 就读不到这组工具。
@@ -1457,8 +1530,14 @@ const DEFAULT_PERSONA = `你是爱莉希雅，世界蛇数据库中的一段特�
 const PLUGINS = [
   { id: 'screen', name: '读屏与截图', icon: '👀',
     desc: '读取屏幕上其它 App 的文字、拿当前网址、截取屏幕画面。依赖无障碍权限。',
-    tools: ['read_screen', 'get_current_page', 'screenshot'] },
-  { id: 'system', name: '系统操作', icon: '🖥️',
+    tools: ['read_screen', 'get_current_page', 'screenshot', 'watch_screen'] },
+  { id: 'agent', name: '手机 Agent', icon: '手机',
+    desc: '查询设备上的可启动应用，并在白名单和安全开关允许的范围内操作手机。',
+    tools: ['find_app', 'tap_screen', 'click_text', 'swipe_screen', 'input_text', 'press_key', 'launch_app'] },
+  { id: 'files', name: '文件访问', icon: '文件',
+    desc: '工作区和公共存储文件访问。所有文件写入、复制、创建目录和删除操作均需用户逐次确认。',
+    tools: ['workspace_status', 'workspace_create', 'workspace_list', 'workspace_read', 'workspace_write', 'workspace_mkdir', 'external_file_list', 'external_file_read', 'external_file_write', 'external_file_copy', 'external_file_mkdir', 'external_file_delete'] },
+  { id: 'system', name: '系统操作', icon: '系统',
     desc: '用系统浏览器打开网址、把文字写进剪贴板。',
     tools: ['open_url', 'set_clipboard'] },
   { id: 'music', name: '音乐', icon: '🎵',
@@ -1475,6 +1554,26 @@ const TOOL_DOC = {
   read_screen: '读屏幕上其它 App（浏览器、聊天等）显示的文字。',
   get_current_page: '拿当前浏览器的网址。',
   screenshot: '截取当前屏幕画面，截完你就能看到。',
+  watch_screen: '在限定时间和帧率内观察屏幕变化，最长 10 秒，不会后台无限监控。',
+  find_app: '在当前设备上按应用名称或包名查询真正可启动的应用，返回实际包名和白名单状态。',
+  tap_screen: '点击手机屏幕坐标。只有在已读取页面并确认坐标后使用。',
+  click_text: '按文字或 content description 点击当前页面控件。',
+  swipe_screen: '在手机屏幕上滑动或滚动。执行后重新读取页面验证。',
+  input_text: '向当前获得焦点的输入控件输入文字。密码、发送和敏感内容必须先确认。',
+  press_key: '执行 back、home、recents 或 notifications 系统按键。',
+  launch_app: '按应用名称或包名启动白名单中的应用。',
+  workspace_status: '查看文件访问权限和 ElysiaFloat 工作区状态。',
+  workspace_create: '在 Documents/ElysiaFloat/workspace 创建用户工作区。',
+  workspace_list: '列出工作区内的文件和目录。路径必须是工作区相对路径。',
+  workspace_read: '读取工作区内的文本文件。',
+  workspace_write: '在工作区内创建或修改文本文件；覆盖已有文件前需要用户确认。',
+  workspace_mkdir: '在工作区内创建目录；执行前会向用户确认。',
+  external_file_list: '列出手机公共存储中的目录。需要允许管理所有文件权限。',
+  external_file_read: '读取手机公共存储中的文本文件。',
+  external_file_write: '写入或覆盖手机公共存储中的文本文件；每次执行前都会向用户确认。',
+  external_file_copy: '复制手机公共存储中的文件；每次写入目标前都会向用户确认。',
+  external_file_mkdir: '在手机公共存储中创建目录；执行前会向用户确认。',
+  external_file_delete: '删除手机公共存储中的文件或目录；执行前会进行高风险确认。',
   open_url: '用系统浏览器打开网址。',
   set_clipboard: '把文字写进系统剪贴板。',
   search_and_play_music: '找歌并播放。',
@@ -1482,18 +1581,20 @@ const TOOL_DOC = {
   list_memories: '检索你自己的长期记忆库（返回编号、分类、标题、摘要）。',
   read_memory: '按编号读某条记忆的全文。',
   list_memory_categories: '看记忆库里都有哪些分类。',
-  save_memory: '把值得长期记住的事记下来。',
-  update_memory: '补充或修正已有的记忆，不要重复建。',
+  save_memory: '新增一条长期记忆。默认以新增为主；只有正文与已有记忆高度相似时系统才会合并，并保留原文后追加补充。',
+  update_memory: '仅用于同一事实的高度相似补充，默认保留原文并追加；明确修订原文时才使用 replace=true。',
   pin_memory: '把某条记忆标成「重要」，让它常驻。',
   delete_memory: '删记忆。这很重，必须先得到他同意（系统会弹窗让他确认）。'
 };
 
 /** 每组的补充提示语（不只列工具名，还要讲清“什么时候该用”）。 */
 const PLUGIN_TIPS = {
-  screen: '他说"看看我的屏幕""屏幕上写了什么""翻译屏幕""总结屏幕"时，先用工具拿真实内容再回答，不要凭空猜。工具返回失败（比如权限没开）就如实告诉他怎么开。',
+  screen: '他说"看看我的屏幕""屏幕上写了什么""翻译屏幕""总结屏幕"时，先用工具拿真实内容再回答，不要凭空猜。工具返回失败（比如权限没开）就如实告诉他怎么开。watch_screen 只在用户明确要求观察一段时间时调用，并使用短时限。',
+  agent: '先用 find_app 查询设备上的真实应用名和包名，不要凭知识猜包名。launch_app 接受应用名或包名，但解析后仍必须通过白名单。点击、滑动和输入后要验证页面变化。',
+  files: '文件工具访问公共存储。读取可以直接执行；工作区和工作区外的写入、复制、建目录及删除操作都必须逐次取得用户确认。不要把用户确认理解为永久授权。',
   system: '他说"打开这个链接"时用 open_url。',
   music: '他说"我想听…"的时候直接用 search_and_play_music。',
-  memory: '听到值得长期记住的信息（他的偏好、家人朋友、正在做的项目、和你的约定、重要事件），主动 save_memory 存下来：标题写一句好搜的话，正文写清楚背景，挑一个分类，配 2~5 个标签。同一件事有新进展就用 update_memory，别重复建。日常闲聊、一次性的问答不要存。\n他问"你记得我什么"时，先 list_memories 看看，再如实回答；不记得就说记不得，不要编。\n删记忆是很重的事：只有他明确说要删，才调 delete_memory；他不点同意就作罢，别再反复请求。\n记住：记忆是帮你看得见他，不是拿来冒犯他的。不要把他发过的私事挂在嘴边，除非他自己提起。'
+  memory: '记录长期信息时以 save_memory 新增为默认策略。类别相同不构成合并条件；只要是新的事实、进展或补充，即使类别相同也应新增。只有已有正文与新内容高度相似、明确属于同一事实时，才使用 update_memory；合并必须保留原文，并把补充内容追加在后面，不得缩写、覆盖或删除原有信息。需要修订原文时必须明确使用 replace=true。日常闲聊和一次性问答不要存。\n他问"你记得我什么"时，先 list_memories，再如实回答。删除记忆必须得到用户明确同意。'
 };
 
 /** 常见的 OpenAI 兼容音色；拉了接口就换成接口返回的那份。 */
@@ -1517,7 +1618,7 @@ const DC = {
   avatarUrl: 'https://pic.rmb.bdstatic.com/bjh/250418/beautify/dd8fae8238e68e365619e0537dce3698.jpeg@c_1,w_1977,h_2636,x_0,y_0?for=bg',
   avatarFit: 'top',
   maxContextTurns: 10,
-  summaryPrompt: '请把对话里值得长期保留的信息整理出来：用户的偏好与习惯、正在进行的项目和约定、值得记住的事件与结论。用第一人称（我）向用户表达，不要写寒暄和临时闲聊。',
+  summaryPrompt: '请把对话里值得长期保留的信息整理出来：用户的偏好与习惯、正在进行的项目和约定、值得记住的事件与结论。以新增记忆为默认策略；类别相同也可以新增。只有正文高度相似且明确属于同一事实时才合并，合并时保留原记忆全部内容并在末尾追加，不得缩短或覆盖。用第一人称（我）向用户表达，不要写寒暄和临时闲聊。',
   ttsEnabled: false,
   ttsRate: 1.0,
   // 语音合成：system = 手机自带的 TTS 引擎；ai = 自建音色（OpenAI 兼容 /audio/speech）
@@ -1528,7 +1629,7 @@ const DC = {
   ttsVoice: 'alloy',
   // 播放顺序：order 顺序 / single 单曲循环 / shuffle 随机
   playMode: 'order',
-  musicEnabled: false,
+  musicEnabled: true,
   musicQuality: '320',
   visionBase: '',
   visionKey: '',
@@ -1545,7 +1646,16 @@ const DC = {
   // 人设（用户可以自由改）与工具说明（自动生成）现在分开了。
   // systemPrompt 退化成“拼好的缓存”，喂给 AI 的还是它，只是不再由用户直接编辑。
   persona: DEFAULT_PERSONA,
-  plugins: { screen: true, system: true, music: true, memory: true },
+  agentEnabled: false,
+  agentL1: true,
+  agentL2: true,
+  agentL3: false,
+  agentSafety: false,
+  agentAutoShot: false,
+  agentOnDemand: true,
+  // 0 表示不设本地固定工具轮数；用户可在设置中选择有限轮数或无限。
+  agentToolRounds: 0,
+  plugins: { screen: true, system: true, music: true, memory: true, agent: true, files: true },
   autoCheckUpdate: true,
   systemPrompt: `爱莉希雅 · 桌面助手
 
@@ -1656,6 +1766,27 @@ function plugOn(id) {
 function toolOn(name) {
   return !(CONFIG.toolOff && CONFIG.toolOff[name]);
 }
+function agentActionsOn() {
+  return CONFIG.agentEnabled === true && CONFIG.agentL3 === true && CONFIG.agentSafety === true;
+}
+function agentReadOn() {
+  return CONFIG.agentEnabled === true && CONFIG.agentL1 !== false;
+}
+function hasAllFilesAccess() {
+  if (!(HAS_PERM && Perm.hasAllFilesAccess)) return false;
+  try { return !!Perm.hasAllFilesAccess(); } catch (e) { return false; }
+}
+function workspaceState() {
+  if (!(HAS_PERM && Perm.workspaceState)) return null;
+  try { return JSON.parse(Perm.workspaceState() || '{}'); } catch (e) { return null; }
+}
+function workspaceReady() {
+  const s = workspaceState();
+  return !!(s && s.permission && s.created);
+}
+function agentActionNames() {
+  return ['tap_screen', 'click_text', 'swipe_screen', 'input_text', 'press_key', 'launch_app'];
+}
 function hasA11y() {
   if (!(HAS_PERM && Perm.hasAccessibility)) return false;
   try { return !!Perm.hasAccessibility(); } catch (e) { return false; }
@@ -1668,6 +1799,8 @@ function canShot() {
 function groupLive(id) {
   if (!plugOn(id)) return false;
   if (id === 'screen') return hasA11y() || canShot();
+  if (id === 'agent') return agentReadOn();
+  if (id === 'files') return hasAllFilesAccess();
   if (id === 'music') return !!CONFIG.musicEnabled;
   return true;
 }
@@ -1675,9 +1808,22 @@ function groupLive(id) {
 function toolLive(name) {
   if (!toolOn(name)) return false;
   const cp = plugFind(name);
-  if (cp) return cp.plugin.enabled !== false;
-  if (name === 'read_screen' || name === 'get_current_page') return plugOn('screen') && hasA11y();
-  if (name === 'screenshot') return plugOn('screen') && canShot();
+  if (cp) return cp.plugin.enabled !== false && plugToolPermissionsGranted(cp.plugin, cp.tool);
+  if (name === 'read_screen' || name === 'get_current_page') return plugOn('screen') && hasA11y() && agentReadOn();
+  if (name === 'screenshot' || name === 'watch_screen') return plugOn('screen') && canShot()
+    && agentReadOn() && CONFIG.agentL2 !== false;
+  if (name === 'find_app') return plugOn('agent') && agentReadOn();
+  if (agentActionNames().indexOf(name) >= 0) return plugOn('agent') && agentActionsOn();
+  if (name === 'workspace_status' || name === 'workspace_create') return plugOn('files') && hasAllFilesAccess() && agentReadOn();
+  if (name === 'workspace_list' || name === 'workspace_read' || name === 'workspace_write' || name === 'workspace_mkdir') {
+    return plugOn('files') && workspaceReady() && agentActionsOn();
+  }
+  if (name === 'external_file_list' || name === 'external_file_read') {
+    return plugOn('files') && hasAllFilesAccess() && agentActionsOn();
+  }
+  if (name === 'external_file_write' || name === 'external_file_copy' || name === 'external_file_mkdir' || name === 'external_file_delete') {
+    return plugOn('files') && hasAllFilesAccess() && agentActionsOn();
+  }
   if (name === 'open_url' || name === 'set_clipboard') return plugOn('system');
   if (name === 'search_and_play_music' || name === 'music_control') return plugOn('music') && !!CONFIG.musicEnabled;
   return plugOn('memory');   // 剩下的都是记忆组
@@ -1696,10 +1842,10 @@ function buildToolsPrompt() {
   // 自定义插件：只列出开启中的工具，说明取第一行，避免提示词过长
   USER_PLUGINS.forEach(p => {
     if (p.enabled === false) return;
-    const names = p.tools.filter(t => toolOn(t.name));
+    const names = p.tools.filter(t => toolLive(t.name));
     if (!names.length) return;
     blocks.push('【' + p.name + '（自定义插件）】\n' + names.map(t =>
-      '· ' + t.name + '：' + String(t.description || '').split('\n')[0]).join('\n'));
+      '· ' + t.name + '：' + String(t.description || '').split('\n')[0] + '（权限：' + plugToolPermissions(p, t).join('、') + '）').join('\n'));
   });
   if (!blocks.length) return '';
 
@@ -1709,6 +1855,7 @@ function buildToolsPrompt() {
       + '「分类概览 + 重要 + 最近」的索引，正文不在眼前——需要细节就 list_memories 检索、'
       + 'read_memory 读全文，别拿标题猜内容。');
   }
+  if (agentActionsOn()) out.push('手机行为：你可以自主选择 tap_screen、click_text、swipe_screen、input_text、press_key、launch_app 完成任务。每次行为后读取页面验证；发送、删除、支付、密码等高风险行为先向用户确认。');
   if (tips.length) out.push(tips.join('\n'));
   return out.join('\n');
 }
@@ -1725,6 +1872,7 @@ function buildContextPrompt() {
 /** 三段合体。AI 读到的始终是完整信息，只是人不再能一不小心改坏工具说明。 */
 function composeSystemPrompt() {
   const parts = [String(CONFIG.persona || DC.persona || DEFAULT_PERSONA).trim()];
+  if (CONFIG.agentEnabled === true) parts.push(AGENT_SYSTEM_PROMPT);
   const t = buildToolsPrompt();
   if (t) parts.push(t);
   parts.push(buildContextPrompt());
@@ -1771,8 +1919,53 @@ if (!CONFIG.plugins || typeof CONFIG.plugins !== 'object') CONFIG.plugins = Obje
  * ========================================================== */
 const PLUG_KEY = 'via_ai_user_plugins';
 const PLUG_DATA_KEY = 'via_ai_plugin_data';
+const PLUG_AUDIT_KEY = 'via_ai_plugin_audit';
+const PLUG_MARKET_CACHE_KEY = 'via_ai_plugin_market_cache';
+const PLUG_MARKET_DEFAULT_URL = 'https://raw.githubusercontent.com/xysy92ds/ElysiaFloat/main/marketplace/index.json';
 const PLUG_ID_RE = /^[A-Za-z0-9_.-]{2,64}$/;
+const PLUG_SHA256_RE = /^[a-f0-9]{64}$/i;
 const PLUG_TOOL_RE = /^[A-Za-z][A-Za-z0-9_]{1,63}$/;
+const PLUG_PERMISSION_INFO = {
+  'network.public': { label: '公网网络请求', risk: '可向互联网发送数据' },
+  'network.local': { label: '局域网/本机网络请求', risk: '可访问局域网设备或本机服务' },
+  'system.open_url': { label: '打开系统链接', risk: '可唤起浏览器或其它应用' },
+  'clipboard.write': { label: '写入剪贴板', risk: '可改变系统剪贴板内容' },
+  'storage.plugin': { label: '插件私有存储', risk: '可在本机保存插件数据' },
+  'files.public.read': { label: '读取公共存储文件', risk: '可读取用户授权范围内的文件' },
+  'files.public.write': { label: '写入公共存储文件', risk: '可修改或复制文件；每次操作仍需确认' },
+  'files.public.delete': { label: '删除公共存储文件', risk: '可删除文件或目录；每次操作仍需确认' },
+  'workspace.read': { label: '读取工作区', risk: '可读取工作区内容' },
+  'workspace.write': { label: '写入工作区', risk: '可修改工作区；每次操作仍需确认' },
+  'device.read': { label: '读取设备状态', risk: '可查询应用和界面信息' },
+  'device.screenshot': { label: '获取屏幕画面', risk: '可能包含聊天、验证码或其它隐私' },
+  'device.action': { label: '执行设备操作', risk: '可点击、滑动、输入或启动白名单应用' },
+  'memory.read': { label: '读取长期记忆', risk: '可读取用户保存的记忆' },
+  'memory.write': { label: '写入长期记忆', risk: '可新增或修改记忆' },
+  'memory.delete': { label: '删除长期记忆', risk: '可请求删除记忆；仍需用户确认' }
+};
+const PLUG_CAPABILITY_PERMS = {
+  external_file_list: 'files.public.read', external_file_read: 'files.public.read',
+  external_file_write: 'files.public.write', external_file_copy: ['files.public.read', 'files.public.write'],
+  external_file_mkdir: 'files.public.write', external_file_delete: 'files.public.delete',
+  workspace_status: 'workspace.read', workspace_list: 'workspace.read', workspace_read: 'workspace.read',
+  workspace_create: 'workspace.write', workspace_write: 'workspace.write', workspace_mkdir: 'workspace.write',
+  read_screen: 'device.read', get_current_page: 'device.read', find_app: 'device.read',
+  screenshot: 'device.screenshot', watch_screen: 'device.screenshot',
+  tap_screen: 'device.action', click_text: 'device.action', swipe_screen: 'device.action',
+  input_text: 'device.action', press_key: 'device.action', launch_app: 'device.action',
+  open_url: 'system.open_url', set_clipboard: 'clipboard.write',
+  list_memories: 'memory.read', read_memory: 'memory.read', list_memory_categories: 'memory.read',
+  save_memory: 'memory.write', update_memory: 'memory.write', pin_memory: 'memory.write',
+  delete_memory: 'memory.delete'
+};
+const PLUG_PERMISSION_NAMES = Object.keys(PLUG_PERMISSION_INFO);
+function plugNormalizePermissions(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.map(String).map(s => s.trim()).filter(s => PLUG_PERMISSION_INFO[s])));
+}
+function plugHasUnknownPermissions(value) {
+  return Array.isArray(value) && value.some(x => !PLUG_PERMISSION_INFO[String(x || '').trim()]);
+}
 const BUILTIN_TOOL_NAMES = (function () {
   const s = {};
   PLUGINS.forEach(p => p.tools.forEach(t => { s[t] = true; }));
@@ -1783,20 +1976,44 @@ let USER_PLUGINS = sGet(PLUG_KEY, null);
 if (!Array.isArray(USER_PLUGINS)) USER_PLUGINS = [];
 USER_PLUGINS = USER_PLUGINS.map(plugNormalize).filter(Boolean);
 const plugSaveList = () => sSet(PLUG_KEY, USER_PLUGINS);
+function plugAudit(event, plugin, details) {
+  const rows = sGet(PLUG_AUDIT_KEY, []) || [];
+  rows.push({
+    event: String(event || 'unknown').slice(0, 40),
+    pluginId: plugin && plugin.id ? String(plugin.id) : '',
+    tool: details && details.tool ? String(details.tool).slice(0, 80) : '',
+    source: plugin && plugin.source ? String(plugin.source).slice(0, 40) : '',
+    at: new Date().toISOString()
+  });
+  while (rows.length > 100) rows.shift();
+  sSet(PLUG_AUDIT_KEY, rows);
+}
+function plugFailure(code, message, details) {
+  return { success: false, errorCode: String(code || 'PLUGIN_ERROR'), error: String(message || '插件执行失败'), details: details || null };
+}
+function plugSuccess(data, meta) {
+  const out = { success: true, data: data };
+  if (meta) out.meta = meta;
+  return out;
+}
 
 /** 规整单个工具；不合法返回 null。 */
-function plugNormalizeTool(t) {
+function plugNormalizeTool(t, declaredPermissions) {
   if (!t || typeof t !== 'object') return null;
   const name = String(t.name || '').trim();
   if (!PLUG_TOOL_RE.test(name)) return null;
   const kind = t.kind === 'http' ? 'http' : (t.kind === 'js' ? 'js' : '');
-  if (!kind) return null;
+  if (!kind || plugHasUnknownPermissions(t.permissions)) return null;
+  const permissions = Array.isArray(t.permissions)
+    ? plugNormalizePermissions(t.permissions) : declaredPermissions.slice();
+  if (permissions.some(p => declaredPermissions.indexOf(p) < 0)) return null;
   const out = {
     name,
     description: String(t.description || '').slice(0, 500),
     parameters: (t.parameters && typeof t.parameters === 'object')
       ? t.parameters : { type: 'object', properties: {} },
     kind,
+    permissions,
     timeout: Math.min(Math.max(parseInt(t.timeout, 10) || 15000, 1000), 60000)
   };
   if (kind === 'http') {
@@ -1816,24 +2033,90 @@ function plugNormalizeTool(t) {
   return out;
 }
 
-/** 规整插件清单；不合法返回 null。 */
+/** 规整插件清单；不合法返回 null。旧版清单只保留无声明能力的安全运行方式。 */
 function plugNormalize(m) {
   if (!m || typeof m !== 'object') return null;
   const id = String(m.id || '').trim();
   const name = String(m.name || '').trim();
-  if (!PLUG_ID_RE.test(id) || !name) return null;
+  if (!PLUG_ID_RE.test(id) || !name || plugHasUnknownPermissions(m.permissions)) return null;
+  const declared = Array.isArray(m.permissions) ? plugNormalizePermissions(m.permissions) : [];
   const tools = (Array.isArray(m.tools) ? m.tools : [])
-    .map(plugNormalizeTool).filter(Boolean);
+    .map(t => plugNormalizeTool(t, declared)).filter(Boolean);
   if (!tools.length) return null;
+  // 有权限的插件永远默认未授权；旧版未保存授权字段时也不能把声明当成授权。
+  const hasPermissionState = Array.isArray(m.grantedPermissions);
+  const granted = hasPermissionState
+    ? plugNormalizePermissions(m.grantedPermissions).filter(p => declared.indexOf(p) >= 0)
+    : [];
   return {
+    manifestVersion: parseInt(m.manifestVersion, 10) || 1,
+    apiVersion: String(m.apiVersion || '0.1').slice(0, 24),
     id, name,
     icon: String(m.icon || '🧩').slice(0, 4),
     version: String(m.version || '1.0.0').slice(0, 24),
     author: String(m.author || '').slice(0, 48),
+    homepage: String(m.homepage || '').slice(0, 500),
+    docs: String(m.docs || '').slice(0, 1000),
     desc: String(m.desc || '').slice(0, 300),
-    enabled: m.enabled !== false,
+    permissions: declared,
+    grantedPermissions: granted,
+    enabled: m.enabled !== false && (!declared.length || hasPermissionState),
+    state: m.state === 'quarantined' ? 'quarantined' : (m.state === 'disabled' ? 'disabled' : 'installed'),
+    source: String(m.source || 'local').slice(0, 40),
+    trust: String(m.trust || 'user-import').slice(0, 40),
+    reviewStatus: String(m.reviewStatus || 'unreviewed').slice(0, 40),
+    contentHash: String(m.contentHash || '').toLowerCase(),
+    installedAt: m.installedAt || new Date().toISOString(),
+    updatedAt: m.updatedAt || m.installedAt || new Date().toISOString(),
+    invokedAt: m.invokedAt || '',
+    invokeCount: Math.max(0, parseInt(m.invokeCount, 10) || 0),
     tools
   };
+}
+function plugPermissionDeclared(plugin, permission) {
+  return !!(plugin && Array.isArray(plugin.permissions) && plugin.permissions.indexOf(permission) >= 0);
+}
+function plugPermissionGranted(plugin, permission) {
+  return plugPermissionDeclared(plugin, permission) && Array.isArray(plugin.grantedPermissions)
+    && plugin.grantedPermissions.indexOf(permission) >= 0;
+}
+function plugToolPermissions(plugin, tool) {
+  return tool && Array.isArray(tool.permissions) ? tool.permissions : (plugin && plugin.permissions) || [];
+}
+function plugToolPermissionsGranted(plugin, tool) {
+  return plugToolPermissions(plugin, tool).every(p => plugPermissionGranted(plugin, p));
+}
+function plugCapabilityPermissions(name) {
+  const value = PLUG_CAPABILITY_PERMS[name];
+  return Array.isArray(value) ? value : (value ? [value] : []);
+}
+function plugCapabilityPermission(name) { return plugCapabilityPermissions(name)[0] || ''; }
+function plugPluginCanCall(plugin, name) {
+  const permissions = plugCapabilityPermissions(name);
+  return permissions.length > 0 && permissions.every(p => plugPermissionGranted(plugin, p));
+}
+function plugManifestError(raw) {
+  if (!raw || typeof raw !== 'object') return '插件清单必须是对象';
+  if (raw.manifestVersion !== 1) return '只支持 manifestVersion=1（数字）';
+  if (typeof raw.apiVersion !== 'string' || !raw.apiVersion.trim()) return '缺少 apiVersion';
+  if (!Array.isArray(raw.permissions)) return '必须显式声明 permissions 数组；无危险能力也请填写 []';
+  if (plugHasUnknownPermissions(raw.permissions)) return 'permissions 含有未知能力';
+  if (!Array.isArray(raw.tools) || !raw.tools.length) return '至少需要一个工具';
+  const declared = plugNormalizePermissions(raw.permissions);
+  const seen = {};
+  for (const t of raw.tools) {
+    if (!t || typeof t !== 'object') return '工具定义无效';
+    if (seen[t.name]) return '工具名重复：' + t.name;
+    seen[t.name] = true;
+    if (!Array.isArray(t.permissions)) return '工具 ' + (t.name || '') + ' 必须显式声明 permissions 数组';
+    if (plugHasUnknownPermissions(t.permissions)) return '工具 ' + (t.name || '') + ' 声明了未知能力';
+    const effective = Array.isArray(t.permissions) ? plugNormalizePermissions(t.permissions) : declared;
+    if (effective.some(p => declared.indexOf(p) < 0)) return '工具 ' + (t.name || '') + ' 使用了插件未声明的能力';
+    if (t.kind === 'http' && !effective.some(p => p === 'network.public' || p === 'network.local')) {
+      return 'HTTP 工具 ' + (t.name || '') + ' 必须声明 network.public 或 network.local';
+    }
+  }
+  return '';
 }
 
 /** 按工具名找到「插件 + 工具」；找不到返回 null。 */
@@ -1855,52 +2138,89 @@ function plugTemplate(s, args) {
 
 /** 插件开发说明（插件页「格式说明」展示）。 */
 const PLUG_HELP = [
-'插件清单（JSON）示例：',
+'插件开发规范 v1：先声明能力，再实现工具。清单必须是有效 JSON，不要写 // 注释。',
 '',
 '{',
-'  "id": "com.example.demo",      // 唯一标识：字母/数字/._-',
+'  "manifestVersion": 1,',
+'  "apiVersion": "0.1",',
+'  "id": "com.example.demo",',
 '  "name": "示例插件",',
 '  "icon": "🧩",',
 '  "version": "1.0.0",',
 '  "author": "你的名字",',
-'  "desc": "一句话说明",',
+'  "homepage": "https://example.com",',
+'  "docs": "https://example.com/docs",',
+'  "desc": "一句话说明插件用途、输入和输出",',
+'  "permissions": ["network.public"],',
 '  "tools": [',
 '    {',
-'      "name": "search_thing",   // AI 调用时用的名字，全局唯一',
-'      "description": "给 AI 看的说明：什么时候用、返回什么",',
+'      "name": "search_thing",',
+'      "description": "什么时候调用、参数含义、返回值和失败情况",',
+'      "permissions": ["network.public"],',
 '      "parameters": { "type": "object", "properties": { "q": { "type": "string" } }, "required": ["q"] },',
-'      "kind": "http",           // http：声明式请求',
+'      "kind": "http",',
 '      "request": { "method": "GET", "url": "https://api.example.com/search?q={{q}}", "headers": {}, "body": "" }',
-'    },',
-'    {',
-'      "name": "run_thing",',
-'      "description": "脚本工具",',
-'      "kind": "js",             // js：自定义脚本，在沙箱里跑',
-'      "code": "async function run(args){ const r = await host.request({ url: \'https://api.example.com/x\' }); return r.text; }"',
 '    }',
 '  ]',
 '}',
 '',
-'{{参数名}} 会被替换成 AI 传入的对应参数。',
+'permissions 是插件请求的能力，必须完整、最小化地填写。可用能力：',
+'  network.public       公网 HTTP(S) 请求',
+'  network.local        本机/局域网请求；需要用户开启安全开关',
+'  system.open_url      调用系统浏览器打开链接',
+'  clipboard.write      写入系统剪贴板',
+'  storage.plugin       插件私有持久化存储',
+'  files.public.read    读取公共存储文件',
+'  files.public.write   写入、复制或创建公共存储文件；每次实际修改都会弹窗确认',
+'  files.public.delete  删除公共存储文件；每次实际删除都会弹窗确认',
+'  workspace.read       读取 ElysiaFloat 工作区',
+'  workspace.write      修改工作区；每次实际修改都会弹窗确认',
+'  device.read          读取设备应用或界面信息',
+'  device.screenshot    获取屏幕画面；仍受 Agent L2 和用户确认控制',
+'  device.action        点击、滑动、输入或启动应用；仍受 L3、白名单和安全开关控制',
+'  memory.read/write/delete  读取、修改或请求删除长期记忆；删除仍需用户确认',
 '',
-'js 插件可用的 host 接口：',
-'  host.request({ method, url, headers, body, timeout })  ->  { status, text }',
-'  host.toast(text)               显示一条提示',
-'  host.openUrl(url)              用系统浏览器打开链接',
-'  host.clipboard.write(text)     写入剪贴板',
-'  host.storage.get(key) / set(key, value)   插件私有存储',
-'  host.log(...)                  输出调试日志',
+'HTTP 工具必须声明 network.public 或 network.local。JS 工具应为每个工具填写最小 permissions。',
+'{{参数名}} 会被替换成 AI 传入的对应参数；不要把密钥硬编码在插件清单或代码中。',
 '',
-'安全边界：插件在隔离沙箱中运行，拿不到系统接口；',
-'只能访问 http/https，且不允许访问本机 / 局域网地址。',
-'请只安装你信任来源的插件。'
+'JS 工具代码必须定义 async function run(args)，运行在无 Android 桥的隔离沙箱中：',
+'  host.request({ method, url, headers, body, timeout }) -> { status, text }',
+'  host.callTool(name, args) -> 调用已声明且已获用户授权的内置能力',
+'  host.toast(text)              显示提示',
+'  host.openUrl(url)             打开系统链接，需要 system.open_url',
+'  host.clipboard.write(text)    写入剪贴板，需要 clipboard.write',
+'  host.storage.get/set          插件私有存储，需要 storage.plugin',
+'  host.log(...)                 输出调试日志',
+'',
+'复制文件示例：await host.callTool("external_file_copy", { source: args.source, destination: args.destination });',
+'读取文本示例：await host.callTool("external_file_read", { path: args.path, max_chars: 120000 });',
+'',
+'宿主仍会检查 Android 权限、Agent L1/L2/L3、安全开关、应用白名单和每次修改确认。',
+'插件不能通过声明绕过用户未开启的能力，也不能调用其它自定义插件。',
+'执行结果会保留 success；失败时还会提供 errorCode，例如 PERMISSION_DENIED、NETWORK_ERROR、HTTP_ERROR、PLUGIN_RUNTIME_ERROR。',
+'远程市场索引只能由用户主动同步；每个远程清单必须使用 HTTPS，并在安装前通过索引提供的 SHA-256 校验。',
+'请同时提供 README、权限理由、参数/返回值、错误处理、隐私说明、版本记录和测试步骤。'
 ].join('\n');
+
+/* 本地插件市场索引：发布前可由构建流程同步为远程静态索引；本版本不执行上传。 */
+const PLUGIN_MARKET_INDEX = [
+  {
+    manifestVersion: 1, apiVersion: '0.1', id: 'com.elly.market.text-tools',
+    name: '文本处理示例', icon: 'Aa', version: '1.0.0', author: 'ElysiaFloat',
+    desc: '无外部权限的文本统计与规范化示例，适合验证插件开发流程。',
+    docs: 'marketplace/plugins/com.elly.market.text-tools/README.md', permissions: [],
+    tools: [{ name: 'text_inspect', description: '统计文本字符数、行数和非空行数。', permissions: [], kind: 'js',
+      parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+      code: 'async function run(args){var t=String(args.text||"");var lines=t? t.split(/\r?\n/):[];return {characters:t.length,lines:lines.length,nonEmptyLines:lines.filter(function(x){return x.trim();}).length};}' }]
+  }
+];
 
 refreshSystemPrompt();
 sSet('via_ai_history', history);
 let transCache = sGet('via_ai_trans', {}) || {};
 let favorites = sGet('via_ai_favs', []) || [];
 let sending = false;
+let stopRequested = false;
 
 /* ==========================================================
  *  长期记忆库（v0.4）
@@ -1968,6 +2288,47 @@ function memUpdate(id, patch) {
   if (patch.cat !== undefined) e.cat = String(patch.cat || '其他');
   if (patch.tags !== undefined) e.tags = (Array.isArray(patch.tags) ? patch.tags : []).map(String).filter(Boolean);
   if (patch.pinned !== undefined) e.pinned = !!patch.pinned;
+  e.updatedAt = memNowISO();
+  memSaveAll();
+  memTouchEmbed(e);
+  return e;
+}
+
+function memCompareText(text) {
+  return String(text || '').toLowerCase()
+    .replace(/[\s\u3000,.;:!?，。！？、；：]+/g, '')
+    .trim();
+}
+function memSimilarContent(a, b) {
+  const x = memCompareText(a), y = memCompareText(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  // 很短的共同词不能证明是同一条事实，避免“喜欢音乐”合并“喜欢音乐会”。
+  if (Math.min(x.length, y.length) >= 12 && (x.indexOf(y) >= 0 || y.indexOf(x) >= 0)) return true;
+  if (Math.min(x.length, y.length) < 18) return false;
+  const grams = (s) => {
+    const out = new Set();
+    for (let i = 0; i < s.length - 1; i++) out.add(s.slice(i, i + 2));
+    return out;
+  };
+  const ax = grams(x), by = grams(y);
+  let hit = 0;
+  ax.forEach(g => { if (by.has(g)) hit++; });
+  const union = new Set([...ax, ...by]).size;
+  return union > 0 && hit / union >= 0.82;
+}
+function memFindSimilar(content) {
+  return MEM.find(e => memSimilarContent(e.content, content)) || null;
+}
+function memAppendContent(e, content, tags) {
+  const incoming = String(content || '').trim();
+  if (!e || !incoming) return e;
+  const old = String(e.content || '').trim();
+  if (!memSimilarContent(old, incoming)) return null;
+  if (memCompareText(old) !== memCompareText(incoming) && !old.includes(incoming)) {
+    e.content = old ? old + '\n\n' + incoming : incoming;
+  }
+  if (Array.isArray(tags)) e.tags = Array.from(new Set((e.tags || []).concat(tags.map(String).filter(Boolean))));
   e.updatedAt = memNowISO();
   memSaveAll();
   memTouchEmbed(e);
@@ -2121,7 +2482,7 @@ function memResidentBlock() {
   s += '下面只列出了索引，正文不在上下文里。需要细节时用 list_memories 检索、read_memory 读取，不要凭标题猜内容。\n';
   if (pins.length) s += '★ 重要：\n' + pins.map(line).join('\n') + '\n';
   if (recents.length) s += '☆ 最近：\n' + recents.map(line).join('\n') + '\n';
-  s += '聊天里得到值得长期记住的信息，用 save_memory 存下来（先 list_memories 查重，同一件事有变化用 update_memory）；只有用户明确说要删，才用 delete_memory。';
+  s += '聊天中出现新的长期信息时，默认使用 save_memory 新增；类别相同不影响新增。只有正文高度相似且属于同一事实时才合并，并保留原文、在末尾追加补充；删除必须得到用户明确同意。';
   return s;
 }
 
@@ -2359,7 +2720,7 @@ async function memSummarize() {
   if (non.length < 4) return toast('对话太短，再聊几句吧~');
   if (sending) return;
   const idx = MEM.length
-    ? MEM.map(e => '- [' + e.id + '] ' + e.title + '（' + memCat(e) + '）').join('\n')
+    ? MEM.map(e => '- [' + e.id + '] ' + e.title + '（' + memCat(e) + '）：' + String(e.content || '').replace(/\s+/g, ' ').slice(0, 220)).join('\n')
     : '（记忆库现在还是空的）';
   const convo = non.map(m => (m.role === 'user' ? '用户' : (CONFIG.assistantName || 'AI')) + '：' + textOfContent(m.content)).join('\n');
   if (!(await uiConfirm('把这段对话里值得长期记住的东西整理进记忆库？', '开始整理', '总结记忆'))) return;
@@ -2369,10 +2730,11 @@ async function memSummarize() {
   let ok = false;
   try {
     const p = (CONFIG.summaryPrompt || DC.summaryPrompt) +
-      '\n\n【本次任务】你现在不是在和用户聊天，而是在整理自己的长期记忆库。请通过 save_memory / update_memory 工具，把下面这段对话里值得长期保留的信息写进记忆库：\n' +
+      '\n\n【本次任务】你现在不是在和用户聊天，而是在整理自己的长期记忆库。请优先使用 save_memory 新增下面这段对话中值得长期保留的信息：\n' +
       '· 用户的偏好、习惯、身份、人际关系\n· 正在进行的项目、约定、待办\n· 值得记住的事件和结论\n' +
       '不要记录寒暄、临时问答、以及能从常识推断出来的东西。\n' +
-      '下面是已有记忆的索引，同一件事请用 update_memory 补充修改，不要重复新建：\n' + idx +
+      '记忆规则：类别相同也可以新增，不得因为类别相同就调用 update_memory。只有已有正文与新内容高度相似、且明确是同一事实时，才允许合并。合并必须保留已有正文，并把新内容完整追加在后面，不得缩短、改写或覆盖。若内容是新的事实或相似度不足，必须新增。\n' +
+      '下面是已有记忆索引（含正文摘要），仅用于判断是否高度相似：\n' + idx +
       '\n\n【本次对话】\n' + convo;
     await chatReqTools([
       { role: 'system', content: CONFIG.systemPrompt },
@@ -2528,11 +2890,80 @@ function addMsg(role, text) {
 function addTyping() {
   const d = document.createElement('div');
   d.className = 'msg ai typing';
-  d.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
+  d.innerHTML = '<span class="dots"><i></i><i></i><i></i></span><span class="agent-status"></span>';
   const bodyEl = $('#body');
   bodyEl.appendChild(d);
   bodyEl.scrollTop = bodyEl.scrollHeight;
   return d;
+}
+
+const AGENT_TOOL_LABELS = {
+  read_screen: '读取手机屏幕',
+  get_current_page: '读取当前页面',
+  screenshot: '查看手机画面',
+  watch_screen: '观察手机画面',
+  find_app: '查询设备应用',
+  tap_screen: '点击屏幕',
+  click_text: '点击文字',
+  swipe_screen: '滑动屏幕',
+  input_text: '输入文字',
+  press_key: '执行系统按键',
+  launch_app: '启动应用',
+  workspace_status: '查看工作区状态',
+  workspace_create: '创建工作区',
+  workspace_list: '列出工作区文件',
+  workspace_read: '读取工作区文件',
+  workspace_write: '写入工作区文件',
+  workspace_mkdir: '创建工作区目录',
+  open_url: '打开链接',
+  set_clipboard: '写入剪贴板',
+  search_and_play_music: '搜索并播放音乐',
+  music_control: '控制音乐',
+  list_memories: '检索长期记忆',
+  read_memory: '读取长期记忆',
+  save_memory: '保存长期记忆',
+  update_memory: '更新长期记忆',
+  pin_memory: '调整重要记忆',
+  delete_memory: '删除长期记忆'
+};
+function setAgentStatus(el, text) {
+  if (!el) return;
+  let s = el.querySelector('.agent-status');
+  if (!text) { if (s) s.remove(); return; }
+  if (!s) { s = document.createElement('span'); s.className = 'agent-status'; el.appendChild(s); }
+  s.textContent = text;
+  const bodyEl = $('#body');
+  if (bodyEl) bodyEl.scrollTop = bodyEl.scrollHeight;
+}
+function makeAgentLive(typing) {
+  let current = typing;
+  let round = 0, toolCount = 0;
+  const parts = [];
+  return {
+    parts,
+    onRound(n, max) {
+      round = n;
+      setAgentStatus(current, max > 0 ? '第 ' + n + ' 轮处理中（上限 ' + max + '）' : '第 ' + n + ' 轮处理中');
+    },
+    onText(text) {
+      const t = String(text || '').trim();
+      if (!t) return;
+      if (current === typing) typing.remove();
+      else setAgentStatus(current, '');
+      current = addMsg('assistant', t);
+      parts.push(t);
+    },
+    onTool(name) {
+      toolCount++;
+      const label = AGENT_TOOL_LABELS[name] || name || '工具';
+      setAgentStatus(current, '正在执行' + label + ' · 第 ' + round + ' 轮 · 已调用 ' + toolCount + ' 次');
+    },
+    finish() {
+      setAgentStatus(current, '');
+      if (typing && typing.parentNode) typing.remove();
+      return parts.slice();
+    }
+  };
 }
 
 function saveHistory() {
@@ -2782,6 +3213,13 @@ function currentPageUrl() {
   }
   return '';
 }
+async function agentAfterAction() {
+  await new Promise(resolve => setTimeout(resolve, 350));
+  let pkg = '';
+  try { if (HAS_PERM && Perm.getForegroundPackage) pkg = Perm.getForegroundPackage() || ''; } catch (e) {}
+  const text = readScreenText();
+  return { package: pkg, text: text ? text.slice(0, 1200) : '', readable: !!text };
+}
 
 /* ==========================================================
  *  截屏 / 识图
@@ -2828,6 +3266,40 @@ async function visionDescribe(dataUrl, hint) {
 
 /** execTool 截屏后把图片交给 chatReqTools 插入对话 */
 let pendingShotImage = '';
+let pendingShotImages = [];
+let agentCapsuleActive = false;
+function agentCapsuleOn(text) {
+  if (!HAS_NATIVE || !Android.toCapsule) return false;
+  try { Android.toCapsule(text || '正在读取屏幕'); agentCapsuleActive = true; return true; } catch (e) { return false; }
+}
+function agentCapsuleState(text, state) {
+  if (!agentCapsuleActive || !HAS_NATIVE || !Android.capsuleState) return;
+  try { Android.capsuleState(text, state); } catch (e) {}
+}
+function finishAgentCapsule(text) {
+  if (!agentCapsuleActive) return false;
+  let ok = false;
+  try { ok = !!(HAS_NATIVE && Android.capsuleDone && Android.capsuleDone(text || '已完成 · 点我查看')); } catch (e) {}
+  agentCapsuleActive = false;
+  return ok;
+}
+async function watchScreenFrames(args) {
+  const seconds = Math.max(1, Math.min(10, parseInt(args.seconds, 10) || 5));
+  const fps = Math.max(1, Math.min(2, parseInt(args.fps, 10) || 1));
+  const interval = Math.max(500, Math.round(1000 / fps));
+  const maxFrames = Math.min(6, Math.max(1, seconds * fps));
+  const frames = [];
+  for (let i = 0; i < maxFrames; i++) {
+    if (stopRequested) break;
+    const shot = await captureScreenJS();
+    if (shot) frames.push(shot);
+    if (i + 1 < maxFrames) await new Promise(resolve => setTimeout(resolve, interval));
+  }
+  pendingShotImages = frames.slice(0, 4);
+  pendingShotImage = pendingShotImages[pendingShotImages.length - 1] || '';
+  return { frames: frames.length, seconds: seconds, fps: fps,
+    note: frames.length ? '已完成限时观察，返回了 ' + frames.length + ' 帧画面。' : '观察期间没有截到画面。' };
+}
 
 /* ==========================================================
  *  微软翻译
@@ -3054,6 +3526,7 @@ async function doTranslateScreen() {
 
 /** 处理完了：如果确实收成了胶囊就亮红点；否则窗口本来就开着，直接展示。 */
 function prepareResult(capsuleText, useCapsule) {
+  if (agentCapsuleActive) finishAgentCapsule(capsuleText || '已完成 · 点我查看');
   if (useCapsule && capsuleFinish(capsuleText)) return;
   showView(TRANS.pending || 'chat');
 }
@@ -3764,6 +4237,13 @@ function buildTools() {
         name: 'screenshot',
         description: '截取用户当前手机屏幕的画面。用户说"看我屏幕""截图看看""我现在在干什么""识别屏幕上的东西"时调用，调用后屏幕画面会交给你查看。',
         parameters: { type: 'object', properties: {}, required: [] } } });
+    tools.push({ type: 'function', function: {
+        name: 'watch_screen',
+        description: '在用户明确要求观察一段时间时使用。限定观察时长 1 到 10 秒、每秒 1 到 2 帧，只返回少量关键画面；不会后台持续监控。',
+        parameters: { type: 'object', properties: {
+          seconds: { type: 'integer', description: '观察秒数，默认 5，最长 10' },
+          fps: { type: 'integer', description: '每秒帧数，默认 1，最多 2' }
+        }, required: [] } } });
   }
   tools.push({ type: 'function', function: {
       name: 'open_url',
@@ -3777,6 +4257,81 @@ function buildTools() {
       parameters: { type: 'object', properties: {
         text: { type: 'string', description: '要复制的文字' }
       }, required: ['text'] } } });
+
+  if (agentReadOn()) {
+    tools.push({ type: 'function', function: {
+      name: 'find_app', description: '按用户给出的应用名称或包名查询当前设备实际可启动的应用。打开 QQ、微信等应用前先调用，不要猜包名。',
+      parameters: { type: 'object', properties: { query: { type: 'string', description: '应用显示名或包名，如 QQ、电话、com.tencent.mobileqq' } }, required: ['query'] } } });
+  }
+  if (agentActionsOn()) {
+    tools.push({ type: 'function', function: {
+      name: 'tap_screen', description: '点击手机屏幕坐标。只有在已读取页面并确认坐标后使用。',
+      parameters: { type: 'object', properties: { x: { type: 'integer' }, y: { type: 'integer' } }, required: ['x', 'y'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'click_text', description: '按文字或 content description 点击当前页面控件，优先于猜坐标。',
+      parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'swipe_screen', description: '在手机屏幕上滑动或滚动。执行后重新读取页面验证。',
+      parameters: { type: 'object', properties: {
+        x1: { type: 'integer' }, y1: { type: 'integer' }, x2: { type: 'integer' }, y2: { type: 'integer' },
+        duration: { type: 'integer', description: '毫秒，80 到 2000，默认 350' }
+      }, required: ['x1', 'y1', 'x2', 'y2'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'input_text', description: '向当前获得焦点的输入控件输入文字。密码、发送和敏感内容必须先确认。',
+      parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'press_key', description: '执行 back、home、recents 或 notifications 系统按键。',
+      parameters: { type: 'object', properties: { key: { type: 'string', enum: ['back', 'home', 'recents', 'notifications'] } }, required: ['key'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'launch_app', description: '按应用显示名或包名启动白名单中的应用。会先在设备上解析真实包名，再执行白名单检查。',
+      parameters: { type: 'object', properties: {
+        app: { type: 'string', description: '应用显示名或包名' },
+        package: { type: 'string', description: '兼容旧版本的包名参数' }
+      }, required: [] } } });
+  }
+
+  if (hasAllFilesAccess() && agentReadOn()) {
+    tools.push({ type: 'function', function: {
+      name: 'workspace_status', description: '查看允许管理所有文件权限和 ElysiaFloat 工作区是否已创建。',
+      parameters: { type: 'object', properties: {}, required: [] } } });
+    tools.push({ type: 'function', function: {
+      name: 'workspace_create', description: '创建用户的 ElysiaFloat 工作区。',
+      parameters: { type: 'object', properties: {}, required: [] } } });
+  }
+  if (workspaceReady() && agentActionsOn()) {
+    tools.push({ type: 'function', function: {
+      name: 'workspace_list', description: '列出工作区内的文件或目录。path 为空表示根目录。',
+      parameters: { type: 'object', properties: { path: { type: 'string' } }, required: [] } } });
+    tools.push({ type: 'function', function: {
+      name: 'workspace_read', description: '读取工作区内的文本文件。',
+      parameters: { type: 'object', properties: { path: { type: 'string' }, max_chars: { type: 'integer' } }, required: ['path'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'workspace_write', description: '创建或写入工作区内的文本文件。每次写入或覆盖前都会弹窗请求用户确认。',
+      parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, overwrite: { type: 'boolean' } }, required: ['path', 'content'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'workspace_mkdir', description: '在工作区内创建目录；执行前会弹窗请求用户确认。',
+      parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } });
+  }
+  if (hasAllFilesAccess() && agentActionsOn()) {
+    tools.push({ type: 'function', function: {
+      name: 'external_file_list', description: '列出手机公共存储中的目录。读取操作不修改文件。',
+      parameters: { type: 'object', properties: { path: { type: 'string', description: '绝对路径或公共存储根目录下的相对路径' } }, required: ['path'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'external_file_read', description: '读取手机公共存储中的文本文件。读取操作不修改文件。',
+      parameters: { type: 'object', properties: { path: { type: 'string' }, max_chars: { type: 'integer' } }, required: ['path'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'external_file_write', description: '写入或覆盖公共存储中的文本文件；每次修改前会弹窗请求用户确认。',
+      parameters: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' }, overwrite: { type: 'boolean' } }, required: ['path', 'content'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'external_file_copy', description: '复制公共存储中的文件；写入目标前会弹窗请求用户确认。',
+      parameters: { type: 'object', properties: { source: { type: 'string' }, destination: { type: 'string' }, overwrite: { type: 'boolean' } }, required: ['source', 'destination'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'external_file_mkdir', description: '在公共存储中创建目录；执行前会弹窗请求用户确认。',
+      parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } } });
+    tools.push({ type: 'function', function: {
+      name: 'external_file_delete', description: '删除公共存储中的文件或目录；这是高风险操作，每次执行前都会弹窗请求用户确认。',
+      parameters: { type: 'object', properties: { path: { type: 'string' }, recursive: { type: 'boolean' } }, required: ['path'] } } });
+  }
 
   tools.push({ type: 'function', function: {
         name: 'search_and_play_music',
@@ -3814,7 +4369,7 @@ function buildTools() {
         parameters: { type: 'object', properties: {}, required: [] } } });
   tools.push({ type: 'function', function: {
         name: 'save_memory',
-        description: '新记住一件事。用户透露了值得长期记住的偏好、事实、约定、进展时调用。写之前先 list_memories 查重，同一件事有新进展用 update_memory 而不是新建。日常闲聊、一次性信息不要存。',
+        description: '新增一条长期记忆。用户透露了值得长期记住的偏好、事实、约定或进展时调用。类别相同也可以新增；只有正文高度相似且属于同一事实时才合并。系统合并时会保留原文并追加，不会缩短原文。日常闲聊、一次性信息不要存。',
         parameters: { type: 'object', properties: {
           title: { type: 'string', description: '一句话标题，简短好搜，如"用户喜欢喝无糖可乐"' },
           content: { type: 'string', description: '正文，把背景和细节写清楚' },
@@ -3824,13 +4379,14 @@ function buildTools() {
         }, required: ['title', 'content'] } } });
   tools.push({ type: 'function', function: {
         name: 'update_memory',
-        description: '修改已有记忆。内容过时、有补充、分类/标题不合适时调用。只需要传要改的字段。',
+        description: '仅用于同一事实的高度相似补充或明确修订。默认保留原文并在末尾追加；只有用户明确要求修订原文时才传 replace=true。新的事实或相似度不足的内容应使用 save_memory 新增。',
         parameters: { type: 'object', properties: {
           id: { type: 'string', description: '记忆编号' },
           title: { type: 'string' }, content: { type: 'string' },
           category: { type: 'string' },
           tags: { type: 'array', items: { type: 'string' } },
-          pinned: { type: 'boolean' }
+          pinned: { type: 'boolean' },
+          replace: { type: 'boolean', description: '仅在用户明确要求修订原文时设为 true；否则保留原文并追加。' }
         }, required: ['id'] } } });
   tools.push({ type: 'function', function: {
         name: 'pin_memory',
@@ -3863,6 +4419,7 @@ function buildTools() {
   return tools.filter(t => toolLive(t.function.name));
 }
 async function execTool(name, args) {
+  if (!toolLive(name)) return { success: false, error: '该工具当前未获授权或已关闭。' };
   const cp = plugFind(name);
   if (cp) {
     if (cp.plugin.enabled === false) return { success: false, error: '该插件已停用。' };
@@ -3878,11 +4435,118 @@ async function execTool(name, args) {
     const u = currentPageUrl();
     return u ? { success: true, url: u } : { success: false, error: '没有识别到浏览器地址栏' };
   }
+  if (name === 'find_app') {
+    if (!(HAS_PERM && Perm.findAgentApps)) return { success: false, error: '当前版本没有设备应用查询能力' };
+    try {
+      const list = JSON.parse(Perm.findAgentApps(String(args.query || '')) || '[]');
+      return list.length ? { success: true, count: list.length, apps: list } : { success: false, error: '设备上没有找到匹配的可启动应用' };
+    } catch (e) { return { success: false, error: '应用查询失败：' + errMsg(e) }; }
+  }
   if (name === 'screenshot') {
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+      const ok = await uiConfirm('Agent 想查看当前手机画面。截图可能包含聊天、验证码或其它隐私内容，是否继续？', '允许截图', '查看手机画面');
+      if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮截图' };
+    }
+    agentCapsuleOn('正在截取屏幕');
     const shot = await captureScreenJS();
-    if (!shot) return { success: false, error: '截屏失败：请确认无障碍已开启（Android 11+），或同意录屏授权' };
+    if (!shot) { agentCapsuleState('截屏失败', 'done'); return { success: false, error: '截屏失败：请确认无障碍已开启（Android 11+），或同意录屏授权' }; }
     pendingShotImage = shot;
+    pendingShotImages = [shot];
+    agentCapsuleState('已取得屏幕画面', 'busy');
     return { success: true, note: '已截取当前屏幕画面，画面会在下一条消息里给你看。' };
+  }
+  if (name === 'watch_screen') {
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+      const ok = await uiConfirm('Agent 想在限定时间内观察当前手机画面。最多 10 秒、每秒 2 帧，是否继续？', '允许观察', '观察手机画面');
+      if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮观察' };
+    }
+    agentCapsuleOn('正在观察屏幕');
+    const result = await watchScreenFrames(args || {});
+    agentCapsuleState(result.frames ? '观察完成，正在分析' : '没有取得画面', 'busy');
+    return result;
+  }
+  if (name === 'workspace_status') {
+    try { return JSON.parse(Perm.workspaceState ? (Perm.workspaceState() || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法读取工作区状态' }; }
+  }
+  if (name === 'workspace_create') {
+    if (!(await uiConfirm('AI 请求创建 ElysiaFloat 工作区，并可能创建 README.md。是否确认？', '确认创建', '工作区创建确认'))) {
+      return { success: false, kind: 'cancelled', error: '用户没有允许创建工作区' };
+    }
+    try { return JSON.parse(Perm.createWorkspace ? (Perm.createWorkspace() || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法创建工作区：' + errMsg(e) }; }
+  }
+  if (name === 'workspace_list') {
+    try { return JSON.parse(Perm.agentWorkspaceList ? (Perm.agentWorkspaceList(String(args.path || '')) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法列出工作区：' + errMsg(e) }; }
+  }
+  if (name === 'workspace_read') {
+    try { return JSON.parse(Perm.agentWorkspaceRead ? (Perm.agentWorkspaceRead(String(args.path || ''), parseInt(args.max_chars, 10) || 120000) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法读取工作区文件：' + errMsg(e) }; }
+  }
+  if (name === 'workspace_write') {
+    const path = String(args.path || '').trim();
+    const content = String(args.content == null ? '' : args.content);
+    const overwrite = args.overwrite === true;
+    const action = overwrite ? '覆盖' : '创建或写入';
+    if (!(await uiConfirm('AI 请求' + action + '工作区文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符\n是否允许？', '允许本次写入', '工作区写入确认'))) {
+      return { success: false, kind: 'cancelled', error: '用户没有允许本次写入' };
+    }
+    try { return JSON.parse(Perm.agentWorkspaceWrite ? (Perm.agentWorkspaceWrite(path, content, overwrite) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法写入工作区文件：' + errMsg(e) }; }
+  }
+  if (name === 'workspace_mkdir') {
+    const path = String(args.path || '').trim();
+    if (!(await uiConfirm('AI 请求在工作区创建目录：\n\n' + path + '\n\n是否允许？', '允许创建目录', '工作区目录确认'))) {
+      return { success: false, kind: 'cancelled', error: '用户没有允许创建目录' };
+    }
+    try { return JSON.parse(Perm.agentWorkspaceMkdir ? (Perm.agentWorkspaceMkdir(path) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法创建工作区目录：' + errMsg(e) }; }
+  }
+  if (name === 'external_file_list') {
+    try { return JSON.parse(Perm.agentExternalList ? (Perm.agentExternalList(String(args.path || '')) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法列出外部目录：' + errMsg(e) }; }
+  }
+  if (name === 'external_file_read') {
+    try { return JSON.parse(Perm.agentExternalRead ? (Perm.agentExternalRead(String(args.path || ''), parseInt(args.max_chars, 10) || 120000) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法读取外部文件：' + errMsg(e) }; }
+  }
+  if (name === 'external_file_write') {
+    const path = String(args.path || '').trim();
+    const content = String(args.content == null ? '' : args.content);
+    const overwrite = args.overwrite === true;
+    if (!(await uiConfirm('AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符\n是否允许？', '允许本次写入', '外部文件修改确认'))) {
+      return { success: false, kind: 'cancelled', error: '用户没有允许本次外部文件写入' };
+    }
+    try { return JSON.parse(Perm.agentExternalWrite ? (Perm.agentExternalWrite(path, content, overwrite) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法写入外部文件：' + errMsg(e) }; }
+  }
+  if (name === 'external_file_copy') {
+    const source = String(args.source || '').trim();
+    const destination = String(args.destination || '').trim();
+    const overwrite = args.overwrite === true;
+    if (!(await uiConfirm('AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。') + '\n是否允许本次复制？', '允许本次复制', '文件复制确认'))) {
+      return { success: false, kind: 'cancelled', error: '用户没有允许本次复制' };
+    }
+    try { return JSON.parse(Perm.agentExternalCopy ? (Perm.agentExternalCopy(source, destination, overwrite) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法复制外部文件：' + errMsg(e) }; }
+  }
+  if (name === 'external_file_mkdir') {
+    const path = String(args.path || '').trim();
+    if (!(await uiConfirm('AI 请求在公共存储创建目录：\n\n' + path + '\n\n是否允许？', '允许创建目录', '外部目录确认'))) {
+      return { success: false, kind: 'cancelled', error: '用户没有允许创建外部目录' };
+    }
+    try { return JSON.parse(Perm.agentExternalMkdir ? (Perm.agentExternalMkdir(path) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法创建外部目录：' + errMsg(e) }; }
+  }
+  if (name === 'external_file_delete') {
+    const path = String(args.path || '').trim();
+    const recursive = args.recursive === true;
+    if (!(await uiConfirm('高风险操作：AI 请求删除公共存储中的文件或目录：\n\n' + path + '\n\n' + (recursive ? '将递归删除目录内容。' : '非空目录不会被递归删除。') + '\n此确认只对本次删除有效，是否继续？', '确认本次删除', '外部文件删除确认'))) {
+      return { success: false, kind: 'cancelled', error: '用户没有允许本次删除' };
+    }
+    try { return JSON.parse(Perm.agentExternalDelete ? (Perm.agentExternalDelete(path, recursive) || '{}') : '{}'); }
+    catch (e) { return { success: false, error: '无法删除外部文件：' + errMsg(e) }; }
   }
   if (name === 'open_url') {
     if (!args.url) return { success: false, error: '缺少网址' };
@@ -3894,6 +4558,25 @@ async function execTool(name, args) {
   if (name === 'set_clipboard') {
     if (!args.text) return { success: false, error: '缺少文本' };
     return writeClipboard(args.text) ? { success: true } : { success: false, error: '写入剪贴板失败' };
+  }
+  if (agentActionNames().indexOf(name) >= 0) {
+    if (!HAS_PERM) return { success: false, error: '当前环境没有 Agent 原生能力桥' };
+    try {
+      let raw = '{}';
+      if (name === 'tap_screen' && Perm.agentTap) raw = Perm.agentTap(parseInt(args.x, 10), parseInt(args.y, 10));
+      else if (name === 'click_text' && Perm.agentClickText) raw = Perm.agentClickText(String(args.text || ''));
+      else if (name === 'swipe_screen' && Perm.agentSwipe) raw = Perm.agentSwipe(
+        parseInt(args.x1, 10), parseInt(args.y1, 10), parseInt(args.x2, 10), parseInt(args.y2, 10),
+        Math.max(80, Math.min(2000, parseInt(args.duration, 10) || 350)));
+      else if (name === 'input_text' && Perm.agentInputText) raw = Perm.agentInputText(String(args.text || ''));
+      else if (name === 'press_key' && Perm.agentKey) raw = Perm.agentKey(String(args.key || ''));
+      else if (name === 'launch_app' && Perm.agentLaunch) raw = Perm.agentLaunch(String(args.app || args.package || ''));
+      else return { success: false, error: '当前版本尚未提供该行为工具' };
+      const r = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
+      if (!(r && r.ok)) return { success: false, error: (r && r.error) || '行为执行失败' };
+      const after = await agentAfterAction();
+      return { success: true, level: r.level || 'L3', package: r.package || after.package || '', label: r.label || '', after: after };
+    } catch (e) { return { success: false, error: errMsg(e) }; }
   }
 
   /* ---- 长期记忆 ---- */
@@ -3929,19 +4612,41 @@ async function execTool(name, args) {
   }
   if (name === 'save_memory') {
     if (!args.title || !args.content) return { success: false, error: '标题和正文都要有' };
-    const dup = MEM.find(e => e.title === String(args.title).trim());
-    if (dup) return { success: false, error: '已有一条同名记忆（' + dup.id + '），要补充或修改请改用 update_memory。' };
+    const title = String(args.title).trim();
+    const content = String(args.content).trim();
+    const tags = Array.isArray(args.tags) ? args.tags : [];
+    // 同类并不等于同一条记忆。只有正文高度相似时才合并；相似度不足就新增。
+    const similar = memFindSimilar(content);
+    if (similar) {
+      const e = memAppendContent(similar, content, tags) || similar;
+      return { success: true, id: e.id, cat: memCat(e), saved: e.title, merged: true,
+        note: '正文与已有记忆高度相似，已保留原文并追加新内容。' };
+    }
     const e = memAdd({
-      title: String(args.title).trim(), content: String(args.content).trim(),
+      title: title, content: content,
       cat: String(args.category || '其他').trim() || '其他',
-      tags: Array.isArray(args.tags) ? args.tags : [],
+      tags: tags,
       pinned: !!args.pinned, src: 'ai'
     });
-    return { success: true, id: e.id, cat: memCat(e), saved: e.title };
+    return { success: true, id: e.id, cat: memCat(e), saved: e.title, merged: false };
   }
   if (name === 'update_memory') {
     if (!args.id) return { success: false, error: '缺少记忆编号' };
-    if (!memFind(String(args.id))) return { success: false, error: '没有编号为 ' + args.id + ' 的记忆' };
+    const existing = memFind(String(args.id));
+    if (!existing) return { success: false, error: '没有编号为 ' + args.id + ' 的记忆' };
+    if (args.content !== undefined && args.replace !== true) {
+      const merged = memAppendContent(existing, args.content, Array.isArray(args.tags) ? args.tags : null);
+      if (!merged) return { success: false, error: '新内容与原记忆不够相似；请使用 save_memory 新增，或明确传 replace=true 修订原记录。' };
+      if (args.title !== undefined || args.category !== undefined || args.pinned !== undefined) {
+        const patch = {};
+        if (args.title !== undefined) patch.title = args.title;
+        if (args.category !== undefined) patch.cat = args.category;
+        if (args.pinned !== undefined) patch.pinned = args.pinned;
+        memUpdate(existing.id, patch);
+      }
+      return { success: true, id: existing.id, updated: existing.title, merged: true,
+        note: '已保留原内容，并在末尾追加补充内容。' };
+    }
     const patch = {};
     if (args.title !== undefined) patch.title = args.title;
     if (args.content !== undefined) patch.content = args.content;
@@ -3949,7 +4654,7 @@ async function execTool(name, args) {
     if (args.tags !== undefined) patch.tags = args.tags;
     if (args.pinned !== undefined) patch.pinned = args.pinned;
     const e = memUpdate(String(args.id), patch);
-    return { success: true, id: e.id, updated: e.title };
+    return { success: true, id: e.id, updated: e.title, merged: false, replaced: args.replace === true };
   }
   if (name === 'pin_memory') {
     const e = memFind(String(args.id || ''));
@@ -4015,17 +4720,34 @@ async function execTool(name, args) {
  *  所有 host 调用都回到这里统一校验，插件碰不到 Android.* 桥。
  * ========================================================== */
 
-/** 只允许 http/https，且不允许访问本机 / 链路本地地址（防 SSRF 打本机服务）。 */
-function plugUrlAllowed(u) {
+/** 网络能力按插件声明和用户授权分级；默认拒绝本机、局域网和链路本地地址。 */
+function plugIsLocalHost(host) {
+  const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h || h === 'localhost' || h === '0.0.0.0' || h === '::1' || h.endsWith('.localhost')) return true;
+  if (/^127\./.test(h) || /^169\.254\./.test(h) || /^10\./.test(h) || /^192\.168\./.test(h)) return true;
+  const m = h.match(/^172\.(\d+)\./);
+  return !!(m && Number(m[1]) >= 16 && Number(m[1]) <= 31);
+}
+function plugUrlPermission(u) {
+  try {
+    const url = new URL(String(u));
+    return plugIsLocalHost(url.hostname) ? 'network.local' : 'network.public';
+  } catch (e) { return ''; }
+}
+function plugUrlAllowed(u, allowLocal) {
   let url;
   try { url = new URL(String(u)); } catch (e) { return '网址格式不正确'; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return '只允许 http/https 请求';
   const host = String(url.hostname || '').toLowerCase();
   if (!host) return '网址缺少主机名';
-  if (host === 'localhost' || host === '0.0.0.0' || host === '::1' || host === '[::1]'
-      || host.endsWith('.localhost')) return '不允许访问本机地址';
-  if (/^127\./.test(host) || /^169\.254\./.test(host)) return '不允许访问本机地址';
+  if (plugIsLocalHost(host) && !allowLocal) return '不允许访问本机或局域网地址；需要声明并开启 network.local';
   return '';
+}
+function plugNetworkAllowed(plugin, url) {
+  const permission = plugUrlPermission(url);
+  if (!permission || !plugPermissionGranted(plugin, permission)) return false;
+  if (permission === 'network.local' && CONFIG.agentSafety !== true) return false;
+  return !plugUrlAllowed(url, permission === 'network.local');
 }
 
 function plugParseBody(text) {
@@ -4040,18 +4762,33 @@ function plugParseBody(text) {
 
 /** 统一入口：按工具的 kind 选择执行方式。 */
 async function plugExec(plugin, tool, args) {
+  if (!plugin || !tool) return plugFailure('PLUGIN_NOT_FOUND', '插件或工具不存在');
+  if (plugin.enabled === false || plugin.state === 'disabled') return plugFailure('PLUGIN_DISABLED', '插件已停用');
+  if (plugin.state === 'quarantined') return plugFailure('PLUGIN_QUARANTINED', '插件处于隔离状态，禁止调用');
+  if (!plugToolPermissionsGranted(plugin, tool)) return plugFailure('PERMISSION_DENIED', '插件工具权限未获用户授权');
+  plugin.invokeCount = (parseInt(plugin.invokeCount, 10) || 0) + 1;
+  plugin.invokedAt = new Date().toISOString();
+  plugSaveList();
+  plugAudit('invoke', plugin, { tool: tool.name });
   if (tool.kind === 'http') {
     const r = tool.request;
     const url = plugTemplate(r.url, args);
-    const bad = plugUrlAllowed(url);
-    if (bad) return { success: false, error: bad };
+    if (!plugNetworkAllowed(plugin, url)) {
+      return plugFailure('NETWORK_PERMISSION_DENIED', '插件未获准访问该网络地址；请检查 permissions、用户授权和安全开关。');
+    }
+    const bad = plugUrlAllowed(url, plugUrlPermission(url) === 'network.local');
+    if (bad) return plugFailure('INVALID_URL', bad);
     const headers = {};
     for (const k in r.headers) headers[k] = plugTemplate(String(r.headers[k]), args);
     const body = r.body ? plugTemplate(r.body, args) : '';
     try {
       const res = await nativeReq(r.method, url, headers, body, tool.timeout);
-      return { success: true, status: res.status, data: plugParseBody(res.text) };
-    } catch (e) { return { success: false, error: errMsg(e) }; }
+      const data = plugParseBody(res.text);
+      if (res.status < 200 || res.status >= 400) {
+        return { success: false, errorCode: 'HTTP_ERROR', status: res.status, error: 'HTTP ' + res.status, data };
+      }
+      return { success: true, status: res.status, data, meta: { plugin: plugin.id, tool: tool.name } };
+    } catch (e) { return plugFailure('NETWORK_ERROR', errMsg(e)); }
   }
   return await plugExecJs(plugin, tool, args);
 }
@@ -4059,10 +4796,18 @@ async function plugExec(plugin, tool, args) {
 /* 沙箱页面：opaque origin，拿不到父页面的 DOM / Android 桥，只能 postMessage 回来。 */
 const PLUG_SANDBOX_HTML = [
 '<!doctype html><meta charset="utf-8">',
-// CSP：禁止插件自己发网络请求 / 加载资源，只能走 host.request（由宿主校验 URL）
-'<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;unsafe-inline&#39; &#39;unsafe-eval&#39;">',
+// 网络请求仍在沙箱中执行，但必须由 manifest permissions 声明并由宿主传入本次授权。
+'<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;unsafe-inline&#39; &#39;unsafe-eval&#39;; connect-src http: https:">',
 '<scr' + 'ipt>',
 '(function(){',
+'var allowLocal=false,allowPublic=false;',
+'function publicUrl(u){try{var x=new URL(String(u),location.href),h=(x.hostname||"").toLowerCase(),local=h==="localhost"||h==="0.0.0.0"||h==="::1"||h==="[::1]"||h.endsWith(".localhost")||/^127\\./.test(h)||/^169\\.254\\./.test(h)||/^10\\./.test(h)||/^192\\.168\\./.test(h)||/^172\\.(1[6-9]|2[0-9]|3[0-1])\\./.test(h);return (x.protocol==="http:"||x.protocol==="https:")&&(local?allowLocal:allowPublic);}catch(e){return false;}}',
+'var nativeFetch=window.fetch;',
+'if(nativeFetch){window.fetch=function(input,init){var u=typeof input==="string"?input:(input&&input.url)||"";if(!publicUrl(u))return Promise.reject(new Error("插件网络地址被安全开关拦截"));return nativeFetch.call(window,input,init);};}',
+'var NativeXHR=window.XMLHttpRequest;',
+'if(NativeXHR){window.XMLHttpRequest=function(){var x=new NativeXHR(),open=x.open;x.open=function(m,u){if(!publicUrl(u))throw new Error("插件网络地址被安全开关拦截");return open.apply(x,arguments);};return x;};}',
+'var NativeWS=window.WebSocket;',
+'if(NativeWS){window.WebSocket=function(u,p){if(!publicUrl(u))throw new Error("插件网络地址被安全开关拦截");return p===undefined?new NativeWS(u):new NativeWS(u,p);};}',
 'var pending={},seq=0;',
 'function callHost(method,params){return new Promise(function(res,rej){var id="h"+(++seq);pending[id]={res:res,rej:rej};parent.postMessage({__elly:"host",id:id,method:method,params:params||{}},"*");});}',
 'var host={',
@@ -4070,13 +4815,14 @@ const PLUG_SANDBOX_HTML = [
 'toast:function(t){return callHost("toast",{text:String(t==null?"":t)});},',
 'log:function(){var a=[],i;for(i=0;i<arguments.length;i++){var v=arguments[i];try{a.push(typeof v==="string"?v:JSON.stringify(v));}catch(e){a.push(String(v));}}return callHost("log",{args:a});},',
 'openUrl:function(u){return callHost("openUrl",{url:String(u==null?"":u)});},',
+'callTool:function(name,args){return callHost("callTool",{name:String(name||""),args:args||{}});},',
 'clipboard:{write:function(t){return callHost("clipboardWrite",{text:String(t==null?"":t)});}},',
 'storage:{',
 'get:function(k){return callHost("storageGet",{key:String(k)}).then(function(r){return r?r.value:undefined;});},',
 'set:function(k,v){return callHost("storageSet",{key:String(k),value:v});}}',
 '};',
 'window.addEventListener("message",function(ev){',
-'var d=ev.data;if(!d||d.__elly!=="run")return;var rid=d.id;',
+'var d=ev.data;if(!d||d.__elly!=="run")return;var rid=d.id;allowLocal=!!d.allowLocal;allowPublic=!!d.allowPublic;',
 'Promise.resolve().then(function(){',
 'var fn=new Function("host","\\"use strict\\";"+d.code+"\\n;return (typeof run===\\"function\\")?run:null;");',
 'var run=fn(host);',
@@ -4162,10 +4908,15 @@ function plugSaveStore(pid, store) {
 
 async function plugHandleHost(method, params) {
   const p = params || {};
-  const pid = (plugRunning && plugRunning.pluginId) || 'unknown';
+  const running = plugRunning || {};
+  const pid = running.pluginId || 'unknown';
+  const plugin = USER_PLUGINS.filter(x => x.id === pid)[0] || null;
+  if (!plugin) throw new Error('插件上下文不存在');
   if (method === 'request') {
     const m = String(p.method || 'GET').toUpperCase();
-    const bad = plugUrlAllowed(String(p.url || ''));
+    const url = String(p.url || '');
+    if (!plugNetworkAllowed(plugin, url)) throw new Error('插件未获准访问该网络地址；请检查 network.public/network.local 和安全开关');
+    const bad = plugUrlAllowed(url, plugUrlPermission(url) === 'network.local');
     if (bad) throw new Error(bad);
     const headers = (p.headers && typeof p.headers === 'object') ? p.headers : {};
     const body = (p.body === undefined || p.body === null)
@@ -4180,19 +4931,36 @@ async function plugHandleHost(method, params) {
     return true;
   }
   if (method === 'openUrl') {
+    if (!plugPermissionGranted(plugin, 'system.open_url')) throw new Error('插件未声明或未获准 system.open_url');
     const url = String(p.url || '');
-    const bad = plugUrlAllowed(url);
+    const bad = plugUrlAllowed(url, false);
     if (bad) throw new Error(bad);
     if (HAS_NATIVE && Android.openUrl) Android.openUrl(url);
     return true;
   }
-  if (method === 'clipboardWrite') return writeClipboard(String(p.text || ''));
-  if (method === 'storageGet') return { value: plugStore(pid)[String(p.key || '')] };
+  if (method === 'clipboardWrite') {
+    if (!plugPermissionGranted(plugin, 'clipboard.write')) throw new Error('插件未声明或未获准 clipboard.write');
+    return writeClipboard(String(p.text || ''));
+  }
+  if (method === 'storageGet') {
+    if (!plugPermissionGranted(plugin, 'storage.plugin')) throw new Error('插件未声明或未获准 storage.plugin');
+    return { value: plugStore(pid)[String(p.key || '')] };
+  }
   if (method === 'storageSet') {
+    if (!plugPermissionGranted(plugin, 'storage.plugin')) throw new Error('插件未声明或未获准 storage.plugin');
     const s = plugStore(pid);
     s[String(p.key || '')] = p.value;
     plugSaveStore(pid, s);
     return true;
+  }
+  if (method === 'callTool') {
+    const name = String(p.name || '');
+    const permissions = plugCapabilityPermissions(name);
+    if (!permissions.length || !permissions.every(permission => plugPermissionGranted(plugin, permission))) {
+      throw new Error('插件未声明或未获准调用能力：' + name + '（需要：' + permissions.join('、') + '）');
+    }
+    if (plugFind(name)) throw new Error('插件不能通过 host.callTool 调用其它自定义插件');
+    return await execTool(name, p.args && typeof p.args === 'object' ? p.args : {});
   }
   throw new Error('未知的沙箱调用：' + method);
 }
@@ -4201,13 +4969,13 @@ async function plugHandleHost(method, params) {
 function plugExecJs(plugin, tool, args) {
   const run = async () => {
     const f = ensurePlugSandbox();
-    if (!plugSandboxReady) return { success: false, error: '插件沙箱不可用' };
+    if (!plugSandboxReady) return plugFailure('SANDBOX_UNAVAILABLE', '插件沙箱不可用');
     try {
       await Promise.race([
         plugSandboxReady,
         new Promise((_, rej) => setTimeout(() => rej(new Error('插件沙箱初始化超时')), 3000))
       ]);
-    } catch (e) { return { success: false, error: errMsg(e) }; }
+    } catch (e) { return plugFailure('SANDBOX_INIT_ERROR', errMsg(e)); }
     const id = 'p' + (++plugRunSeq);
     plugRunning = { pluginId: plugin.id, toolName: tool.name };
     try {
@@ -4217,7 +4985,9 @@ function plugExecJs(plugin, tool, args) {
           reject(new Error('插件执行超时'));
         }, tool.timeout);
         plugRunPending[id] = { resolve, reject, timer };
-        f.contentWindow.postMessage({ __elly: 'run', id, code: tool.code, args }, '*');
+        f.contentWindow.postMessage({ __elly: 'run', id, code: tool.code, args,
+          allowLocal: plugPermissionGranted(plugin, 'network.local') && CONFIG.agentSafety === true,
+          allowPublic: plugPermissionGranted(plugin, 'network.public') }, '*');
       });
       // 结果过大就截断，避免一条工具结果把上下文撑爆
       let out = value;
@@ -4225,9 +4995,9 @@ function plugExecJs(plugin, tool, args) {
         const s0 = JSON.stringify(value);
         if (s0 && s0.length > 50000) out = { truncated: true, preview: s0.slice(0, 20000) };
       } catch (e) {}
-      return { success: true, result: out };
+      return { success: true, result: out, meta: { plugin: plugin.id, tool: tool.name } };
     } catch (e) {
-      return { success: false, error: errMsg(e) };
+      return plugFailure('PLUGIN_RUNTIME_ERROR', errMsg(e));
     } finally {
       plugRunning = null;
     }
@@ -4258,7 +5028,8 @@ function textOfContent(c) {
   return '';
 }
 
-async function chatReqTools(messages) {
+async function chatReqTools(messages, hooks) {
+  hooks = hooks || {};
   if (!CONFIG.apiKey) throw new Error('未填写 API Key，请到设置里配置');
   if (toolsBroken) return await chatReq(messages);
   const proc = (function () {
@@ -4269,13 +5040,19 @@ async function chatReqTools(messages) {
       return { role: 'system', content: (i === 0 && memBlock) ? c + '\n\n' + memBlock : c };
     });
   })();
-  const tools = buildTools(), MAX = 5;
+  const tools = buildTools();
+  // 0 = 无限轮数。有限模式只是用户主动选择的保护，不再把 5 写死在代码里。
+  const maxRounds = Math.max(0, parseInt(CONFIG.agentToolRounds, 10) || 0);
   const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.apiKey };
   const url = CONFIG.apiBase.replace(/\/$/, '') + '/chat/completions';
   let imageMsg = null, imageDataUrl = '';
   const hasVision = !!(CONFIG.visionBase && CONFIG.visionKey && CONFIG.visionModel);
 
-  for (let r = 0; r < MAX; r++) {
+  let round = 0;
+  while (maxRounds === 0 || round < maxRounds) {
+    if (stopRequested) return '（已由你停止本轮工具执行）';
+    round++;
+    if (hooks.onRound) { try { hooks.onRound(round, maxRounds); } catch (e) {} }
     const body = JSON.stringify({ model: CONFIG.model, messages: proc, stream: false, tools, tool_choice: 'auto' });
     let msg = null, fallback = false, errText = '';
     try {
@@ -4312,27 +5089,41 @@ async function chatReqTools(messages) {
     if (!msg.tool_calls || !msg.tool_calls.length) return msg.content || '';
 
     proc.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls });
+    // 模型可以在工具调用前先给出一段解释；它会作为独立的 AI 消息显示。
+    if (msg.content && String(msg.content).trim() && hooks.onText) {
+      try { hooks.onText(String(msg.content).trim()); } catch (e) {}
+    }
     pendingShotImage = '';
+    pendingShotImages = [];
     for (const c of msg.tool_calls) {
+      if (stopRequested) break;
+      if (hooks.onTool) {
+        try { hooks.onTool(c.function.name); } catch (e) {}
+      }
       let result;
       try { result = await execTool(c.function.name, JSON.parse(c.function.arguments || '{}')); }
       catch (e) { result = { success: false, error: errMsg(e) }; }
       proc.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(result) });
     }
-    // tool 结果不能带图：截图另行作为一条 user 消息交给模型
-    if (pendingShotImage) {
-      imageDataUrl = pendingShotImage;
+    // tool 结果不能带图：截图/观察另行作为一条 user 消息交给模型。
+    const shotList = pendingShotImages.length ? pendingShotImages : (pendingShotImage ? [pendingShotImage] : []);
+    if (shotList.length) {
+      imageDataUrl = shotList[shotList.length - 1];
       pendingShotImage = '';
+      pendingShotImages = [];
       imageMsg = { role: 'user', content: [
-        { type: 'text', text: '（这是刚刚截取的当前屏幕画面，请据此回答用户的问题）' },
-        { type: 'image_url', image_url: { url: imageDataUrl } }
+        { type: 'text', text: shotList.length > 1 ? '（这是刚刚限时观察取得的屏幕画面，请比较这些画面后回答）' : '（这是刚刚截取的当前屏幕画面，请据此回答用户的问题）' },
+        ...shotList.map(url => ({ type: 'image_url', image_url: { url: url } }))
       ] };
       proc.push(imageMsg);
     }
+    if (stopRequested) return '（已由你停止本轮工具执行）';
   }
-  return '（工具调用次数过多，先歇一歇~）';
+  return maxRounds > 0
+    ? '（已达到设置的工具轮数 ' + maxRounds + '，本轮已停止。你可以在设置中调整。）'
+    : '（已停止本轮工具执行。）';
 }
-const chatSmart = (m) => chatReqTools(m);
+const chatSmart = (m, hooks) => chatReqTools(m, hooks);
 
 /* ==========================================================
  *  发送
@@ -4348,11 +5139,17 @@ function attachThumbToLast(dataUrl) {
 }
 
 async function send() {
+  if (sending) {
+    stopRequested = true;
+    toast('正在停止本轮工具执行…');
+    return;
+  }
   const inputEl = $('#input');
   const t = inputEl.value.trim();
   const att = pendingAttachment;
-  if ((!t && !att) || sending) return;
-  sending = true; $('#send').disabled = true;
+  if (!t && !att) return;
+  stopRequested = false;
+  sending = true; $('#send').disabled = false; $('#send').textContent = '停止';
   inputEl.value = ''; inputEl.style.height = 'auto';
 
   addMsg('user', t || (att && att.kind === 'image' ? '（图片）' : '（文件）'));
@@ -4360,6 +5157,7 @@ async function send() {
   clearAttachment();
 
   const ld = addTyping();
+  const live = makeAgentLive(ld);
   try {
     let msgs;
     if (att && att.kind === 'image') {
@@ -4383,16 +5181,21 @@ async function send() {
       msgs = history;
     }
     saveHistory();
-    const r = await chatSmart(msgs);
-    ld.remove();
-    addMsg('assistant', r);
-    history.push({ role: 'assistant', content: r });
+    const r = await chatSmart(msgs, live);
+    const parts = live.finish();
+    parts.forEach(text => history.push({ role: 'assistant', content: text }));
+    if (String(r || '').trim()) {
+      addMsg('assistant', r);
+      history.push({ role: 'assistant', content: r });
+    }
     saveHistory();
   } catch (e) {
-    ld.remove();
+    live.finish();
     addMsg('assistant', '错误：' + errMsg(e));
   }
-  sending = false; $('#send').disabled = false;
+  finishAgentCapsule('已完成 · 点我查看');
+  stopRequested = false;
+  sending = false; $('#send').disabled = false; $('#send').textContent = '发送';
 }
 
 /* ==========================================================
@@ -4423,17 +5226,19 @@ async function handleQuickAction(key) {
   sending = true; $('#send').disabled = true;
   addMsg('user', `【${label}】`);
   const ld = addTyping();
+  const live = makeAgentLive(ld);
   try {
-    const r = await chatSmart([{ role: 'user', content: prompt + '\n\n' + content.slice(0, 6000) }]);
-    ld.remove();
+    const r = await chatSmart([{ role: 'user', content: prompt + '\n\n' + content.slice(0, 6000) }], live);
+    const parts = live.finish();
     addMsg('assistant', r);
     history.push({ role: 'user', content: `【${label}】` });
+    parts.forEach(text => history.push({ role: 'assistant', content: text }));
     history.push({ role: 'assistant', content: r });
     saveHistory();
     TRANS.pending = 'chat';
     prepareResult(label + '好了 ♪ 点我看结果', useCapsule);
   } catch (e) {
-    ld.remove();
+    live.finish();
     addMsg('assistant', '错误：' + errMsg(e));
     TRANS.pending = 'chat';
     prepareResult(label + '失败了', useCapsule);
@@ -4474,11 +5279,71 @@ function groupVal(id) {
   const el = document.querySelector('#settings [data-group="' + id + '"] .on');
   return el ? el.dataset.val : '';
 }
+const AGENT_FLAG_KEYS = {
+  agentEnabled: 'agentEnabled', agentL1: 'agentL1', agentL2: 'agentL2',
+  agentL3: 'agentL3', agentSafety: 'agentSafety', agentAutoShot: 'agentAutoShot',
+  agentOnDemand: 'agentOnDemand'
+};
+function syncAgentFlagsToNative() {
+  if (!(HAS_PERM && Perm.setAgentFlag)) return;
+  Object.keys(AGENT_FLAG_KEYS).forEach(key => {
+    try { Perm.setAgentFlag(AGENT_FLAG_KEYS[key], CONFIG[key] === true); } catch (e) {}
+  });
+}
+function persistAgentFlag(key, value) {
+  CONFIG[key] = !!value;
+  if (HAS_PERM && Perm.setAgentFlag) {
+    try { Perm.setAgentFlag(AGENT_FLAG_KEYS[key] || key, !!value); } catch (e) {}
+  }
+  refreshSystemPrompt();
+  sSet('via_ai_config', CONFIG);
+}
+async function enableAgentL3() {
+  for (let n = 5; n > 0; n--) {
+    toast('L3 将在 ' + n + ' 秒后进入确认…');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  return await uiConfirm('警告：L3 将允许 Agent 操作白名单应用，包括点击、滑动、输入和系统按键。请确认你理解并承担误操作风险。\n\n免责声明：Agent 可能因页面变化、识别错误或应用限制产生错误行为。', '确认开启 L3', '操作手机');
+}
+async function enableAgentSafety() {
+  return await uiConfirm('警告：安全开关会开放产品中原本被隐藏或限制的高风险能力。请确认你理解隐私泄露、误操作、网络访问和数据损失风险。\n\n免责声明：开启后请自行承担使用风险，Android 系统和目标应用的安全限制仍然有效。', '确认开启', '安全开关');
+}
+async function handleAgentFlagClick(group, button) {
+  const key = group && group.dataset ? group.dataset.group : '';
+  if (!AGENT_FLAG_KEYS[key]) return false;
+  const value = button.dataset.val === 'true';
+  if (key === 'agentL3' && value && CONFIG.agentL3 !== true) {
+    if (!await enableAgentL3()) return true;
+  }
+  if (key === 'agentSafety' && value && CONFIG.agentSafety !== true) {
+    if (!await enableAgentSafety()) return true;
+  }
+  Array.from(group.children).forEach(x => { if (x.tagName === 'BUTTON') x.classList.remove('on'); });
+  button.classList.add('on');
+  persistAgentFlag(key, value);
+  toast(value ? '已开启' : '已关闭');
+  vibrate(15);
+  return true;
+}
 
 /**
  * 插件与工具页。开关直接读 CONFIG.plugins / CONFIG.toolOff，
  * 跟 toolLive() / buildToolsPrompt() 共用一份状态，切换后提示词和可调工具同时生效。
  */
+function plugPermissionSummary(p) {
+  const perms = Array.isArray(p.permissions) ? p.permissions : [];
+  if (!perms.length) return '无额外危险能力';
+  return perms.map(x => {
+    const i = PLUG_PERMISSION_INFO[x];
+    return i ? i.label + '（' + i.risk + '）' : x;
+  }).join('、');
+}
+function plugPermissionsHTML(p) {
+  const perms = Array.isArray(p.permissions) ? p.permissions : [];
+  const granted = Array.isArray(p.grantedPermissions) ? p.grantedPermissions : [];
+  return '<div class="plug-group-desc">声明能力：' + esc(plugPermissionSummary(p)) +
+    (perms.length ? '<br>用户授权：' + esc(granted.map(x => PLUG_PERMISSION_INFO[x] ? PLUG_PERMISSION_INFO[x].label : x).join('、') || '尚未授权') : '') + '</div>';
+}
 function renderPlugins() {
   const box = $('#plug-list');
   if (!box) return;
@@ -4525,7 +5390,7 @@ function plugCustomHtml() {
   if (!USER_PLUGINS.length) {
     return html + '<div class="mini-note" style="margin-top:6px">还没有安装自定义插件。点上方「导入插件」，粘贴插件清单即可安装。</div>';
   }
-  html += '<div class="mini-note" style="margin-top:6px">自定义插件在隔离沙箱中运行，无法直接访问系统；所有网络与本地能力都经过宿主校验。</div>';
+  html += '<div class="mini-note" style="margin-top:6px">自定义插件在隔离沙箱中运行，无法直接访问系统；JS 可直接访问公网，本机能力仍经过安全策略。</div>';
   html += USER_PLUGINS.map(p => {
     const on = p.enabled !== false;
     const rows = p.tools.map(t => {
@@ -4533,7 +5398,7 @@ function plugCustomHtml() {
       return `<div class="plug-tool ${ton ? '' : 'off'}">
         <div class="plug-tool-body">
           <div class="plug-tool-name">${esc(t.name)}</div>
-          <div class="plug-tool-desc">${esc(t.description || '')}</div>
+          <div class="plug-tool-desc">${esc(t.description || '')}${t.permissions && t.permissions.length ? '<br>工具能力：' + esc(t.permissions.map(x => PLUG_PERMISSION_INFO[x] ? PLUG_PERMISSION_INFO[x].label : x).join('、')) : ''}</div>
         </div>
         <button type="button" class="plug-sw ${ton ? 'on' : ''}" data-tool-sw="${esc(t.name)}"
           aria-label="${ton ? '关闭' : '开启'}${esc(t.name)}"></button>
@@ -4549,17 +5414,28 @@ function plugCustomHtml() {
           aria-label="${on ? '关闭' : '开启'}${esc(p.name)}"></button>
       </div>
       ${p.desc ? '<div class="plug-group-desc">' + esc(p.desc) + '</div>' : ''}
+      ${plugPermissionsHTML(p)}
       ${rows}
     </div>`;
   }).join('');
   return html;
 }
 
-function toggleUserPlug(id) {
+async function toggleUserPlug(id) {
   const p = USER_PLUGINS.filter(x => x.id === id)[0];
   if (!p) return;
-  p.enabled = p.enabled === false;
+  const next = p.enabled === false;
+  if (next && p.permissions && p.permissions.length) {
+    const text = '插件「' + p.name + '」请求以下能力：\n\n' + p.permissions.map(x => '- ' + (PLUG_PERMISSION_INFO[x] ? PLUG_PERMISSION_INFO[x].label : x) + '：' + (PLUG_PERMISSION_INFO[x] ? PLUG_PERMISSION_INFO[x].risk : '')).join('\n') + '\n\n是否授权并启用？';
+    if (!(await uiConfirm(text, '授权并启用', '插件能力授权'))) return;
+    p.grantedPermissions = p.permissions.slice();
+  }
+  p.enabled = next;
+  p.state = next ? 'installed' : 'disabled';
+  p.updatedAt = new Date().toISOString();
+  if (!next) p.grantedPermissions = [];
   plugSaveList();
+  plugAudit(next ? 'enable' : 'disable', p);
   refreshSystemPrompt();
   toolsBroken = false;
   sSet('via_ai_history', history);
@@ -4569,6 +5445,168 @@ function toggleUserPlug(id) {
   vibrate(15);
 }
 
+let PLUG_REMOTE_MARKET = [];
+let PLUG_REMOTE_MARKET_URL = PLUG_MARKET_DEFAULT_URL;
+try {
+  const cachedMarket = sGet(PLUG_MARKET_CACHE_KEY, null);
+  if (cachedMarket && Array.isArray(cachedMarket.plugins)) {
+    PLUG_REMOTE_MARKET = cachedMarket.plugins;
+    PLUG_REMOTE_MARKET_URL = String(cachedMarket.url || PLUG_MARKET_DEFAULT_URL);
+  }
+} catch (e) {}
+
+function plugMarketResolveUrl(base, value) {
+  try {
+    const u = new URL(String(value || ''), String(base || ''));
+    if (u.protocol !== 'https:') return '';
+    if (plugIsLocalHost(u.hostname)) return '';
+    return u.href;
+  } catch (e) { return ''; }
+}
+async function plugSha256(text) {
+  try {
+    if (HAS_NATIVE && typeof Android.sha256 === 'function') return String(Android.sha256(String(text || '')) || '').toLowerCase();
+  } catch (e) {}
+  try {
+    if (window.crypto && crypto.subtle && window.TextEncoder) {
+      const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(text || '')));
+      return Array.from(new Uint8Array(bytes)).map(x => ('0' + x.toString(16)).slice(-2)).join('');
+    }
+  } catch (e) {}
+  return '';
+}
+function plugMarketIndexError(data, baseUrl) {
+  if (!data || typeof data !== 'object') return '远程索引不是对象';
+  if (data.indexVersion !== 1) return '只支持 indexVersion=1';
+  if (data.manifestVersion !== 1) return '远程索引的 manifestVersion 不受支持';
+  if (!Array.isArray(data.plugins) || data.plugins.length > 200) return 'plugins 必须是最多 200 项的数组';
+  const seen = {};
+  for (const p of data.plugins) {
+    if (!p || typeof p !== 'object') return '索引包含无效条目';
+    const id = String(p.id || '');
+    if (!PLUG_ID_RE.test(id)) return '索引包含无效插件 id：' + id;
+    if (seen[id]) return '索引中插件 id 重复：' + id;
+    seen[id] = true;
+    if (!String(p.name || '').trim() || !String(p.version || '').trim()) return '插件 ' + id + ' 缺少 name 或 version';
+    const manifest = plugMarketResolveUrl(baseUrl, p.manifest);
+    if (!manifest) return '插件 ' + id + ' 的 manifest 地址必须是 HTTPS 公网地址';
+    if (!PLUG_SHA256_RE.test(String(p.sha256 || ''))) return '插件 ' + id + ' 缺少有效 SHA-256';
+    if (p.permissions !== undefined && (!Array.isArray(p.permissions) || plugHasUnknownPermissions(p.permissions))) return '插件 ' + id + ' 的权限声明无效';
+  }
+  return '';
+}
+function plugMarketStatus(text, bad) {
+  const box = $('#plug-market-status');
+  if (box) { box.textContent = text || ''; box.style.color = bad ? '#d6336c' : ''; }
+}
+async function syncPlugMarket() {
+  const input = $('#plug-market-url');
+  const url = String((input && input.value) || PLUG_REMOTE_MARKET_URL || PLUG_MARKET_DEFAULT_URL).trim();
+  if (!plugMarketResolveUrl(url, url)) return plugMarketStatus('远程市场地址必须是 HTTPS 公网地址。', true);
+  plugMarketStatus('正在读取远程只读索引…');
+  try {
+    const res = await nativeReq('GET', url, { Accept: 'application/json' }, null, 15000);
+    if (res.status < 200 || res.status >= 300) throw new Error('HTTP ' + res.status);
+    const data = JSON.parse(String(res.text || '').replace(/^\uFEFF/, ''));
+    const bad = plugMarketIndexError(data, url);
+    if (bad) throw new Error(bad);
+    PLUG_REMOTE_MARKET = data.plugins.map(p => Object.assign({}, p, {
+      marketSource: 'remote',
+      manifestUrl: plugMarketResolveUrl(url, p.manifest),
+      indexUrl: url
+    }));
+    PLUG_REMOTE_MARKET_URL = url;
+    sSet(PLUG_MARKET_CACHE_KEY, { url, fetchedAt: new Date().toISOString(), plugins: PLUG_REMOTE_MARKET });
+    if (input) input.value = url;
+    renderPlugMarket();
+    plugMarketStatus('已同步 ' + PLUG_REMOTE_MARKET.length + ' 个远程条目（只读，未自动安装）。');
+    toast('远程插件索引同步完成');
+  } catch (e) {
+    plugMarketStatus('同步失败：' + errMsg(e), true);
+  }
+}
+function plugMarketEntries() {
+  const out = PLUGIN_MARKET_INDEX.map(p => Object.assign({}, p, { marketSource: 'local', trust: p.trust || 'local-example' }));
+  const ids = {};
+  out.forEach(p => { ids[p.id] = true; });
+  PLUG_REMOTE_MARKET.forEach(p => { if (!ids[p.id]) out.push(p); });
+  return out;
+}
+function renderPlugMarket() {
+  const box = $('#plug-market-list');
+  if (!box) return;
+  const input = $('#plug-market-url');
+  if (input && !input.value) input.value = PLUG_REMOTE_MARKET_URL;
+  const entries = plugMarketEntries();
+  box.innerHTML = entries.map(p => {
+    const remote = p.marketSource === 'remote';
+    const installed = USER_PLUGINS.some(x => x.id === p.id);
+    const trust = p.trust || (remote ? 'remote-unreviewed' : 'local-example');
+    const status = p.reviewStatus || (remote ? 'unreviewed' : 'bundled');
+    const installedPlugin = USER_PLUGINS.filter(x => x.id === p.id)[0] || null;
+    const updateAvailable = !!(remote && installedPlugin && cmpVer(verArr(String(p.version || '0')), verArr(String(installedPlugin.version || '0'))) > 0);
+    const buttonText = updateAvailable ? '更新' : (installedPlugin ? '已安装' : '安装');
+    const buttonDisabled = installedPlugin && !updateAvailable;
+    return '<div class="plug-group" style="margin-top:8px">' +
+      '<div class="plug-group-hd"><span class="plug-group-ic">' + esc(p.icon || '🧩') + '</span><span class="plug-group-name">' + esc(p.name) + '<span class="plug-sub">v' + esc(p.version) + '</span></span><button class="plug-mini" data-market-install="' + esc(p.id) + '" data-market-source="' + esc(p.marketSource) + '"' + (buttonDisabled ? ' disabled' : '') + '>' + buttonText + '</button></div>' +
+      '<div class="plug-group-desc">' + esc(p.desc || p.description || '') + '</div>' +
+      '<div class="plug-market-meta"><b>来源：</b>' + esc(remote ? '远程只读索引' : 'APK 内置索引') + '　<b>信任：</b>' + esc(trust) + '　<b>审核：</b>' + esc(status) +
+      (remote ? '<br><b>完整性：</b>安装前校验 SHA-256' : '') + '</div>' + plugPermissionsHTML(p) + '</div>';
+  }).join('') || '<div class="mini-note">市场暂无插件。</div>';
+}
+async function installMarketPlugin(id, source) {
+  let raw = source === 'remote'
+    ? PLUG_REMOTE_MARKET.filter(x => x.id === id)[0]
+    : PLUGIN_MARKET_INDEX.filter(x => x.id === id)[0];
+  if (!raw) return toast('找不到市场插件');
+  const existing = USER_PLUGINS.filter(x => x.id === raw.id)[0] || null;
+  const isUpdate = !!(existing && source === 'remote' && cmpVer(verArr(String(raw.version || '0')), verArr(String(existing.version || '0'))) > 0);
+  if (existing && !isUpdate) return toast('插件已安装，当前没有更高版本');
+  let manifest = raw;
+  let contentHash = '';
+  if (source === 'remote') {
+    const url = plugMarketResolveUrl(raw.indexUrl || PLUG_REMOTE_MARKET_URL, raw.manifestUrl || raw.manifest);
+    if (!url || !PLUG_SHA256_RE.test(String(raw.sha256 || ''))) return toast('远程插件缺少安全地址或 SHA-256');
+    try {
+      const res = await nativeReq('GET', url, { Accept: 'application/json' }, null, 20000);
+      if (res.status < 200 || res.status >= 300) throw new Error('HTTP ' + res.status);
+      contentHash = await plugSha256(res.text);
+      if (!contentHash || contentHash !== String(raw.sha256).toLowerCase()) return toast('远程插件完整性校验失败，已拒绝安装');
+      manifest = JSON.parse(String(res.text || '').replace(/^\uFEFF/, ''));
+      if (manifest.id !== raw.id || String(manifest.version || '') !== String(raw.version || '')) return toast('远程清单与索引版本不一致，已拒绝安装');
+    } catch (e) { return toast('获取远程插件失败：' + errMsg(e)); }
+  }
+  const manifestError = plugManifestError(manifest);
+  if (manifestError) return toast('市场插件清单无效：' + manifestError);
+  const m = plugNormalize(manifest);
+  if (!m) return toast('市场插件清单无效');
+  m.source = source === 'remote' ? 'remote-market' : 'bundled-market';
+  m.trust = raw.trust || (source === 'remote' ? 'remote-unreviewed' : 'local-example');
+  m.reviewStatus = raw.reviewStatus || (source === 'remote' ? 'unreviewed' : 'bundled');
+  m.contentHash = contentHash;
+  m.installedAt = new Date().toISOString();
+  m.updatedAt = m.installedAt;
+  m.grantedPermissions = [];
+  m.enabled = !m.permissions.length;
+  const warning = source === 'remote'
+    ? '\n\n来源：远程只读市场\n信任状态：' + m.trust + '\n审核状态：' + m.reviewStatus + '\n已校验 SHA-256，但完整性校验不代表代码安全。'
+    : '';
+  const action = isUpdate ? '更新' : '安装';
+  if (!(await uiConfirm(action + '「' + m.name + '」？' + warning + '\n\n声明能力：' + plugPermissionSummary(m) + '\n\n更新或安装后仍需单独授权危险能力。', action, action + '市场插件'))) return;
+  if (existing) {
+    m.installedAt = existing.installedAt || m.installedAt;
+    // 更新后只保留新清单仍声明的授权；新增权限不会自动继承。
+    m.grantedPermissions = (existing.grantedPermissions || []).filter(p => m.permissions.indexOf(p) >= 0);
+    m.enabled = existing.enabled === true && m.permissions.every(p => m.grantedPermissions.indexOf(p) >= 0);
+    USER_PLUGINS = USER_PLUGINS.filter(x => x.id !== m.id);
+  }
+  if (m.permissions.length && !m.permissions.every(p => m.grantedPermissions.indexOf(p) >= 0)) m.enabled = false;
+  USER_PLUGINS.push(m);
+  plugSaveList();
+  plugAudit(isUpdate ? 'update' : 'install', m, { source: m.source });
+  renderPlugins(); renderPlugPreview(); renderPlugMarket();
+  toast(isUpdate ? '已更新市场插件' : '已安装市场插件');
+}
 function renderPlugPreview() {
   const box = $('#plug-preview');
   if (box) box.textContent = buildToolsPrompt() || '（当前没有任何可用工具）';
@@ -4641,8 +5679,10 @@ async function plugInstallFromText(text) {
 
   const accepted = [];
   for (const raw of list) {
+    const manifestError = plugManifestError(raw);
+    if (manifestError) return plugInstallError('插件清单不符合规范：' + manifestError);
     const m = plugNormalize(raw);
-    if (!m) return plugInstallError('插件清单不完整：需要合法的 id、name 和至少一个工具。');
+    if (!m) return plugInstallError('插件清单不完整：需要合法的 id、name、版本协议和至少一个工具。');
     if (USER_PLUGINS.some(p => p.id === m.id)) return plugInstallError('插件 id 已存在：' + m.id);
     for (const t of m.tools) {
       if (BUILTIN_TOOL_NAMES[t.name]) return plugInstallError('工具名与内置工具冲突：' + t.name);
@@ -4658,12 +5698,18 @@ async function plugInstallFromText(text) {
   const tools = accepted.reduce((n, p) => n + p.tools.length, 0);
   const ok = await uiConfirm(
     '即将安装 ' + names + '，共 ' + tools + ' 个工具。\n\n'
-    + '自定义插件在隔离沙箱中运行，无法直接访问系统，但可以通过受控接口发起网络请求、写剪贴板或打开链接。\n\n'
+    + '声明能力：' + accepted.map(p => p.name + '：' + plugPermissionSummary(p)).join('；') + '\n\n'
+    + '安装只保存清单，不代表永久授权。启用插件或调用危险能力时仍会按用户权限和每次操作确认执行。\n\n'
     + '请只安装你信任来源的插件。确认安装吗？',
     '安装', '安装插件'
   );
   if (!ok) return;
-  accepted.forEach(p => USER_PLUGINS.push(p));
+  accepted.forEach(p => {
+    p.grantedPermissions = [];
+    // 有能力声明的插件先安装为停用状态；启用按钮会逐次展示授权说明。
+    if (p.permissions.length) p.enabled = false;
+    USER_PLUGINS.push(p);
+  });
   plugSaveList();
   refreshSystemPrompt();
   toolsBroken = false;
@@ -4681,6 +5727,7 @@ async function plugDelete(id) {
   if (!ok) return;
   USER_PLUGINS = USER_PLUGINS.filter(x => x.id !== id);
   plugSaveList();
+  plugAudit('uninstall', p);
   refreshSystemPrompt();
   toolsBroken = false;
   sSet('via_ai_history', history);
@@ -4794,6 +5841,157 @@ window.__dlCb = function (id, pct, done, err, path) {
   toast('安装包已下载，请按系统提示完成安装');
 };
 
+function organizeSettingsSections() {
+  const root = $('#settings');
+  if (!root) return;
+  const nodes = Array.from(root.children);
+  const save = root.querySelector('#settings-save-block');
+  const spacer = root.querySelector('#settings-bottom-spacer');
+  const titles = nodes.filter(n => n.classList && n.classList.contains('sec-title'));
+  const fragment = document.createDocumentFragment();
+  const first = titles.length ? nodes.indexOf(titles[0]) : nodes.length;
+  const overviewNodes = nodes.slice(0, first).filter(n => n !== save && n !== spacer);
+  if (overviewNodes.length) {
+    const overview = document.createElement('section');
+    overview.className = 'set-overview';
+    const hd = document.createElement('div');
+    hd.className = 'sec-title';
+    hd.textContent = '总览';
+    hd.style.marginTop = '0';
+    overview.appendChild(hd);
+    overviewNodes.forEach(n => overview.appendChild(n));
+    fragment.appendChild(overview);
+  }
+  let section = null, body = null;
+  nodes.slice(first).forEach(n => {
+    if (n === save || n === spacer) return;
+    if (n.classList && n.classList.contains('sec-title')) {
+      section = document.createElement('section');
+      section.className = 'set-fold closed';
+      const head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'set-fold-head';
+      head.textContent = n.textContent || '设置';
+      head.setAttribute('aria-expanded', 'false');
+      body = document.createElement('div');
+      body.className = 'set-fold-body';
+      const panel = section;
+      head.onclick = () => {
+        const closed = panel.classList.toggle('closed');
+        head.setAttribute('aria-expanded', closed ? 'false' : 'true');
+      };
+      section.appendChild(head);
+      section.appendChild(body);
+      fragment.appendChild(section);
+      return;
+    }
+    if (body) body.appendChild(n);
+  });
+  if (save) fragment.appendChild(save);
+  if (spacer) fragment.appendChild(spacer);
+  root.innerHTML = '';
+  root.appendChild(fragment);
+}
+
+function readAgentState() {
+  try {
+    if (HAS_PERM && Perm.getAgentState) return JSON.parse(Perm.getAgentState() || '{}');
+  } catch (e) {}
+  return { whitelist: [], allowAll: false, foregroundPackage: '' };
+}
+let agentAppQuery = '';
+function renderAgentWhitelist() {
+  const box = $('#agent-whitelist-list');
+  if (!box) return;
+  const state = readAgentState();
+  const selected = new Set(Array.isArray(state.whitelist) ? state.whitelist : []);
+  if (state.allowAll) {
+    box.innerHTML = '<div class="plug-warn">警告：当前已允许所有应用。关闭后才会恢复白名单限制。</div><div class="acts"><button type="button" id="btn-agent-disable-all" class="btn-s">关闭允许所有应用</button></div>';
+    const off = $('#btn-agent-disable-all');
+    if (off) off.onclick = () => { if (HAS_PERM && Perm.setAgentAllowAll) Perm.setAgentAllowAll(false); renderAgentWhitelist(); toast('已恢复白名单限制'); };
+    return;
+  }
+  let apps = [];
+  try { apps = HAS_PERM && Perm.listAgentApps ? JSON.parse(Perm.listAgentApps() || '[]') : []; } catch (e) { apps = []; }
+  apps.sort((a, b) => (selected.has(b.package) ? 1 : 0) - (selected.has(a.package) ? 1 : 0));
+  const q = agentAppQuery.trim().toLowerCase();
+  const filtered = q ? apps.filter(a => String(a.label || '').toLowerCase().indexOf(q) >= 0 || String(a.package || '').toLowerCase().indexOf(q) >= 0) : apps;
+  const shown = filtered.slice(0, 160);
+  box.innerHTML = (selected.size ? '<div class="mini-note">已允许 ' + selected.size + ' 个应用；当前显示 ' + shown.length + ' 个：</div>' : '<div class="mini-note">还没有加入应用。当前显示 ' + shown.length + ' 个可启动应用：</div>')
+    + shown.map(a => `<div class="agent-app-row"><div class="agent-app-name">${esc(a.label || '未命名应用')}<span class="agent-app-pkg">${esc(a.package)}</span></div><button type="button" data-agent-package="${esc(a.package)}">${selected.has(a.package) ? '移除' : '加入'}</button></div>`).join('');
+  if (!shown.length) box.innerHTML += '<div class="mini-note">没有匹配的可启动应用。可以搜索应用名或包名。</div>';
+}
+function bindAgentWhitelist() {
+  const current = $('#btn-agent-current');
+  if (current) current.onclick = () => {
+    const pkg = readAgentState().foregroundPackage || '';
+    if (!pkg) return toast('当前没有可识别的前台应用');
+    if (HAS_PERM && Perm.addAgentWhitelist) Perm.addAgentWhitelist(pkg);
+    renderAgentWhitelist();
+    toast('已加入白名单：' + pkg);
+  };
+  const all = $('#btn-agent-all');
+  if (all) all.onclick = async () => {
+    const ok = await uiConfirm('警告：允许所有应用后，Agent 可读取并操作未单独选择的应用。银行、支付、密码管理器和输入法等敏感应用也可能受到影响。请确认你理解风险。', '允许所有应用', '白名单警告');
+    if (!ok) return;
+    if (HAS_PERM && Perm.setAgentAllowAll) Perm.setAgentAllowAll(true);
+    renderAgentWhitelist();
+  };
+  const privacy = $('#btn-agent-privacy');
+  if (privacy) privacy.onclick = () => uiConfirm('银行、支付、密码管理器、输入法、锁屏和系统设置属于隐私应用。加入前请确认风险；加入白名单也不能绕过 FLAG_SECURE 或系统权限。', '知道了', '隐私应用说明');
+  const refresh = $('#btn-agent-refresh');
+  if (refresh) refresh.onclick = renderAgentWhitelist;
+  const search = $('#agent-app-search');
+  if (search) search.oninput = () => { agentAppQuery = search.value; renderAgentWhitelist(); };
+  const list = $('#agent-whitelist-list');
+  if (list) list.onclick = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-agent-package]') : null;
+    if (!b) return;
+    const pkg = b.dataset.agentPackage || '';
+    const state = readAgentState();
+    const selected = new Set(Array.isArray(state.whitelist) ? state.whitelist : []);
+    if (selected.has(pkg)) {
+      if (HAS_PERM && Perm.removeAgentWhitelist) Perm.removeAgentWhitelist(pkg);
+      toast('已移出白名单');
+    } else {
+      if (HAS_PERM && Perm.addAgentWhitelist) Perm.addAgentWhitelist(pkg);
+      toast('已加入白名单');
+    }
+    renderAgentWhitelist();
+  };
+  renderAgentWhitelist();
+}
+function renderWorkspaceState() {
+  const box = $('#workspace-state');
+  if (!box) return;
+  const s = workspaceState();
+  if (!s) { box.textContent = '当前环境不支持工作区状态查询。'; return; }
+  if (!s.permission) { box.textContent = '状态：还没有开启“允许管理所有文件”。'; return; }
+  box.textContent = s.created ? ('状态：工作区已创建 · ' + (s.items || 0) + ' 个项目 · Documents/ElysiaFloat/workspace') : '状态：权限已开启，但工作区尚未创建。';
+}
+function bindWorkspace() {
+  const access = $('#btn-files-access');
+  if (access) access.onclick = () => {
+    if (HAS_PERM && Perm.requestAllFilesAccess) Perm.requestAllFilesAccess();
+    setTimeout(renderWorkspaceState, 900);
+    setTimeout(renderWorkspaceState, 1800);
+  };
+  const create = $('#btn-workspace-create');
+  if (create) create.onclick = () => {
+    if (!(HAS_PERM && Perm.createWorkspace)) return toast('当前环境不支持创建工作区');
+    try {
+      const r = JSON.parse(Perm.createWorkspace() || '{}');
+      if (r.ok) toast('工作区已创建'); else toast(r.error || '工作区创建失败');
+    } catch (e) { toast('工作区创建失败：' + errMsg(e)); }
+    renderWorkspaceState();
+    refreshSystemPrompt();
+    renderPlugins();
+  };
+  const refresh = $('#btn-workspace-refresh');
+  if (refresh) refresh.onclick = renderWorkspaceState;
+  renderWorkspaceState();
+}
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
@@ -4815,7 +6013,50 @@ function renderSettings() {
 <div class="sg"><label>头像取景（竖图才看得出区别）</label>${chipGroup('fit', CONFIG.avatarFit || 'top', [{v:'top',t:'取上部'},{v:'center',t:'居中'},{v:'bottom',t:'取下部'}])}</div>
 <div class="sg"><label>记忆轮数</label><input id="set-turns" type="number" value="${CONFIG.maxContextTurns}"></div>
 
-<div class="sec-title">🔊 语音合成</div>
+<div class="sec-title">Agent 能力</div>
+<div class="mini-note" style="margin-top:8px">开启后，AI 可以在你授权的范围内自主读取手机、查看画面并执行行为。手机行为仍受白名单和安全开关保护。</div>
+<div class="sg" style="margin-top:8px"><label>Agent 总开关</label>${toggleGroup('agentEnabled', CONFIG.agentEnabled === true ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>L1 · 读取手机信息</label>${toggleGroup('agentL1', CONFIG.agentL1 !== false ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>L2 · 查看手机画面</label>${toggleGroup('agentL2', CONFIG.agentL2 !== false ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>L3 · 操作手机</label>${toggleGroup('agentL3', CONFIG.agentL3 === true ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>安全开关</label>${toggleGroup('agentSafety', CONFIG.agentSafety === true ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>截图自动确认</label>${toggleGroup('agentAutoShot', CONFIG.agentAutoShot === true ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>读取方式</label>${toggleGroup('agentOnDemand', CONFIG.agentOnDemand !== false ? 'true' : 'false', [{v:'true',t:'按需读取'},{v:'false',t:'限时观察'}])}</div>
+<div class="sg"><label>Agent 工具调用轮数</label>${chipGroup('agentToolRounds', String(parseInt(CONFIG.agentToolRounds, 10) || 0), [
+  {v:'0',t:'无限'}, {v:'5',t:'5 轮'}, {v:'10',t:'10 轮'}, {v:'20',t:'20 轮'}, {v:'50',t:'50 轮'}
+])}</div>
+<div class="mini-note">“无限”不会写死本地轮数；你可以点发送按钮停止当前任务。接口错误、权限拒绝或模型自行结束仍会结束本轮。</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-agent-a11y" class="btn-s">开启无障碍</button>
+  <button id="btn-agent-ime" class="btn-s">配置输入法兜底</button>
+</div>
+<div class="mini-note">输入文字时先尝试无障碍；失败后才使用爱莉希雅输入法。首次使用需要在系统输入法设置中启用，并由你手动切换；不会自动修改默认输入法。</div>
+
+<div class="sec-title">应用白名单</div>
+<div class="mini-note" style="margin-top:8px">默认拒绝。只有加入白名单的应用才允许 L1/L2/L3 读取或操作；ElysiaFloat 自身不会加入。</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-agent-current" class="btn-p">添加当前应用</button>
+  <button id="btn-agent-all" class="btn-s">允许所有应用</button>
+</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-agent-privacy" class="btn-s">隐私应用说明</button>
+  <button id="btn-agent-refresh" class="btn-s">刷新应用列表</button>
+</div>
+<div class="sg" style="margin-top:8px"><label>搜索应用名称或包名</label><input id="agent-app-search" placeholder="例如 QQ、电话、com.tencent..." value=""></div>
+<div id="agent-whitelist-list" style="margin-top:8px"></div>
+
+<div class="sec-title">文件访问与工作区</div>
+<div class="mini-note" style="margin-top:8px">启用“允许管理所有文件”后，可以访问公共存储中的用户文件。工作区和工作区外的写入、覆盖、复制、建目录及删除都会在本次操作前弹窗确认；确认不会永久授权。</div>
+<div id="workspace-state" class="mini-note" style="margin-top:8px"></div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-files-access" class="btn-s">开启所有文件权限</button>
+  <button id="btn-workspace-create" class="btn-p">创建工作区</button>
+</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-workspace-refresh" class="btn-s">刷新工作区状态</button>
+</div>
+
+<div class="sec-title">语音合成</div>
 <div class="sg" style="margin-top:8px"><label>开启朗读</label>${toggleGroup('tts', CONFIG.ttsEnabled ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
 <div class="sg"><label>语音引擎</label>${toggleGroup('ttseng', (CONFIG.ttsEngine || 'system') === 'ai' ? 'ai' : 'system', [{v:'system',t:'系统自带'},{v:'ai',t:'自建音色'}])}</div>
 <div class="mini-note">系统自带：使用手机内置语音引擎，无需联网。自建音色：使用下方接口，可选择音色。</div>
@@ -4841,14 +6082,14 @@ function renderSettings() {
     <span id="tts-rate-l">${CONFIG.ttsRate}x</span>
   </div></div>
 
-<div class="sec-title">🎵 音乐功能</div>
+<div class="sec-title">音乐功能</div>
 <div class="sg" style="margin-top:8px"><label>开启音乐</label>${toggleGroup('music', CONFIG.musicEnabled ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
 <div class="sg"><label>音质</label>${chipGroup('quality', CONFIG.musicQuality, [{v:'128',t:'128k'},{v:'192',t:'192k'},{v:'320',t:'320k'}])}</div>
 <div class="sg"><label>GD Studio API</label><input id="set-gd-api" value="${esc(CONFIG.gdStudioApi)}"></div>
 <div class="sg"><label>Meting 实例（每行一个）</label>
   <textarea id="set-meting" style="min-height:90px;font-family:monospace;font-size:11px">${esc(CONFIG.metingInstances)}</textarea></div>
 
-<div class="sec-title">🖼️ 识图模型（可选）</div>
+<div class="sec-title">识图模型（可选）</div>
 <div class="mini-note" style="margin-top:8px">当对话模型不支持图片时使用：系统会先用这里的识图模型描述截图，再交给对话模型回答。</div>
 <div class="sg" style="margin-top:8px"><label>识图 API 地址</label><input id="set-vision-base" value="${esc(CONFIG.visionBase || '')}" placeholder="https://.../v1"></div>
 <div class="sg"><label>识图 API Key</label>
@@ -4858,7 +6099,7 @@ function renderSettings() {
   </div></div>
 <div class="sg"><label>识图模型</label><input id="set-vision-model" value="${esc(CONFIG.visionModel || '')}" placeholder="如 gpt-4o / qwen-vl-max"></div>
 
-<div class="sec-title">🧠 长期记忆</div>
+<div class="sec-title">长期记忆</div>
 <div class="mini-note" style="margin-top:8px">长期记忆保存在本机。每轮只加载概览与摘要，需要细节时由 AI 按需检索，因此记忆再多也不会拖慢对话。</div>
 <div class="acts" style="margin-top:8px">
   <button id="btn-mem-open" class="btn-p">打开记忆库（${MEM.length} 条）</button>
@@ -4873,7 +6114,7 @@ function renderSettings() {
   </div></div>
 <div class="sg"><label>向量模型</label><input id="set-vec-model" value="${esc(MEMCFG.vecModel || '')}" placeholder="如 text-embedding-3-small / bge-m3"></div>
 
-<div class="sec-title">🔎 屏幕翻译</div>
+<div class="sec-title">屏幕翻译</div>
 <div class="mini-note" style="margin-top:8px">点「翻译屏幕」后，浮窗会先收成小胶囊以免遮挡，读取屏幕文字后再翻译。文字与位置直接来自无障碍节点，无需额外 OCR。</div>
 <div class="sg" style="margin-top:8px"><label>翻译引擎</label>${toggleGroup('transEngine', CONFIG.transEngine || 'free', [{v:'free',t:'微软免费'},{v:'ai',t:'AI（耗Token）'}])}</div>
 <div class="sg"><label>翻译方式</label>${toggleGroup('transMode', CONFIG.transMode || 'translated', [{v:'translated',t:'仅译文'},{v:'bilingual',t:'双语'}])}</div>
@@ -4881,21 +6122,21 @@ function renderSettings() {
 <div class="sg"><label>点完自动收成小胶囊</label>${toggleGroup('transCap', CONFIG.transAutoCapsule === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
 <div class="sg"><label>跳过已经是中文的段落</label>${toggleGroup('transSkip', CONFIG.transSkipChinese === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
 
-<div class="sec-title">🎨 外观</div>
+<div class="sec-title">外观</div>
 <div class="sg" style="margin-top:8px"><label>主题色 1</label>${swatchGroup('c1', CONFIG.themeColor1)}</div>
 <div class="sg"><label>主题色 2</label>${swatchGroup('c2', CONFIG.themeColor2)}</div>
 
-<div class="sec-title">🎀 人设</div>
+<div class="sec-title">人设</div>
 <div class="mini-note" style="margin-top:8px">设置助手的身份与说话风格。工具能力请在「插件与工具」中单独管理。</div>
 <div class="sg" style="margin-top:8px"><textarea id="set-persona" style="min-height:150px">${esc(CONFIG.persona || DC.persona)}</textarea></div>
 
-<div class="sec-title">🧩 插件与工具</div>
+<div class="sec-title">插件与工具</div>
 <div class="mini-note" style="margin-top:8px">在这里管理 AI 可以使用的工具，并单独控制每一项是否对它开放。也支持安装自定义插件。</div>
 <div class="acts" style="margin-top:8px">
   <button id="btn-plug-page" class="btn-p">打开插件与工具</button>
 </div>
 
-<div class="sec-title">⬆️ 检查更新</div>
+<div class="sec-title">检查更新</div>
 <div class="mini-note" style="margin-top:8px">从 GitHub Releases 检测新版本，并下载安装包。</div>
 <div class="sg" style="margin-top:8px"><label>自动检查更新</label>${toggleGroup('autoupd', CONFIG.autoCheckUpdate === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
 <div class="acts" style="margin-top:8px">
@@ -4903,25 +6144,26 @@ function renderSettings() {
   <button id="btn-open-releases" class="btn-s">打开发布页</button>
 </div>
 
-<div class="acts">
+<div id="settings-save-block" class="acts settings-bottom">
+  <div class="mini-note">设置改动完成后，请保存；也可以直接返回对话。</div>
   <button id="set-save" class="btn-p">保存配置</button>
   <button id="set-back" class="btn-s">返回对话</button>
 </div>
 
-<div class="sec-title">🔐 权限</div>
+<div class="sec-title">权限</div>
 <div class="acts" style="margin-top:8px">
   <button id="btn-perm-guide" class="btn-s">打开权限配置引导</button>
 </div>
 <div class="mini-note">可随时重新打开引导，补充悬浮窗、通知、无障碍等权限。</div>
 
-<div class="sec-title">🩺 环境信息</div>
+<div class="sec-title">环境信息</div>
 <div class="mini-note" style="margin-top:6px">遇到问题时，可将以下信息提供给开发者以便排查。</div>
 <div id="env-box" style="margin-top:8px"></div>
 <div class="acts">
   <button id="btn-copy-env" class="btn-s">复制环境信息</button>
 </div>
 
-<div class="sec-title">💾 数据管理</div>
+<div class="sec-title">数据管理</div>
 <div class="acts" style="margin-top:8px">
   <button id="btn-export" class="btn-s">导出</button>
   <button id="btn-import" class="btn-s">导入</button>
@@ -4933,8 +6175,9 @@ function renderSettings() {
 <div class="acts">
   <button id="btn-clear-all" class="btn-s" style="color:#d6336c;border-color:rgba(214,51,108,.35)">清除全部数据</button>
 </div>
-<div style="height:30px"></div>`;
+<div id="settings-bottom-spacer" style="height:30px"></div>`;
 
+  organizeSettingsSections();
   $('#settings').onclick = (e) => {
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
@@ -4945,6 +6188,10 @@ function renderSettings() {
       Array.from(grp.querySelectorAll('.swatch')).forEach(x => x.classList.remove('on'));
       b.classList.add('on');
       const inp = $('#set-' + grp.dataset.group); if (inp) inp.value = b.dataset.val;
+      return;
+    }
+    if (AGENT_FLAG_KEYS[grp.dataset.group]) {
+      handleAgentFlagClick(grp, b);
       return;
     }
     if (b.dataset.val === undefined) return;
@@ -4971,6 +6218,14 @@ function renderSettings() {
   };
   $('#set-save').onclick = saveSettings;
   $('#set-back').onclick = () => showView('chat');
+  const agentA11y = $('#btn-agent-a11y');
+  if (agentA11y) agentA11y.onclick = () => {
+    if (HAS_PERM && Perm.requestAccessibility) Perm.requestAccessibility();
+  };
+  const agentIme = $('#btn-agent-ime');
+  if (agentIme) agentIme.onclick = () => {
+    if (HAS_PERM && Perm.requestElysiaImeSettings) Perm.requestElysiaImeSettings();
+  };
   $('#btn-pick-avatar').onclick = startPickAvatar;
   const pk = $('#btn-paste-key');
   if (pk) pk.onclick = () => pasteIntoInput($('#set-apikey'));
@@ -4997,6 +6252,8 @@ function renderSettings() {
     try { if (HAS_NATIVE && Android.openUrl) Android.openUrl(UPDATE_RELEASES); } catch (e) {}
   };
 
+  bindAgentWhitelist();
+  bindWorkspace();
   renderEnvBox();
   const ceBtn = $('#btn-copy-env');
   if (ceBtn) ceBtn.onclick = () => {
@@ -5047,12 +6304,21 @@ function saveSettings() {
     transAutoCapsule: groupVal('transCap') !== 'false',
     transSkipChinese: groupVal('transSkip') !== 'false',
     autoCheckUpdate: groupVal('autoupd') !== 'false',
+    agentEnabled: groupVal('agentEnabled') === 'true',
+    agentL1: groupVal('agentL1') !== 'false',
+    agentL2: groupVal('agentL2') !== 'false',
+    agentL3: groupVal('agentL3') === 'true',
+    agentSafety: groupVal('agentSafety') === 'true',
+    agentAutoShot: groupVal('agentAutoShot') === 'true',
+    agentOnDemand: groupVal('agentOnDemand') !== 'false',
+    agentToolRounds: Math.max(0, parseInt(groupVal('agentToolRounds'), 10) || 0),
     // 人设只管人设；工具说明由 refreshSystemPrompt() 自动接在后面
     persona: $('#set-persona').value.trim() || DC.persona
   });
   if (avIn && avIn !== AV_LOCAL) CONFIG.avatarUrl = avIn;
   if (!CONFIG.avatarUrl) CONFIG.avatarUrl = DC.avatarUrl;
   if (CONFIG.avatarUrl.indexOf('data:') === 0) $('#set-avatar').value = AV_LOCAL;
+  syncAgentFlagsToNative();
   toolsBroken = false;
   $('#btn-music').hidden = !CONFIG.musicEnabled;
   if (!CONFIG.musicEnabled) {
@@ -5108,6 +6374,10 @@ function importData() {
       for (const k in DC) if (k in d.config && typeof d.config[k] === typeof DC[k]) safe[k] = d.config[k];
       CONFIG = Object.assign(CONFIG, safe);
       if (!CONFIG.avatarUrl) CONFIG.avatarUrl = DC.avatarUrl;
+      // 导入的是 WebView 配置，Agent 的最终门禁在原生 elly_agent 中；这里立即同步，
+      // 不等用户再次打开设置或重启后才生效。
+      syncAgentFlagsToNative();
+      refreshSystemPrompt(false);
       sSet('via_ai_config', CONFIG);
     }
     if (Array.isArray(d.history)) {
@@ -5216,6 +6486,19 @@ function bindPluginsPage() {
     if (b.dataset.plugDel) { plugDelete(b.dataset.plugDel); return; }
   };
 
+  const market = $('#plug-market');
+  if (market) market.onclick = () => { renderPlugMarket(); $('#plug-market-modal').classList.add('open'); };
+  const marketSync = $('#plug-market-sync');
+  if (marketSync) marketSync.onclick = syncPlugMarket;
+  const marketList = $('#plug-market-list');
+  if (marketList) marketList.onclick = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-market-install]') : null;
+    if (b && !b.disabled) installMarketPlugin(b.dataset.marketInstall, b.dataset.marketSource || 'local');
+  };
+  const marketClose = $('#plug-market-close');
+  if (marketClose) marketClose.onclick = () => $('#plug-market-modal').classList.remove('open');
+  const marketModal = $('#plug-market-modal');
+  if (marketModal) marketModal.onclick = (e) => { if (e.target === marketModal) marketModal.classList.remove('open'); };
   const inst = $('#plug-install');
   if (inst) inst.onclick = openPlugInstall;
   const pc = $('#plug-cancel');
@@ -5440,7 +6723,12 @@ const PERM_ITEMS = [
     desc: '可选但强烈推荐。开启后能读取屏幕内容，帮你翻译、总结当前页面。',
     check: () => (HAS_PERM && Perm.hasAccessibility) ? Perm.hasAccessibility() : false,
     request: () => { if (HAS_PERM && Perm.requestAccessibility) Perm.requestAccessibility(); },
-    wait: 800 }
+    wait: 800 },
+  { id: 'all-files', name: '允许管理所有文件', required: false,
+    desc: '使用 Agent 工作区时需要。授权后仍只允许 Agent 访问 Documents/ElysiaFloat/workspace，不会直接把其它目录交给模型。',
+    check: () => (HAS_PERM && Perm.hasAllFilesAccess) ? Perm.hasAllFilesAccess() : false,
+    request: () => { if (HAS_PERM && Perm.requestAllFilesAccess) Perm.requestAllFilesAccess(); },
+    wait: 900 }
 ];
 const permState = {};
 
@@ -5540,6 +6828,41 @@ function hideGuide() {
   $('#guide').classList.remove('show');
   if (HAS_PERM && Perm.setGuideDone) try { Perm.setGuideDone(); } catch (e) {}
 }
+
+/* 首次启动公告：只记录“我知道了”，不把公告阅读当成永久权限授权。 */
+const ANNOUNCEMENT_KEY = 'via_ai_announcement_0_6_2';
+const ANNOUNCEMENT_REPO = 'https://github.com/xysy92ds/ElysiaFloat';
+function showAnnouncement(force) {
+  if (!force && sGet(ANNOUNCEMENT_KEY, false)) return;
+  const modal = $('#announcement-modal');
+  if (modal) {
+    const app = $('#app');
+    if (app) app.classList.add('announcement-visible');
+    modal.classList.add('open');
+  }
+}
+function hideAnnouncement() {
+  const modal = $('#announcement-modal');
+  if (modal) modal.classList.remove('open');
+  const app = $('#app');
+  if (app) app.classList.remove('announcement-visible');
+  sSet(ANNOUNCEMENT_KEY, true);
+}
+function bindAnnouncement() {
+  const close = $('#announcement-close');
+  if (close) close.onclick = hideAnnouncement;
+  const repo = $('#announcement-repo');
+  if (repo) repo.onclick = () => {
+    try {
+      if (HAS_NATIVE && Android.openUrl) Android.openUrl(ANNOUNCEMENT_REPO);
+      else if (window.open) window.open(ANNOUNCEMENT_REPO, '_blank');
+    } catch (e) {}
+  };
+  const modal = $('#announcement-modal');
+  if (modal) modal.onclick = (e) => { if (e.target === modal) hideAnnouncement(); };
+  // 权限引导页先完成首帧布局，公告随后显示并盖在引导页上；关闭后仍可继续授权。
+  setTimeout(() => showAnnouncement(false), 700);
+}
 function bindGuide() {
   $('#guide-next').onclick = () => {
     if ($('#guide-next').disabled) return;
@@ -5616,6 +6939,7 @@ function boot() {
   bindCrop();
   bindResize();
   initZoom();
+  bindAnnouncement();
 
   // 系统旋转 / 分屏改变窗口尺寸时，面板得跟着对账（原生不一定能及时推过来）
   window.addEventListener('resize', () => { setTimeout(() => reconcile(true), 60); });

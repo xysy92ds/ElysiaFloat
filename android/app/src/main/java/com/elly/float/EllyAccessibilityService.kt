@@ -1,14 +1,19 @@
 package com.elly.assistant
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.graphics.Bitmap
+import android.graphics.Path
 import android.hardware.HardwareBuffer
 import android.os.Build
+import android.os.Bundle
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
 class EllyAccessibilityService : AccessibilityService() {
@@ -88,6 +93,102 @@ class EllyAccessibilityService : AccessibilityService() {
 
     /** 当前设备能不能用无障碍截屏 */
     fun canShot(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
+    /** 当前主导的外部应用包名，供 Agent native policy 使用。 */
+    fun foregroundPackageName(): String = externalRoot()?.packageName?.toString().orEmpty()
+
+    private fun findNode(node: AccessibilityNodeInfo?, query: String): AccessibilityNodeInfo? {
+        if (node == null) return null
+        val q = query.trim()
+        if (q.isNotEmpty() && (node.text?.toString() == q || node.contentDescription?.toString() == q)) return node
+        for (i in 0 until node.childCount) {
+            val found = findNode(node.getChild(i), q)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun center(node: AccessibilityNodeInfo): Pair<Float, Float>? {
+        val r = android.graphics.Rect()
+        node.getBoundsInScreen(r)
+        if (r.isEmpty || r.width() <= 0 || r.height() <= 0) return null
+        return Pair((r.left + r.right) / 2f, (r.top + r.bottom) / 2f)
+    }
+
+    private fun gesture(path: Path, durationMs: Long): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+        val latch = CountDownLatch(1)
+        var ok = false
+        val accepted = try {
+            dispatchGesture(
+                GestureDescription.Builder()
+                    .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs.coerceAtLeast(1)))
+                    .build(),
+                object : GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: GestureDescription?) { ok = true; latch.countDown() }
+                    override fun onCancelled(gestureDescription: GestureDescription?) { latch.countDown() }
+                },
+                null
+            )
+        } catch (_: Exception) { false }
+        if (!accepted) return false
+        latch.await(1800, TimeUnit.MILLISECONDS)
+        return ok
+    }
+
+    fun tap(x: Int, y: Int): Boolean {
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()); lineTo(x + 1f, y + 1f) }
+        return gesture(path, 80)
+    }
+
+    fun swipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long): Boolean {
+        val path = Path().apply { moveTo(x1.toFloat(), y1.toFloat()); lineTo(x2.toFloat(), y2.toFloat()) }
+        return gesture(path, durationMs.coerceIn(80, 2000))
+    }
+
+    fun clickText(query: String): Boolean {
+        val node = findNode(externalRoot(), query) ?: return false
+        var target: AccessibilityNodeInfo? = node
+        repeat(6) {
+            val t = target
+            if (t?.isClickable == true && t.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            target = t?.parent
+        }
+        val p = center(node) ?: return false
+        return tap(p.first.toInt(), p.second.toInt())
+    }
+
+    fun inputText(text: String): Boolean {
+        val root = externalRoot() ?: return false
+        fun findFocused(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+            if (node == null) return null
+            if (node.isEditable && node.isFocused) return node
+            for (i in 0 until node.childCount) findFocused(node.getChild(i))?.let { return it }
+            return null
+        }
+        val node = findFocused(root)
+        if (node != null) {
+            try {
+                val before = node.text?.toString()
+                val acted = Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                }.let { node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, it) }
+                // 某些聊天输入框会返回 true 但实际没有改变内容；只有确认成功才结束。
+                val after = node.text?.toString()
+                if (acted && (text.isEmpty() || after == text || before != after)) return true
+            } catch (_: Exception) { }
+        }
+        // 兜底通道需要用户事先在系统输入法设置中启用并切换到爱莉希雅输入法。
+        return EllyInputMethodService.commit(text)
+    }
+
+    fun globalAction(name: String): Boolean = when (name.lowercase()) {
+        "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
+        "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
+        "recents" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+        "notifications" -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+        else -> false
+    }
 
     /**
      * 屏幕翻译（原位覆盖）的命根子：不只拿文字，还要拿**精确坐标**。

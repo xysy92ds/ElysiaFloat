@@ -1,0 +1,22 @@
+{
+  "indexVersion": 1,
+  "manifestVersion": 1,
+  "generatedAt": "2026-10-06",
+  "source": "https://github.com/xysy92ds/ElysiaFloat",
+  "trustPolicy": "repository-source-not-security-guarantee",
+  "plugins": [
+    {
+      "id": "com.elly.market.text-tools",
+      "name": "文本处理示例",
+      "version": "1.0.0",
+      "author": "ElysiaFloat",
+      "description": "无外部权限的文本统计与规范化示例，适合验证插件开发流程。",
+      "manifest": "plugins/com.elly.market.text-tools/manifest.json",
+      "docs": "plugins/com.elly.market.text-tools/README.md",
+      "permissions": [],
+      "trust": "repository-source",
+      "reviewStatus": "self-published",
+      "sha256": "325326ebd5ad2778bc131931576c36e1dbd3443d94b32d46d0ca96385c76585e"
+    }
+  ]
+}

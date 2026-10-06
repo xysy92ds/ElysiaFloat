@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elysiafloat.local/schema/plugin-manifest-v1.json",
+  "title": "ElysiaFloat Plugin Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifestVersion", "apiVersion", "id", "name", "permissions", "tools"],
+  "properties": {
+    "manifestVersion": { "const": 1 },
+    "apiVersion": { "type": "string", "minLength": 1, "maxLength": 24 },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{2,64}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "icon": { "type": "string", "maxLength": 4 },
+    "version": { "type": "string", "maxLength": 24 },
+    "author": { "type": "string", "maxLength": 48 },
+    "homepage": { "type": "string", "maxLength": 500 },
+    "docs": { "type": "string", "maxLength": 1000 },
+    "desc": { "type": "string", "maxLength": 300 },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/permission" }
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/tool" }
+    }
+  },
+  "$defs": {
+    "permission": {
+      "type": "string",
+      "enum": [
+        "network.public", "network.local", "system.open_url", "clipboard.write", "storage.plugin",
+        "files.public.read", "files.public.write", "files.public.delete", "workspace.read", "workspace.write",
+        "device.read", "device.screenshot", "device.action", "memory.read", "memory.write", "memory.delete"
+      ]
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "permissions", "kind"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]{1,63}$" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "permissions": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/permission" } },
+        "parameters": { "type": "object" },
+        "kind": { "enum": ["http", "js"] },
+        "timeout": { "type": "integer", "minimum": 1000, "maximum": 60000 },
+        "request": { "type": "object" },
+        "code": { "type": "string" }
+      }
+    }
+  }
+}

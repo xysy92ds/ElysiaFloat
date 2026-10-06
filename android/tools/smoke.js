@@ -22,9 +22,9 @@ let js = m[1];
 const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool', 'cyclePlayMode',
   'updateBar', 'updateMini', 'onLyricTime', 'setLyric', 'refreshSystemPrompt', 'buildTools',
   'buildToolsPrompt', 'composeSystemPrompt', 'speakText', 'stopTTS', 'ttsSplit', 'ttsStripMd',
-  'togglePlug', 'toggleTool', 'toolOn', 'renderPlugins', 'CONFIG', 'DC', 'PLUGINS', 'toolLive', 'mSearch', 'mGetUrl', 'getAudio', 'MP',
-  'plugNormalize', 'plugExec', 'plugUrlAllowed', 'plugFind', 'USER_PLUGINS', 'verArr', 'cmpVer',
-  'PLUG_SANDBOX_HTML', 'PLUG_HELP',
+  'togglePlug', 'toggleTool', 'toolOn', 'renderPlugins', 'renderPlugMarket', 'CONFIG', 'DC', 'PLUGINS', 'toolLive', 'mSearch', 'mGetUrl', 'getAudio', 'MP',
+  'plugNormalize', 'plugManifestError', 'plugExec', 'plugUrlAllowed', 'plugFind', 'plugPermissionGranted', 'PLUG_PERMISSION_INFO', 'PLUGIN_MARKET_INDEX', 'USER_PLUGINS', 'verArr', 'cmpVer',
+  'PLUG_SANDBOX_HTML', 'PLUG_HELP', 'MEM', 'memSimilarContent',
   'saveSettings', 'renderSettings',
   'showGuide', 'hideGuide', 'ensureGuideFooterVisible', 'activePermItems', 'PERM_ITEMS',
   'renderGuideSteps', 'webviewLevel', 'loadEnv', 'sdkAtLeast', 'detectCaps'];
@@ -228,7 +228,11 @@ const Perm = {
   hasNotification() { return true; }, requestNotification() { },
   isNotificationChannelOn() { return true; }, requestNotificationChannel() { },
   hasAccessibility() { return true; }, requestAccessibility() { },
-  canScreenshot() { return true; }, isIgnoringBattery() { return false; },
+  canScreenshot() { return true; },
+  hasAllFilesAccess() { return false; }, requestAllFilesAccess() { },
+  workspaceState() { return JSON.stringify({ permission: false, created: false }); },
+  createWorkspace() { return JSON.stringify({ ok: false, error: 'mock' }); },
+  isIgnoringBattery() { return false; },
   requestIgnoreBattery() { }, getScreenSize() { return '{"w":1080,"h":2400,"density":2.75}'; },
   getWindowLimits() { return Android.getWindowLimits(); }, getEnvInfo() { return Android.getEnvInfo(); }
 };
@@ -359,6 +363,38 @@ function step(name, fn) {
     if (!/music_control/.test(p)) throw new Error('提示词里没列 music_control');
   });
 
+  await step('Agent 新工具：应用解析、无限轮数和工作区开关结构', () => {
+    if (T.CONFIG.agentToolRounds !== 0) throw new Error('默认工具轮数不是无限');
+    if (!T.PLUGINS.some(p => p.id === 'agent') || !T.PLUGINS.some(p => p.id === 'files')) throw new Error('缺 Agent/工作区插件');
+    const old = {
+      enabled: T.CONFIG.agentEnabled, l1: T.CONFIG.agentL1, l3: T.CONFIG.agentL3, safety: T.CONFIG.agentSafety,
+      access: Perm.hasAllFilesAccess, state: Perm.workspaceState
+    };
+    T.CONFIG.agentEnabled = true; T.CONFIG.agentL1 = true; T.CONFIG.agentL3 = true; T.CONFIG.agentSafety = true;
+    Perm.hasAllFilesAccess = () => true;
+    Perm.workspaceState = () => JSON.stringify({ permission: true, created: true });
+    const names = T.buildTools().map(t => t.function.name);
+    if (!names.includes('find_app') || !names.includes('watch_screen')) throw new Error('缺应用查询或限时观察工具');
+    if (!names.includes('workspace_read') || !names.includes('workspace_write')) throw new Error('缺工作区读写工具');
+    if (!names.includes('external_file_read') || !names.includes('external_file_write') || !names.includes('external_file_copy') || !names.includes('external_file_delete')) throw new Error('缺公共存储文件修改工具');
+    for (const marker of ['external_file_write', 'external_file_copy', 'external_file_mkdir', 'external_file_delete']) {
+      if (!html.includes("if (name === '" + marker + "')") || !html.includes('uiConfirm')) throw new Error(marker + ' 缺少逐次确认结构');
+    }
+    T.CONFIG.agentEnabled = old.enabled; T.CONFIG.agentL1 = old.l1; T.CONFIG.agentL3 = old.l3; T.CONFIG.agentSafety = old.safety;
+    Perm.hasAllFilesAccess = old.access; Perm.workspaceState = old.state;
+  });
+
+  await step('记忆策略：默认新增，相似正文才追加合并', async () => {
+    const before = T.MEM.length;
+    const a = await T.execTool('save_memory', { title: '测试偏好A', content: '用户长期偏好使用纯文本记录项目进度。', category: '项目' });
+    const b = await T.execTool('save_memory', { title: '测试偏好B', content: '用户长期偏好使用纯文本记录项目进度，并要求保留历史内容。', category: '项目' });
+    const c = await T.execTool('save_memory', { title: '测试偏好C', content: '用户计划下周测试输入法兜底功能。', category: '项目' });
+    if (!a.success || !b.success || !c.success) throw new Error('记忆工具调用失败');
+    if (T.MEM.length !== before + 2) throw new Error('相似内容没有合并或新事实被错误合并');
+    const merged = T.MEM.find(e => e.id === b.id);
+    if (!merged || !merged.content.includes('纯文本记录项目进度') || !merged.content.includes('保留历史内容')) throw new Error('合并时没有保留并追加原文');
+  });
+
   await step('搜索 → 播放：全链路打到原生 mpLoad', async () => {
     T.CONFIG.musicEnabled = true;
     const list = await T.mSearch('测试');
@@ -471,10 +507,11 @@ function step(name, fn) {
   });
 
   await step('插件页：结构存在且渲染不炸', () => {
-    for (const id of ['plugins', 'plug-list', 'btn-plug-page', 'plug-back', 'plug-preview-btn']) {
+    for (const id of ['plugins', 'plug-list', 'btn-plug-page', 'plug-back', 'plug-market', 'plug-market-modal', 'plug-market-list', 'plug-preview-btn']) {
       if (!html.includes('id="' + id + '"')) throw new Error('index.html 里找不到 #' + id);
     }
     T.renderPlugins();
+    T.renderPlugMarket();
     if (T.toolOn('read_screen') !== true) throw new Error('默认应为开启');
     T.CONFIG.toolOff = { read_screen: true };
     if (T.toolOn('read_screen') !== false) throw new Error('toolOff 未生效');
@@ -483,11 +520,12 @@ function step(name, fn) {
 
   await step('自定义插件：清单校验 + 工具注册 + 执行', async () => {
     const m = T.plugNormalize({
-      id: 'com.test.echo', name: '回声', icon: '📣',
+      manifestVersion: 1, apiVersion: '0.1', id: 'com.test.echo', name: '回声', icon: '📣',
+      permissions: ['network.public'], grantedPermissions: ['network.public'],
       tools: [
-        { name: 'echo_http', description: '回显', kind: 'http',
+        { name: 'echo_http', description: '回显', kind: 'http', permissions: ['network.public'],
           request: { method: 'GET', url: 'https://example.com/api?q={{q}}' } },
-        { name: 'echo_js', description: '脚本', kind: 'js', code: 'async function run(a){return a;}' }
+        { name: 'echo_js', description: '脚本', kind: 'js', permissions: [], code: 'async function run(a){return a;}' }
       ]
     });
     if (!m) throw new Error('合法清单被拒');
@@ -510,6 +548,22 @@ function step(name, fn) {
     T.refreshSystemPrompt(false);
   });
 
+  await step('插件权限声明、授权和本地市场结构', () => {
+    const safe = { manifestVersion: 1, apiVersion: '0.1', id: 'com.test.safe', name: '安全插件', permissions: [], tools: [{ name: 'safe_tool', description: '安全工具', permissions: [], kind: 'js', code: 'async function run(a){return a;}' }] };
+    const dangerous = { manifestVersion: 1, apiVersion: '0.1', id: 'com.test.danger', name: '危险插件', permissions: ['files.public.write'], tools: [{ name: 'danger_tool', description: '写文件', permissions: ['files.public.write'], kind: 'js', code: 'async function run(a){return a;}' }] };
+    if (T.plugManifestError(safe)) throw new Error('安全清单不应被拒：' + T.plugManifestError(safe));
+    if (T.plugManifestError(dangerous)) throw new Error('危险清单结构不应被拒：' + T.plugManifestError(dangerous));
+    const missingToolPerm = Object.assign({}, safe, { tools: [{ name: 'safe_tool', description: '安全工具', kind: 'js', code: 'async function run(a){return a;}' }] });
+    if (!T.plugManifestError(missingToolPerm)) throw new Error('缺少工具 permissions 时未拒绝');
+    const n = T.plugNormalize(dangerous);
+    if (!n || T.plugPermissionGranted(n, 'files.public.write')) throw new Error('危险能力不应在清单规整时默认授权');
+    const granted = T.plugNormalize(Object.assign({}, dangerous, { grantedPermissions: ['files.public.write'] }));
+    if (!T.plugPermissionGranted(granted, 'files.public.write')) throw new Error('显式授权危险能力后仍不可用');
+    const ungranted = T.plugNormalize(Object.assign({}, dangerous, { grantedPermissions: [] }));
+    if (T.plugPermissionGranted(ungranted, 'files.public.write')) throw new Error('未授权危险能力仍然可用');
+    if (!Array.isArray(T.PLUGIN_MARKET_INDEX) || !T.PLUGIN_MARKET_INDEX.length) throw new Error('本地插件市场索引为空');
+  });
+
   await step('自定义插件：本机地址与危险协议被拦截', () => {
     for (const u of ['http://127.0.0.1:8080/x', 'http://localhost/x', 'file:///etc/passwd',
                      'javascript:alert(1)', 'http://169.254.1.1/x']) {
@@ -526,7 +580,7 @@ function step(name, fn) {
     const m = h.match(/<script>([\s\S]*)<\/script>/);
     if (!m) throw new Error('沙箱模板缺少 script');
     new vm.Script(m[1]);   // 语法不合法会抛
-    if (!/host\.request/.test(T.PLUG_HELP)) throw new Error('格式说明缺少 host 接口');
+    if (!/host\.request/.test(T.PLUG_HELP) || !/host\.callTool/.test(T.PLUG_HELP) || !/permissions/.test(T.PLUG_HELP)) throw new Error('格式说明缺少权限或 host 接口');
   });
 
   await step('版本比较与更新页结构', () => {

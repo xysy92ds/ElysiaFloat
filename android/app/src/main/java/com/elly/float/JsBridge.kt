@@ -20,6 +20,7 @@ import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 
 class JsBridge(private val ctx: Context, private val webView: WebView) {
 
@@ -46,6 +47,15 @@ class JsBridge(private val ctx: Context, private val webView: WebView) {
         try {
             ctx.getSharedPreferences("elly", Context.MODE_PRIVATE).edit().clear().apply()
         } catch (e: Exception) {}
+    }
+
+    /** 为远程插件清单做内容完整性校验；只返回 SHA-256，不保存输入内容。 */
+    @JavascriptInterface
+    fun sha256(value: String): String {
+        return try {
+            MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        } catch (_: Exception) { "" }
     }
 
     /* ---------- 窗口 ---------- */
