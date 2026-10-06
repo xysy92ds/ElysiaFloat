@@ -27,6 +27,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.text.TextUtils
 import android.util.Base64
 import android.view.Gravity
@@ -62,7 +63,8 @@ class FloatService : Service() {
         var pendingPickedImage: String? = null
         var pendingPickedFile: String? = null
 
-        private const val CHANNEL_ID = "elly_float"
+        /** 引导页会检查这个渠道有没有被用户关掉，所以得给 PermissionBridge 用。 */
+        const val CHANNEL_ID = "elly_float"
         private const val NOTI_ID = 1
 
         /** 截屏前藏悬浮层后，留给合成器生效的时间。 */
@@ -73,19 +75,74 @@ class FloatService : Service() {
     private var webView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
 
+    /**
+     * 原生音频引擎（第二批）：音乐与语音合成都走它。
+     * 以前音乐是 WebView 里的 <audio>，浮窗没有 Activity，WebView 一直「不可见」，
+     * Chromium 不申请唤醒锁、息屏就挂起渲染进程 —— 所以电池白名单也救不了息屏续播。
+     */
+    private var audio: AudioEngine? = null
+
+    /** 当前是不是处于截屏授权 / 投屏状态（决定前台服务类型要不要带 mediaProjection）。 */
+    private var projectionOn = false
+
+    fun audio(): AudioEngine? = audio
+
     private var bubble: ImageView? = null
     private var bubbleBmp: Bitmap? = null
     private var minimized = false
     private var savedFlags = 0
     private var savedRect: IntArray? = null
 
+    /**
+     * 聊天窗当前是不是已经藏起来了。
+     * 以前这里用 minimized/capsuleMode 兼职判断，但两个 minimize 入口都是
+     * 「先置位再 hideWebView()」，导致存档分支永远进不去，savedFlags 一直是 0：
+     * 恢复后丢掉 FLAG_NOT_TOUCH_MODAL（外面点不动）和 FLAG_LAYOUT_NO_LIMITS
+     * （位置被系统夹回固定角落）。所以单独用一个标志，语义才干净。
+     */
+    private var winHidden = false
+
+    /** 窗口矩形写盘用的节流令牌，拖动时避免每帧都写 SharedPreferences。 */
+    private val persistTick = Runnable { persistWinRect() }
+
+    private val prefs get() = getSharedPreferences("elly", MODE_PRIVATE)
+
+    /** 聊天窗最小尺寸：太小就没法用了，同时也会让 JS 那边的缩放下限算错。 */
+    private fun minWindowSize(): Int = (120 * resources.displayMetrics.density).toInt()
+
+    /**
+     * 布局基准尺寸（物理像素）：页面永远是按这个尺寸排版然后再整体缩放的，
+     * 所以它必须是常量。否则一缩放就重新排版，「像电脑窗口那样等比缩放」就没了。
+     */
+    private fun baseSize(): IntArray {
+        val dm = resources.displayMetrics
+        return intArrayOf(
+            min((dm.widthPixels * 0.92).toInt(), (400 * dm.density).toInt()),
+            min((dm.heightPixels * 0.78).toInt(), (660 * dm.density).toInt())
+        )
+    }
+
     /* 迷你播放器（独立系统悬浮窗，缩成小球后依然可见可拖动） */
     private var miniBar: LinearLayout? = null
     private var miniName: TextView? = null
     private var miniArtist: TextView? = null
+    private var miniLyric: TextView? = null
     private var miniPlay: TextView? = null
+    private var miniMode: TextView? = null
+    private var miniPrev: TextView? = null
+    private var miniNext: TextView? = null
     private var miniParams: WindowManager.LayoutParams? = null
     private var miniVisible = false
+
+    /* 迷你条收起状态：只留音符小方块，点音符可展开 / 收起 */
+    private var miniDisc: TextView? = null
+    private var miniInfo: LinearLayout? = null
+    private var miniClose: TextView? = null
+    private var miniCollapsed = false
+    private var miniExpandedWidth = 0
+
+    /** 迷你条还没建出来时先存着歌词，建好立刻补上。 */
+    private var miniLyricText = ""
     private var bubbleParams: WindowManager.LayoutParams? = null
 
     /* 状态胶囊：处理中（转圈）/ 有新消息（右上角红点） */
@@ -122,6 +179,7 @@ class FloatService : Service() {
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         try {
             setupWebView()
+            audio = AudioEngine(this, webView!!)
             addFloatView()
             // 先用内置图垫底，再用用户实际头像覆盖，避免小球退化成系统默认图标
             setBubbleAvatar("file:///android_asset/avatar.jpg")
@@ -134,6 +192,10 @@ class FloatService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 媒体通知 / 耳机线控发过来的动作
+        if (intent?.action == AudioEngine.ACTION_MEDIA) {
+            audio?.onAction(intent.getStringExtra(AudioEngine.EXTRA_CMD))
+        }
         // 允许系统在内存回收后尽量重建浮窗；用户点击关闭仍会 stopSelf。
         return START_STICKY
     }
@@ -210,13 +272,45 @@ class FloatService : Service() {
      */
     private fun upgradeForegroundForProjection() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        projectionOn = true
+        refreshForegroundType()
+    }
+
+    /**
+     * 重新上报前台服务类型。
+     *
+     * Android 14 起，发媒体通知要求应用跑着 mediaPlayback 类型的前台服务，
+     * 所以开始播歌时要把这个类型加上，停了再撒掉。
+     * 这整段都是「锦上添花」：任何一步失败都安静退回原样，
+     * 服务本身、播放本身都不依赖它。
+     */
+    fun refreshForegroundType() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
         try {
-            startForeground(
-                NOTI_ID, buildNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } catch (_: Exception) { }
+            var t = 0
+            if (Build.VERSION.SDK_INT >= 34) {
+                t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            }
+            if (projectionOn) t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            if (audio?.isActive() == true) {
+                t = t or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            }
+            if (t == 0) {
+                startForeground(NOTI_ID, buildNotification())
+            } else {
+                startForeground(NOTI_ID, buildNotification(), t)
+            }
+        } catch (_: Exception) {
+            // 例如从后台被限制启动 FGS：不影响播放，媒体通知退化成普通通知而已。
+            // 回退时也不能把 mediaProjection 带进去 —— Android 14 上拿到授权前声明它会被拒。
+            try {
+                if (Build.VERSION.SDK_INT >= 34) {
+                    startForeground(NOTI_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                } else {
+                    startForeground(NOTI_ID, buildNotification())
+                }
+            } catch (_: Exception) { }
+        }
     }
 
     /* ---------------- WebView ---------------- */
@@ -251,21 +345,33 @@ class FloatService : Service() {
     private fun addFloatView() {
         val wv = webView ?: return
         val dm = resources.displayMetrics
-        val w = min((dm.widthPixels * 0.92).toInt(), (400 * dm.density).toInt())
-        val h = min((dm.heightPixels * 0.78).toInt(), (660 * dm.density).toInt())
+        val b = baseSize()
+        val w = b[0]
+        val h = b[1]
+
+        val first = clampRect(
+            prefs.getInt("win_x", (dm.widthPixels - w) / 2),
+            prefs.getInt("win_y", (dm.heightPixels - h) / 3),
+            prefs.getInt("win_w", w),
+            prefs.getInt("win_h", h)
+        )
 
         val p = WindowManager.LayoutParams(
-            w, h, overlayType(),
+            first[2], first[3], overlayType(),
+            // FLAG_NOT_TOUCH_MODAL：窗口之外的点按要透传给后面的 App，
+            // 少了它，缩小之后周围一整片都会「看得见点不到」。
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = (dm.widthPixels - w) / 2
-            y = (dm.heightPixels - h) / 3
+            x = first[0]
+            y = first[1]
         }
         params = p
+        savedFlags = p.flags
+        winRect = first
         wm?.addView(wv, p)
     }
 
@@ -275,7 +381,10 @@ class FloatService : Service() {
         val dm = resources.displayMetrics
         p.x = (p.x + dx).coerceIn(0, (dm.widthPixels - p.width).coerceAtLeast(0))
         p.y = (p.y + dy).coerceIn(0, (dm.heightPixels - p.height).coerceAtLeast(0))
+        winRect = intArrayOf(p.x, p.y, p.width, p.height)
         try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
+        schedulePersistWinRect()
+        pushRectToJs(false)
     }
 
     fun resize(w: Int, h: Int) = runOnMain {
@@ -286,29 +395,133 @@ class FloatService : Service() {
     fun windowRectJson(): String {
         val p = params ?: return "{}"
         return try {
+            val b = baseSize()
             JSONObject().apply {
                 put("x", p.x); put("y", p.y); put("w", p.width); put("h", p.height)
+                put("bw", b[0]); put("bh", b[1])
+                put("hidden", winHidden)
             }.toString()
         } catch (e: Exception) { "{}" }
     }
 
-    /** JS 按住边缘缩放时回调，坐标与尺寸均为物理像素。 */
-    fun setWindowRect(x: Int, y: Int, w: Int, h: Int) = runOnMain { applyRect(x, y, w, h) }
-
-    private fun applyRect(x: Int, y: Int, w: Int, h: Int) {
-        val p = params ?: return
-        val wv = webView ?: return
+    /**
+     * 把请求的矩形夹进「屏幕范围 + 最小尺寸」里。
+     * 纯计算，不碰 View，所以 JS 线程也能直接调，返回值就是最终一定生效的结果。
+     */
+    private fun clampRect(x: Int, y: Int, w: Int, h: Int): IntArray {
         val dm = resources.displayMetrics
         val sw = dm.widthPixels
         val sh = dm.heightPixels
-        val minSize = (190 * dm.density).toInt()
+        val minSize = minWindowSize()
         val nw = w.coerceIn(minSize, max(minSize, sw))
         val nh = h.coerceIn(minSize, max(minSize, sh))
         val nx = x.coerceIn(0, (sw - nw).coerceAtLeast(0))
         val ny = y.coerceIn(0, (sh - nh).coerceAtLeast(0))
-        p.width = nw; p.height = nh; p.x = nx; p.y = ny
-        try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
+        return intArrayOf(nx, ny, nw, nh)
     }
+
+    /**
+     * JS 按住边缘缩放时回调，坐标与尺寸均为物理像素。
+     *
+     * 返回「真正生效」的矩形（JSON）。JS 用这个回执反推缩放比，
+     * 就不用猜原生会不会夹它 —— 面板和窗口从此不可能对不上。
+     */
+    fun setWindowRect(x: Int, y: Int, w: Int, h: Int): String {
+        val r = clampRect(x, y, w, h)
+        runOnMain { applyClamped(r) }
+        return rectJson(r)
+    }
+
+    private fun applyRect(x: Int, y: Int, w: Int, h: Int) {
+        applyClamped(clampRect(x, y, w, h))
+    }
+
+    private fun applyClamped(r: IntArray) = runOnMain {
+        val p = params ?: return@runOnMain
+        val wv = webView ?: return@runOnMain
+        p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3]
+        winRect = intArrayOf(r[0], r[1], r[2], r[3])
+        try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
+        schedulePersistWinRect()
+        // 缩放过程中 JS 已经拿到 setWindowRect 的回执了，这里不必每帧都推，
+        // 免得 evaluateJavascript 把拖动手感拖垮。
+        pushRectToJs(false)
+    }
+
+    private fun rectJson(r: IntArray): String = try {
+        val b = baseSize()
+        JSONObject().apply {
+            put("x", r[0]); put("y", r[1]); put("w", r[2]); put("h", r[3])
+            // bw/bh 是布局基准，JS 用 ZOOM = w / bw 就能得到精确的缩放比。
+            put("bw", b[0]); put("bh", b[1])
+        }.toString()
+    } catch (e: Exception) { "{}" }
+
+    /** 当前窗口矩形缓存（物理像素），JS 那边对账时读它。 */
+    @Volatile
+    private var winRect: IntArray? = null
+
+    private var lastRectPushAt = 0L
+
+    private fun pushRectToJs() = pushRectToJs(true)
+
+    /**
+     * 拖拽时每帧都回推一次会让拖动手感发飘（evaluateJavascript 有开销），
+     * 所以拖动路径走节流，结构性变化（显示 / 缩放落定）走立即。
+     */
+    private fun pushRectToJs(force: Boolean) {
+        val r = winRect ?: return
+        val now = SystemClock.uptimeMillis()
+        if (!force && now - lastRectPushAt < 100L) return
+        lastRectPushAt = now
+        val json = "window.__onWinRect&&window.__onWinRect(${rectJson(r)});"
+        try { webView?.evaluateJavascript(json, null) } catch (_: Exception) { }
+    }
+
+    /* ---------------- 窗口 / 小球位置记忆 ---------------- */
+
+    private fun schedulePersistWinRect() {
+        main.removeCallbacks(persistTick)
+        main.postDelayed(persistTick, 400)
+    }
+
+    private fun persistWinRect() {
+        val r = winRect ?: return
+        try {
+            prefs.edit()
+                .putInt("win_x", r[0]).putInt("win_y", r[1])
+                .putInt("win_w", r[2]).putInt("win_h", r[3])
+                .apply()
+        } catch (_: Exception) { }
+    }
+
+    private fun persistBubblePos() {
+        val p = bubbleParams ?: return
+        try { prefs.edit().putInt("bubble_x", p.x).putInt("bubble_y", p.y).apply() } catch (_: Exception) { }
+    }
+
+    /** JS 直接给定绝对坐标（左边缘拖拽用），同样返回生效后的矩形。 */
+    fun moveWindowTo(x: Int, y: Int): String {
+        val p = params ?: return "{}"
+        val r = clampRect(x, y, p.width, p.height)
+        runOnMain { applyClamped(r) }
+        return rectJson(r)
+    }
+
+    /** 尺寸限制给 JS，让它在自己那侧就算对，不必依赖原生兜底。 */
+    fun windowLimitsJson(): String = try {
+        val dm = resources.displayMetrics
+        val b = baseSize()
+        JSONObject().apply {
+            put("minW", minWindowSize())
+            put("minH", minWindowSize())
+            put("maxW", dm.widthPixels)
+            put("maxH", dm.heightPixels)
+            put("bw", b[0])
+            put("bh", b[1])
+            put("density", dm.density.toDouble())
+        }.toString()
+    } catch (e: Exception) { "{}" }
 
     /* ---------------- 隐藏 / 恢复聊天窗（小球与胶囊共用） ---------------- */
 
@@ -316,10 +529,14 @@ class FloatService : Service() {
     private fun hideWebView() {
         val p = params ?: return
         val wv = webView ?: return
-        if (!minimized && !capsuleMode) {
+        // 只在「窗口本来就在台面上」的时候记档。
+        // 用 winHidden 判断而不是 minimized/capsuleMode：那两个是业务状态，
+        // 而这里关心的是「当前到底可不可见」，两回事。
+        if (!winHidden) {
             savedFlags = p.flags
             savedRect = intArrayOf(p.x, p.y, p.width, p.height)
         }
+        winHidden = true
         p.alpha = 0f
         p.x = -p.width - 500
         p.flags = p.flags or
@@ -331,11 +548,27 @@ class FloatService : Service() {
     private fun showWebView() {
         val p = params ?: return
         val wv = webView ?: return
+        // 优先用台面上的存档；万一没存过（比如被截屏流程直接藏掉），
+        // 退回到持久化的位置，总比被系统夹到固定角落强。
         savedRect?.let { p.x = it[0]; p.y = it[1]; p.width = it[2]; p.height = it[3] }
+            ?: restorePersistedWinRect(p)
+        if (savedFlags != 0) p.flags = savedFlags
+        winHidden = false
         p.alpha = 1f
-        p.flags = savedFlags
+        winRect = intArrayOf(p.x, p.y, p.width, p.height)
         try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
         try { wv.requestLayout(); wv.invalidate() } catch (_: Exception) { }
+        pushRectToJs()
+    }
+
+    private fun restorePersistedWinRect(p: WindowManager.LayoutParams) {
+        val r = clampRect(
+            prefs.getInt("win_x", p.x),
+            prefs.getInt("win_y", p.y),
+            prefs.getInt("win_w", p.width),
+            prefs.getInt("win_h", p.height)
+        )
+        p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3]
     }
 
     /* ---------------- 最小化成悬浮小球 ---------------- */
@@ -387,8 +620,11 @@ class FloatService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = dm.widthPixels - size - (10 * dm.density).toInt()
-            y = (dm.heightPixels * 0.60).toInt()
+            // 小球位置也要记住，否则拖走之后再最小化，它又跳回默认点。
+            x = prefs.getInt("bubble_x", dm.widthPixels - size - (10 * dm.density).toInt())
+                .coerceIn(0, (dm.widthPixels - size).coerceAtLeast(0))
+            y = prefs.getInt("bubble_y", (dm.heightPixels * 0.60).toInt())
+                .coerceIn(0, (dm.heightPixels - size).coerceAtLeast(0))
         }
         attachBubbleTouch(iv, p, dm)
         bubble = iv
@@ -419,7 +655,7 @@ class FloatService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    if (!moved) restoreFromBubble()
+                    if (!moved) restoreFromBubble() else persistBubblePos()
                     true
                 }
                 else -> false
@@ -835,10 +1071,17 @@ class FloatService : Service() {
     }
 
     /* ---------------- 迷你播放器悬浮窗 ---------------- */
+
+    /**
+     * 独立于聊天窗的系统级小播放条：缩成小球之后依然看得见、拖得动。
+     * 现在多了上一首 / 下一首，以及一行歌词（歌词由 JS 算好送过来，
+     * 原生不解析 LRC —— 免得两边各存一份歌词对不上）。
+     */
     fun showMiniPlayer(name: String, artist: String, playing: Boolean) = runOnMain {
         val bar = miniBar ?: buildMiniBar().also { miniBar = it }
         miniName?.text = if (name.isBlank()) "正在播放" else name
         miniArtist?.text = if (artist.isBlank()) "—" else artist
+        miniArtist?.visibility = if (miniLyric?.text.isNullOrBlank()) View.VISIBLE else View.GONE
         miniPlay?.text = if (playing) "❚❚" else "▶"
         if (!miniVisible) {
             addMiniBar(bar)
@@ -848,12 +1091,63 @@ class FloatService : Service() {
         }
     }
 
+    /** 迷你播放条上那一行歌词（没有歌词时传空串，会自动退回显示歌手）。 */
+    fun setMiniLyric(text: String) = runOnMain {
+        miniLyricText = text
+        val el = miniLyric ?: return@runOnMain
+        // 同一句不用反复刷，减少无谓的重绘
+        if (el.text.toString() == text) return@runOnMain
+        el.text = text
+        el.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+        miniArtist?.visibility = if (text.isBlank()) View.VISIBLE else View.GONE
+    }
+
+    /** 迷你播放条上的播放方式图标（🔁 / 🔂 / 🔀）。 */
+    fun setMiniPlayMode(icon: String) = runOnMain {
+        val el = miniMode ?: return@runOnMain
+        if (el.text.toString() == icon) return@runOnMain
+        el.text = icon
+    }
+
     fun hideMiniPlayer() = runOnMain {
         val bar = miniBar ?: return@runOnMain
         try { wm?.removeView(bar) } catch (_: Exception) { }
+        miniName = null
+        miniArtist = null
+        miniLyric = null
+        miniPlay = null
+        miniMode = null
+        miniPrev = null
+        miniNext = null
+        miniDisc = null
+        miniInfo = null
+        miniClose = null
+        miniCollapsed = false
+        miniExpandedWidth = 0
         miniBar = null
         miniParams = null
         miniVisible = false
+    }
+
+    /** 按当前收起状态隐藏 / 显示除音符以外的部分，并同步窗口宽度。 */
+    private fun applyMiniCollapsed() {
+        val bar = miniBar ?: return
+        val vis = if (miniCollapsed) View.GONE else View.VISIBLE
+        miniInfo?.visibility = vis
+        miniPrev?.visibility = vis
+        miniMode?.visibility = vis
+        miniPlay?.visibility = vis
+        miniNext?.visibility = vis
+        miniClose?.visibility = vis
+        val p = miniParams ?: return
+        p.width = if (miniCollapsed) WindowManager.LayoutParams.WRAP_CONTENT else miniExpandedWidth
+        try { wm?.updateViewLayout(bar, p) } catch (_: Exception) { }
+    }
+
+    /** 点音符图标：在「完整播放条」和「只有音符的小方框」之间切换。 */
+    private fun toggleMiniCollapse() {
+        miniCollapsed = !miniCollapsed
+        applyMiniCollapsed()
     }
 
     private fun buildMiniBar(): LinearLayout {
@@ -901,25 +1195,64 @@ class FloatService : Service() {
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = "—"
+            visibility = if (miniLyricText.isBlank()) View.VISIBLE else View.GONE
+        }
+        val lyric = TextView(this).apply {
+            setTextColor(0xFFD6336C.toInt())
+            textSize = 10f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.MARQUEE
+            marqueeRepeatLimit = -1
+            isSingleLine = true
+            isSelected = true          // TextView 跑马灯得先 selected
+            text = miniLyricText
+            visibility = if (miniLyricText.isBlank()) View.GONE else View.VISIBLE
         }
         info.addView(name)
         info.addView(artist)
+        info.addView(lyric)
         val infoLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         infoLp.leftMargin = dp(8)
         infoLp.rightMargin = dp(4)
         bar.addView(info, infoLp)
 
-        val play = TextView(this).apply {
-            text = "▶"
+        fun circle(txt: String, bg: Int, fg: Int, sz: Int): TextView = TextView(this).apply {
+            text = txt
             gravity = Gravity.CENTER
-            setTextColor(0xFFFFFFFF.toInt())
-            textSize = 12f
+            setTextColor(fg)
+            textSize = if (sz >= 32) 12f else 13f
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(0xFFD6336C.toInt())
+                setColor(bg)
             }
         }
-        bar.addView(play, LinearLayout.LayoutParams(dp(32), dp(32)))
+
+        val prev = circle("⏮", 0x26FF9A9E, 0xFFD6336C.toInt(), 32)
+        bar.addView(prev, LinearLayout.LayoutParams(dp(32), dp(32)))
+
+        val mode = TextView(this).apply {
+            text = "🔁"
+            gravity = Gravity.CENTER
+            setTextColor(0xFFD6336C.toInt())
+            textSize = 13f
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0x1AFF9A9E)
+            }
+        }
+        val modeLp = LinearLayout.LayoutParams(dp(30), dp(30))
+        modeLp.leftMargin = dp(4)
+        bar.addView(mode, modeLp)
+
+        val play = circle("▶", 0xFFD6336C.toInt(), 0xFFFFFFFF.toInt(), 32)
+        val playLp = LinearLayout.LayoutParams(dp(32), dp(32))
+        playLp.leftMargin = dp(4)
+        bar.addView(play, playLp)
+
+        val next = circle("⏭", 0x26FF9A9E, 0xFFD6336C.toInt(), 32)
+        val nextLp = LinearLayout.LayoutParams(dp(32), dp(32))
+        nextLp.leftMargin = dp(4)
+        bar.addView(next, nextLp)
 
         val close = TextView(this).apply {
             text = "×"
@@ -933,10 +1266,23 @@ class FloatService : Service() {
 
         miniName = name
         miniArtist = artist
+        miniLyric = lyric
         miniPlay = play
+        miniMode = mode
+        miniPrev = prev
+        miniNext = next
+        miniDisc = disc
+        miniInfo = info
+        miniClose = close
+        miniCollapsed = false
 
-        play.setOnClickListener {
-            webView?.evaluateJavascript("window.__miniToggle&&window.__miniToggle()", null)
+        // 这四个按钮直接打本地引擎：息屏、聊天窗收起时也能用
+        prev.setOnClickListener { audio?.onAction("prev") }
+        next.setOnClickListener { audio?.onAction("next") }
+        play.setOnClickListener { audio?.onAction("toggle") }
+        // 播放方式由 JS 决定（它才是歌单的主人），这里只负责把意图报上去
+        mode.setOnClickListener {
+            webView?.evaluateJavascript("window.__miniMode&&window.__miniMode()", null)
         }
         close.setOnClickListener {
             hideMiniPlayer()
@@ -948,7 +1294,7 @@ class FloatService : Service() {
     private fun addMiniBar(bar: View) {
         val dm = resources.displayMetrics
         val d = dm.density
-        val width = min((280 * d).toInt(), dm.widthPixels - (32 * d).toInt()).coerceAtLeast((160 * d).toInt())
+        val width = min((370 * d).toInt(), dm.widthPixels - (24 * d).toInt()).coerceAtLeast((210 * d).toInt())
         val p = WindowManager.LayoutParams(
             width,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -962,6 +1308,7 @@ class FloatService : Service() {
             y = (dm.heightPixels - (170 * d).toInt()).coerceAtLeast(0)
         }
         attachMiniTouch(bar, p, dm)
+        miniExpandedWidth = width
         miniParams = p
         try {
             wm?.addView(bar, p)
@@ -999,9 +1346,18 @@ class FloatService : Service() {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (!moved) {
-                        // 点一下播放条 → 还原窗口并打开音乐页
-                        restoreFromBubble()
-                        webView?.evaluateJavascript("window.__miniOpen&&window.__miniOpen()", null)
+                        val disc = miniDisc
+                        val onDisc = disc != null && disc.width > 0 &&
+                                ev.x >= disc.left && ev.x <= disc.right &&
+                                ev.y >= disc.top && ev.y <= disc.bottom
+                        if (onDisc) {
+                            // 点音符 → 收起 / 展开旁边的按钮
+                            toggleMiniCollapse()
+                        } else {
+                            // 点播放条其它位置 → 还原窗口并打开音乐页
+                            restoreFromBubble()
+                            webView?.evaluateJavascript("window.__miniOpen&&window.__miniOpen()", null)
+                        }
                     }
                     true
                 }
@@ -1352,6 +1708,8 @@ class FloatService : Service() {
 
     override fun onDestroy() {
         instance = null
+        try { audio?.destroy() } catch (_: Exception) { }
+        audio = null
         removeBubble()
         miniBar?.let { bar -> try { wm?.removeView(bar) } catch (_: Exception) { } }
         miniBar = null

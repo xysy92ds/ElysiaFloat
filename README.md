@@ -3,7 +3,8 @@
 > 一个常驻在安卓屏幕上的粉色悬浮窗 AI 助手。
 > 不占前台、不挡视线，随时能问、能看、能读屏、能翻译、能记事、能放歌。
 
-- **安卓 App**（主项目）：`android/` — 纯 Kotlin 原生外壳 + WebView 粉红 UI，当前版本 **0.5.1**（versionCode 6）
+- **安卓 App**（主项目）：`android/` — 纯 Kotlin 原生外壳 + WebView 粉红 UI，当前版本 **0.6**（versionCode 10）
+- **插件开发指南**：`PLUGINS.md` — 自定义插件的完整规范，见 [插件开发](#插件开发)
 - **浏览器用户脚本**（早期版本，功能较少）：`userscript/` — 见 [下文的区别说明](#浏览器用户脚本和-app-是什么关系)
 - **成品安装包**：`apk/` 与 [Releases](https://github.com/xysy92ds/ElysiaFloat/releases)
 
@@ -14,6 +15,9 @@
 - [它是什么](#它是什么)
 - [整体架构](#整体架构)
 - [各模块是怎么实现的](#各模块是怎么实现的)
+- [插件系统](#插件系统)
+- [检查更新](#检查更新)
+- [插件开发](#插件开发)
 - [功能一览](#功能一览)
 - [怎么用](#怎么用)
 - [怎么构建](#怎么构建)
@@ -76,22 +80,30 @@ ElysiaFloat 是一个**悬浮在任意应用上面**的 AI 助手窗口。它不
 │  ┌───────────┴───────────┐   ┌──────────┴──────────────────┐  │
 │  │ JsBridge  →  Android.* │   │ EllyAccessibilityService     │  │
 │  │ PermissionBridge       │   │   ├─ dumpScreenNodes()       │  │
-│  │        →  Perm.*       │   │   └─ 屏幕尺寸 / 包名 / 文本    │  │
-│  └───────────┬───────────┘   │ ScreenCaptureActivity        │  │
-│              │               │ ScreenShotUtil (MediaProjection)│
+│  │ ApkProvider → 安装包    │   │   └─ 屏幕尺寸 / 包名 / 文本    │  │
+│  │        →  Perm.*       │   │ ScreenCaptureActivity        │  │
+│  └───────────┬───────────┘   │ ScreenShotUtil (MediaProjection)│
 │              │               └──────────────────────────────┘  │
 │              ▼                                                 │
 │  ┌────────────────────────────────────────────────────────┐   │
 │  │  WebView 里的 index.html（整个 UI 都在里面）              │   │
 │  │                                                        │   │
-│  │   · 单页多视图路由 showView('chat'|'settings'|...)      │   │
+│  │   · 单页多视图路由 showView('chat'|'settings'|'plugins') │   │
 │  │   · CONFIG / 设置持久化   →  Android.getValue/setValue  │   │
 │  │   · 对话 + Function Calling 循环                        │   │
+│  │   · 工具/插件注册表       →  内置组 + 自定义插件          │   │
 │  │   · 长期记忆库            → 记忆工具 + 常驻摘要块          │   │
 │  │   · 屏幕翻译引擎（免费微软 / AI）                        │   │
 │  │   · 音乐播放器（GD Studio / Meting 双源）               │   │
 │  │   · TTS 朗读（系统 TTS / OpenAI 兼容接口）              │   │
+│  │   · 检查更新 → GitHub Releases → ApkProvider → 系统安装器 │   │
 │  └────────────────────────────────────────────────────────┘   │
+│                    ▲                                          │
+│                    │ postMessage（受控 host RPC）             │
+│  ┌─────────────────┴──────────────────────────────────────┐  │
+│  │ 插件沙箱 <iframe sandbox="allow-scripts">（opaque origin）│  │
+│  │   · 拿不到 Android.* / DOM / 网络，只能调 host.*          │  │
+│  └────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -126,7 +138,14 @@ Android.capsuleState(t, s)      // 更新胶囊进度 / 红点
 Android.capsuleDone(t)          // 任务完成，点红点
 Android.showTranslateOverlay(json) // 把译文贴到屏幕上
 Android.pickFile(mode)          // 拉起选图 / 选文件
+Android.canInstall()            // 是否已允许「安装未知应用」
+Android.requestInstallPermission() // 跳到系统设置去开启安装权限
+Android.downloadAndInstall(id, url, name) // 下载 APK 并调起系统安装器
+
+// 下载进度由原生回抛：window.__dlCb(id, pct, done, err, path)
 ```
+
+安装包通过自写的 [`ApkProvider.kt`](android/app/src/main/java/com/elly/float/ApkProvider.kt) 以 `content://` 暴露（只读 `cache/updates`，防目录穿越）——没有引入 androidx 的 `FileProvider`，保持零依赖。
 
 **`Perm.*` — 权限和系统状态查询**（[`PermissionBridge.kt`](android/app/src/main/java/com/elly/float/PermissionBridge.kt)）
 
@@ -265,6 +284,40 @@ Perm.getCurrentPage()
 
 主题色、头像（支持上传本地照片 + 拖动缩放裁剪成圆形）、气泡样式、助手名字都在设置里改，持久化在 SharedPreferences。整个 UI 是纯 CSS 手写的，没有用任何 UI 框架。
 
+音乐迷你条支持**折叠**：点一下音符（♪）图标即可把两侧的上一首/播放/下一首按钮收起，只留一个音符小方块，再点一下展开，点小方块本身则打开完整音乐页。
+
+### 10. 工具与插件系统
+
+AI 能调用的每个工具都登记在一张**注册表**里，分两来源：
+
+- **内置工具**：在 `index.html` 里按组声明（屏幕 / 系统 / 音乐 / 记忆），每组有图标、名称、说明。
+- **自定义插件**：用户导入的插件清单，存在 `via_ai_user_plugins`，与内置工具一起合成最终的函数定义和提示词。
+
+开关分两级，且都**同时作用于函数定义和提示词**（关掉之后 AI 既看不到说明、也调不到）：
+
+| 层级 | 存储 | 作用 |
+|---|---|---|
+| 组开关 | `CONFIG.plugins[组id]` | 关闭整组工具 |
+| 单项开关 | `CONFIG.toolOff[工具名]` | 只关闭某一个工具（缺失即视为开启） |
+
+所有工具集中在**独立的「插件与工具」页**（`showView('plugins')`，从设置进入），顶部提供「导入插件 / 格式说明 / AI 说明」。自定义插件在「🧩 自定义插件」区块，可整体启停、逐项启停、删除。
+
+插件的两种执行方式：
+
+- `kind: "http"`：声明式请求，由原生 `HttpURLConnection` 代发，支持 `{{参数}}` 占位。
+- `kind: "js"`：在一张 `<iframe sandbox="allow-scripts">`（opaque origin）里执行，拿不到 `Android.*` 桥和父页面 DOM，只能通过 `postMessage` 调用受控的 `host.*`（网络请求、提示、剪贴板、私有存储）。宿主对每个 URL 做校验：只允许公网 `http/https`，拒绝本机 / 链路本地地址。
+
+完整的清单规范、`host` API、安全边界和示例见 **[`PLUGINS.md`](PLUGINS.md)**。
+
+### 11. 检查更新
+
+App 会读取 GitHub 仓库的 Releases（`api.github.com/repos/xysy92ds/ElysiaFloat/releases/latest`），把 release 标签与当前版本逐段比较：
+
+- **自动**：首次进入、以及距上次检查超过 24 小时时静默检查一次（可在设置里关掉）；只有确实有新版本才弹窗。
+- **手动**：设置 → 检查更新 → 「立即检查」。
+
+发现新版本后，弹窗展示版本号和更新说明。点「下载并安装」：原生 `JsBridge.downloadAndInstall()` 下载 APK 到 `cacheDir/updates`，通过自写的 `ApkProvider`（只读暴露该目录、防目录穿越，零依赖，不引入 androidx `FileProvider`）生成 `content://` URI，再拉起系统安装器。首次安装会检查 `REQUEST_INSTALL_PACKAGES` 并引导用户开启「安装未知应用」。
+
 ---
 
 ## 功能一览
@@ -277,8 +330,10 @@ Perm.getCurrentPage()
 | **快捷指令** | 翻译屏幕、总结屏幕、要点、解释（读屏时自动收成胶囊，完成弹红点） |
 | **屏幕翻译** | 免费 / AI 双引擎，仅译文 / 双语，悬浮面板 / 贴屏叠加两种形态 |
 | **长期记忆** | 分类记忆库、关键词+向量检索、常驻摘要块、AI 主动读写、可视化增删改查、JSON/Markdown 导入导出 |
-| **音乐** | GD Studio + Meting 双源搜索、播放、歌词、收藏、原生迷你控制条 |
+| **音乐** | GD Studio + Meting 双源搜索、播放、歌词、收藏、原生迷你控制条（可折叠） |
 | **语音** | 朗读助手回复，系统 TTS / OpenAI 兼容接口 |
+| **插件** | 独立插件页、逐组/逐项工具开关、自定义插件导入/导出 JSON、HTTP 与 JS 双模式、隔离沙箱执行；规范见 [`PLUGINS.md`](PLUGINS.md) |
+| **更新** | GitHub Releases 检测、首启/每 24h 自动检查、手动检查、下载并调起系统安装器 |
 | **上传** | 发图片（走识图模型）、发文件（读文本内容，≤200KB） |
 | **其它** | 剪贴板读写、打开链接、头像裁剪、主题色自定义、导出导入全部配置 |
 
@@ -310,6 +365,10 @@ App 内 设置 → 🔐 权限 里有直达各设置页的按钮。
 
 想用识图、AI 翻译、AI 朗读，在对应分区勾选「独立配置」再填各自的接口。全部配置都存在本地 SharedPreferences，**不会上传到任何地方**。
 
+### 3.5 装插件（可选）
+
+设置 → 插件与工具 → 导入插件，粘贴一段 JSON 清单即可。内置工具和已装插件都可以逐组、逐项开关。插件怎么写、有哪些能力边界，见 [`PLUGINS.md`](PLUGINS.md)；App 内插件页也有「格式说明」速查。
+
 ### 4. 日常使用
 
 - 点悬浮球 → 展开助手窗口
@@ -317,6 +376,9 @@ App 内 设置 → 🔐 权限 里有直达各设置页的按钮。
 - 顶栏 `×` → 关闭悬浮窗
 - 底部 `＋` → 发图片或文件
 - 底部 🎵 / ⚙️ / 🧠 → 音乐 / 设置 / 记忆库
+- 音乐迷你条上的 ♪ 图标 → 折叠 / 展开两侧控制按钮；点音符方块本身 → 打开完整音乐页
+- 设置 → 插件与工具 → 管理 AI 能用的工具，导入自定义插件
+- 设置 → 检查更新 → 手动检查新版本；首次进入也会自动检查一次
 - 快捷指令条上的「翻译屏幕 / 总结屏幕 / 要点 / 解释」→ 会自动读屏，并把窗口收成小胶囊；跑完胶囊上出现红点，点它就能看结果
 - 悬浮球长按可拖动换位置
 
@@ -336,7 +398,10 @@ cd android
 
 **没有第三方依赖**，所以 `--offline` 也能构建成功。
 
-关于 `android/tools/`：里面是一个叫 `remove_fix.c` 的小 LD_PRELOAD 垫片，只用来解决**在 Termux/proot 这类受限环境里**打包时 `apkzlib` 删临时目录失败的问题。正常在 PC 上构建**完全不需要它**，详情见 [`android/BUILD_NOTES.md`](android/BUILD_NOTES.md)。
+关于 `android/tools/`：
+
+- `remove_fix.c` 是一个小 LD_PRELOAD 垫片，只用来解决**在 Termux/proot 这类受限环境里**打包时 `apkzlib` 删临时目录失败的问题。正常在 PC 上构建**完全不需要它**，详情见 [`android/BUILD_NOTES.md`](android/BUILD_NOTES.md)。
+- `smoke.js` 是**无需安卓设备**就能跑的 JS 逻辑冒烟测试（用 Node 的 `vm` 把 `index.html` 里的脚本跑起来，桩掉 Android 桥），覆盖工具开关、插件校验、沙箱模板、版本比较等。跑法：`node android/tools/smoke.js`。
 
 ---
 
@@ -372,10 +437,13 @@ cd android
 ```
 ElysiaFloat/
 ├── README.md                  ← 你正在看的这份
+├── PLUGINS.md                 ← 🧩 插件开发指南（清单规范 / host API / 示例）
 ├── android/                   ← 📱 安卓 App 源码（主项目）
 │   ├── build.sh               ← 构建入口（Gradle 环境封装）
 │   ├── BUILD_NOTES.md         ← 构建笔记 / Termux 环境下的坑
-│   ├── tools/                 ← 只给 Termux 用的 apkzlib 垫片
+│   ├── tools/                 ← apkzlib 垫片 + 冒烟测试
+│   │   ├── smoke.js           ← 无需安卓即可跑的 JS 逻辑冒烟测试
+│   │   └── remove_fix.c       ← 只给受限环境用的 apkzlib 垫片
 │   └── app/src/main/
 │       ├── AndroidManifest.xml
 │       ├── assets/
@@ -387,6 +455,8 @@ ElysiaFloat/
 │       │   ├── FloatService.kt             → ★ 前台服务 + 全部悬浮窗（最大文件）
 │       │   ├── JsBridge.kt                 → Android.* 桥（干活）
 │       │   ├── PermissionBridge.kt         → Perm.* 桥（权限与系统状态）
+│       │   ├── AudioEngine.kt              → 原生音频播放引擎
+│       │   ├── ApkProvider.kt              → 安装包 content:// 提供者（零依赖）
 │       │   ├── EllyAccessibilityService.kt → 读屏（节点树 + 真实坐标）
 │       │   ├── ScreenCaptureActivity.kt    → 截屏授权
 │       │   ├── ScreenShotUtil.kt           → MediaProjection 截帧
@@ -406,10 +476,13 @@ ElysiaFloat/
 |---|---|
 | 换配色、改布局、加按钮 | `android/app/src/main/assets/index.html` 的 `<style>` / `<body>` |
 | 改角色人设、加系统提示词 | `index.html` 里的 `systemPrompt`（或直接在 App 设置里改，不用重编译） |
-| 加一个新工具给 AI 用 | `index.html` 的 `buildTools()` + `execTool()` |
+| 加一个内置工具给 AI 用 | `index.html` 的 `buildTools()` + `execTool()` |
+| 写自定义插件（不用改代码） | 照 [`PLUGINS.md`](PLUGINS.md) 写 JSON，App 里导入 |
+| 改插件清单校验 / 沙箱 / host 能力 | `index.html` 的 `plugNormalize` / `PLUG_SANDBOX_HTML` / `plugHandleHost` |
 | 加一个新的系统能力（原生） | `JsBridge.kt` 加 `@JavascriptInterface` 方法 → `index.html` 里调用 |
 | 改悬浮窗行为 | `FloatService.kt` |
 | 改读屏逻辑 | `EllyAccessibilityService.kt` |
+| 改更新检查 / 下载安装 | `index.html` 的 `checkUpdate` + `JsBridge.kt` 的 `downloadAndInstall` |
 
 因为业务逻辑几乎都在一个 HTML 文件里，**改界面/加功能通常只需要动 `index.html` 然后重新打包**，不用碰 Kotlin。
 
@@ -422,6 +495,7 @@ ElysiaFloat/
 - **免费翻译引擎是公共接口**：不保证稳定，请求密集时可能被限流。要稳定就切 AI 引擎。
 - **APK 是 debug 签名**：仅供自用/测试，不适合直接分发到应用商店。
 - **没有 Shizuku / root 相关功能**：全部能力都建立在无障碍 + MediaProjection + 悬浮窗这三个公开 API 上。
+- **插件要自己把关**：自定义插件虽然被关在隔离沙箱里、网络也受 URL 白名单限制，但安装后它仍能向你批准的 http(s) 地址发请求。**请只安装可信来源的插件。**
 - **对话历史存在本地**：清空数据会一起没掉；重要的东西建议用记忆库或导出功能留一份。
 - Android 14+ 对前台服务`specialUse` 类型的审核较严，某些定制 ROM 可能需要手动允许后台运行。
 

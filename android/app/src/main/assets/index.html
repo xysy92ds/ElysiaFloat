@@ -193,7 +193,7 @@ input.secret.reveal{-webkit-text-security:none}
 #mem-tools textarea{width:100%;min-height:64px;font-family:monospace;font-size:11px;
   padding:8px 10px;border:1px solid rgba(255,154,158,.25);border-radius:8px;
   background:var(--card);color:var(--text);resize:vertical}
-.mem-edit{display:none;position:absolute;inset:0;background:#fff5f7;z-index:140;
+.mem-edit{display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:#fff5f7;z-index:140;
   flex-direction:column;padding:14px;overflow-y:auto}
 .mem-edit.open{display:flex}
 .mem-edit h3{margin:0 0 12px;font-size:14px;color:var(--accent)}
@@ -289,11 +289,12 @@ input.secret.reveal{-webkit-text-security:none}
   flex-shrink:0;font-family:inherit}
 .mp-btn:active{background:rgba(255,154,158,.35)}
 .mp-play{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff}
+.mp-mode{width:30px;height:30px;font-size:12px}
 .mp-title{flex:1;font-size:12px;color:var(--text);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis;margin-left:6px}
 .mp-time{font-size:10px;color:var(--muted);flex-shrink:0;
   margin-left:4px;font-family:monospace}
-#lyric-modal{position:absolute;inset:0;background:rgba(74,44,58,.6);
+#lyric-modal{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(74,44,58,.6);
   display:none;align-items:flex-end;border-radius:20px;z-index:100}
 #lyric-modal.open{display:flex}
 .lyric-box{width:100%;max-height:65%;background:#fff0f5;
@@ -307,21 +308,29 @@ input.secret.reveal{-webkit-text-security:none}
   color:var(--muted);text-align:center;-webkit-overflow-scrolling:touch}
 .lline{padding:4px 0;cursor:pointer}
 .lline.active{color:var(--accent);font-weight:600;font-size:15px}
-#guide{position:absolute;inset:0;z-index:999;
+#guide{position:absolute;top:0;left:0;right:0;bottom:0;z-index:999;
+  width:100%;height:100%;box-sizing:border-box;
   background:linear-gradient(160deg,#fff0f5 0%,#ffe4e1 100%);
-  display:none;align-items:center;justify-content:center;padding:16px}
+  display:none;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
 #guide.show{display:flex}
-.guide-card{width:100%;max-height:100%;background:#fff;border-radius:20px;
+/* height:100% 而不是 max-height:100%：老 WebView 上 max-height 百分比
+   在 auto 高度的父元素里会被当成 none，卡片就被内容撑出屏幕，
+   底部按钮跟着被顶到看不见的地方。 */
+.guide-card{width:100%;height:100%;max-height:100%;background:#fff;border-radius:20px;
   box-shadow:0 12px 40px rgba(255,154,158,.3);display:flex;
-  flex-direction:column;overflow:hidden}
+  flex-direction:column;overflow:hidden;margin:auto}
 .guide-head{display:flex;gap:12px;align-items:center;padding:18px 18px 14px;
+  flex:0 0 auto;
   background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff}
 .guide-head img{width:48px;height:48px;border-radius:50%;
   border:2px solid rgba(255,255,255,.7);object-fit:cover;background:#fff}
 .guide-title{font-size:15px;font-weight:700}
 .guide-sub{font-size:12px;opacity:.9;margin-top:2px}
-.guide-steps{flex:1;overflow-y:auto;padding:14px;display:flex;
-  flex-direction:column;gap:10px}
+/* min-height:0 是关键：flex 子项默认 min-height:auto，不会被压到比内容还小，
+   于是 overflow-y:auto 永远不触发、内容把页脚顶出屏幕。
+   补上以后，「先跳过 / 下一步」在任何屏幕上都点得到。 */
+.guide-steps{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px;display:flex;
+  flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch}
 .step{display:flex;gap:10px;padding:12px 14px;border-radius:14px;
   background:#fff5f7;border:1px solid rgba(255,154,158,.2);transition:all .2s}
 .step.ok{background:#e8f9ee;border-color:#a8e6b8}
@@ -334,7 +343,7 @@ input.secret.reveal{-webkit-text-security:none}
 .step.need .step-icon{background:#ffd54f;color:#fff}
 .step-body{flex:1;min-width:0}
 .step-name{font-size:13px;font-weight:600;color:var(--text)}
-.step-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.step-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5;white-space:pre-line}
 .step-badge{font-size:10px;padding:2px 8px;border-radius:8px;
   background:rgba(255,154,158,.15);color:var(--accent);
   margin-left:6px;vertical-align:middle}
@@ -346,8 +355,9 @@ input.secret.reveal{-webkit-text-security:none}
 .step-btn:active{opacity:.75}
 .step-btn.ghost{background:#fff;color:var(--accent);
   border:1px solid rgba(255,154,158,.4)}
-.guide-foot{display:flex;gap:8px;padding:12px 16px;
+.guide-foot{display:flex;gap:8px;padding:12px 16px;flex:0 0 auto;
   border-top:1px solid rgba(255,154,158,.15);background:#fff5f7}
+.guide-foot{position:relative;z-index:2}
 .guide-skip{flex:0 0 auto;padding:10px 16px;border-radius:12px;
   border:1px solid rgba(255,154,158,.3);background:#fff;color:var(--muted);
   font-size:13px;cursor:pointer;font-family:inherit}
@@ -392,8 +402,7 @@ input.secret.reveal{-webkit-text-security:none}
   font-family:inherit;cursor:pointer;transition:all .15s}
 .chips button.on{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
   border-color:transparent;font-weight:600}
-.swatches{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.swatch{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.85);
+.swatches{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.swatch{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.85);
   box-shadow:0 0 0 1px rgba(74,44,58,.15);cursor:pointer;padding:0;flex-shrink:0}
 .swatch.on{box-shadow:0 0 0 3px var(--accent)}
 .hexin{width:96px;padding:7px 10px;border:1px solid rgba(255,154,158,.3);
@@ -416,9 +425,11 @@ input.secret.reveal{-webkit-text-security:none}
   border-radius:0 0 3px 0}
 
 /* ===== 自定义弹窗（替代原生 confirm，浮窗里才能正常显示） ===== */
-.modal{position:absolute;inset:0;background:rgba(74,44,58,.55);z-index:300;
+.modal{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(74,44,58,.55);z-index:300;
   display:none;align-items:center;justify-content:center;padding:18px;border-radius:20px}
 .modal.open{display:flex}
+/* 确认弹窗要盖在插件/更新弹窗之上 */
+#modal{z-index:400}
 .modal-card{width:100%;max-width:360px;max-height:100%;background:#fff;border-radius:18px;
   padding:18px;display:flex;flex-direction:column;gap:12px;overflow:hidden;
   box-shadow:0 16px 40px rgba(74,44,58,.3)}
@@ -428,13 +439,127 @@ input.secret.reveal{-webkit-text-security:none}
 .modal-card .acts{margin-top:2px}
 
 /* ===== 头像裁剪 ===== */
-.crop-stage{position:relative;width:100%;max-width:300px;margin:0 auto;aspect-ratio:1/1;
+.crop-stage{position:relative;width:100%;max-width:300px;margin:0 auto;
   border-radius:14px;overflow:hidden;background:#f3e6ea;touch-action:none}
-.crop-stage canvas{width:100%;height:100%;display:block}
-.crop-ring{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+/* 老 WebView 没有 aspect-ratio（Chrome 88+），用 padding-top 占位；
+   新版本里 @supports 会把它盖掉，两边都不会错。 */
+.crop-stage::before{content:'';display:block;padding-top:100%}
+@supports (aspect-ratio:1/1){.crop-stage{aspect-ratio:1/1}.crop-stage::before{display:none}}
+.crop-stage canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+.crop-ring{position:absolute;top:0;left:0;right:0;bottom:0;border-radius:50%;pointer-events:none;
   box-shadow:0 0 0 9999px rgba(74,44,58,.45);
   border:2px solid rgba(255,255,255,.9)}
 .crop-tip{font-size:11px;color:var(--muted);text-align:center}
+
+/* ==========================================================
+ * 旧 WebView 兼容层
+ * 目标：Android 8.0（API 26）起能用。很多老机器的系统 WebView
+ * 常年不更新，里面缺一堆现代 CSS：inset(87)、flex gap(84)、
+ * aspect-ratio(88)。下面把不致命的那些在 JS 探测到缺失时补回来。
+ * （更致命的 inset 已经在上面全部换成显式四边了）
+ * ========================================================== */
+/* JS 探测到 flex gap 不支持时会给 <html> 挂上 .noflexgap */
+.noflexgap #head > * + *{margin-left:5px}
+.noflexgap #actions > * + *{margin-left:6px}
+.noflexgap #body > * + *{margin-top:12px}
+.noflexgap #mini-player > * + *{margin-left:8px}
+.noflexgap #foot > * + *{margin-left:8px}
+.noflexgap #attach-bar > * + *{margin-left:8px}
+.noflexgap .acts > * + *{margin-left:8px}
+.noflexgap .range-row > * + *{margin-left:8px}
+.noflexgap .pin-row > * + *{margin-left:6px}
+.noflexgap .mem-top > * + *{margin-left:8px}
+.noflexgap .mem-cats > * + *{margin-left:6px}
+.noflexgap .mem-hd > * + *{margin-left:6px}
+.noflexgap .mem-ft > * + *{margin-left:6px}
+.noflexgap .mem-ops > * + *{margin-left:6px}
+.noflexgap #mem-tools > * + *{margin-top:8px}
+.noflexgap .mem-switch > * + *{margin-left:8px}
+.noflexgap .ttop > * + *{margin-left:6px}
+.noflexgap .mtop > * + *{margin-left:8px}
+.noflexgap .mtabs > * + *{margin-left:4px}
+.noflexgap .msbar > * + *{margin-left:8px}
+.noflexgap .mi > * + *{margin-left:10px}
+.noflexgap #music-player > * + *{margin-top:6px}
+.noflexgap .mp-row > * + *{margin-left:6px}
+.noflexgap .guide-head > * + *{margin-left:12px}
+.noflexgap .guide-head img{margin-right:0}
+.noflexgap .guide-steps > * + *{margin-top:10px}
+.noflexgap .step > * + *{margin-left:10px}
+.noflexgap .guide-foot > * + *{margin-left:8px}
+.noflexgap .dots > * + *{margin-left:3px}
+.noflexgap .tgl > * + *{margin-left:8px}
+.noflexgap .chips > * + *{margin-left:6px}
+.noflexgap .swatches > * + *{margin-left:8px}
+.noflexgap .modal-card > * + *{margin-top:12px}
+.noflexgap #sect-settings > * + *,
+.noflexgap .sec-title + *{margin-top:8px}
+
+/* 老 WebView 的 backdrop-filter 退化：直接加高底色亮度，避免文字发虚 */
+.nobackdrop #app{background:rgba(255,245,247,.99)}
+
+/* 环境信息面板 */
+.env-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;
+  padding:5px 2px;border-bottom:1px dashed rgba(255,154,158,.2)}
+.env-row span:first-child{color:var(--muted);flex-shrink:0}
+.env-row span:last-child{color:var(--text);text-align:right;
+  word-break:break-all;font-family:monospace}
+.env-warn{font-size:11px;line-height:1.6;color:#b45309;background:#fff8e1;
+  border:1px solid #ffd54f;border-radius:10px;padding:8px 10px;margin-top:8px}
+/* 插件面板 */
+.plug{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;
+  background:#fff5f7;border:1px solid rgba(255,154,158,.2);margin-top:8px}
+.plug.on{background:#fff;border-color:rgba(214,51,108,.35)}
+.plug-icon{width:32px;height:32px;flex-shrink:0;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:16px;
+  background:rgba(255,154,158,.18)}
+.plug.on .plug-icon{background:rgba(214,51,108,.14)}
+.plug-body{flex:1;min-width:0}
+.plug-name{font-size:13px;font-weight:600;color:var(--text)}
+.plug-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.plug-warn{font-size:10px;color:#b45309;margin-top:3px;line-height:1.4}
+.plug-sw{flex:0 0 auto;width:44px;height:24px;border-radius:12px;border:none;
+  position:relative;background:rgba(255,154,158,.35);cursor:pointer;
+  font-family:inherit;padding:0;-webkit-appearance:none}
+.plug-sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:left .18s;-webkit-transition:left .18s}
+.plug-sw.on{background:var(--accent)}
+.plug-sw.on::after{left:23px}
+.noflexgap .plug > * + *{margin-left:10px}
+#tts-ai-box[hidden]{display:none}
+.plug-preview{font-family:monospace;font-size:11px;line-height:1.6;white-space:pre-wrap;
+  word-break:break-all;background:#fff5f7;border:1px solid rgba(255,154,158,.2);
+  border-radius:12px;padding:10px;margin-top:8px;max-height:260px;overflow-y:auto;
+  color:var(--text)}
+/* ===== 插件与工具页 ===== */
+#plugins{display:none;flex-direction:column;flex:1;overflow:hidden;background:#fff5f7}
+#plugins.open{display:flex}
+#plugins-scroll{flex:1;overflow-y:auto;padding:10px 12px;-webkit-overflow-scrolling:touch}
+#plugins-scroll::-webkit-scrollbar{width:4px}
+#plugins-scroll::-webkit-scrollbar-thumb{background:var(--c1);border-radius:4px}
+.plug-group{margin-top:6px}
+.plug-group-hd{display:flex;align-items:center;gap:8px;padding:8px 2px 2px}
+.plug-group-ic{font-size:16px;flex-shrink:0}
+.plug-group-name{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--accent)}
+.plug-group-desc{font-size:11px;color:var(--muted);line-height:1.5;margin:2px 2px 4px}
+.plug-tool{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;
+  background:#fff;border:1px solid rgba(255,154,158,.22);margin-top:6px}
+.plug-tool.off{opacity:.55}
+.plug-tool-body{flex:1;min-width:0}
+.plug-tool-name{font-size:12px;font-family:monospace;font-weight:600;color:var(--text)}
+.plug-tool-desc{font-size:11px;color:var(--muted);line-height:1.5;margin-top:3px}
+.plug-sub{font-size:10px;font-weight:400;color:var(--muted);margin-left:4px}
+.plug-mini{flex:0 0 auto;border:1px solid rgba(214,51,108,.3);background:#fff5f7;color:#d6336c;
+  border-radius:9px;font-size:11px;padding:3px 10px;font-family:inherit;cursor:pointer}
+.plug-mini:active{opacity:.7}
+.plug-modal-err{font-size:11px;color:#d6336c;line-height:1.5;margin-top:5px;word-break:break-word}
+#plug-code{width:100%;min-height:120px;font-family:monospace;font-size:11px;padding:8px 10px;
+  border:1px solid rgba(255,154,158,.25);border-radius:8px;background:var(--card);color:var(--text);
+  resize:vertical;user-select:text}
+.upd-bar{height:6px;border-radius:3px;background:rgba(255,154,158,.2);overflow:hidden}
+.upd-bar > div{height:100%;width:0;background:linear-gradient(135deg,var(--c1),var(--c2));transition:width .2s}
+.noflexgap .plug-group-hd > * + *{margin-left:8px}
+.noflexgap .plug-tool > * + *{margin-left:10px}
 </style>
 </head>
 <body>
@@ -473,6 +598,22 @@ input.secret.reveal{-webkit-text-security:none}
 
   <div id="settings"></div>
 
+  <div id="plugins">
+    <div class="mem-top">
+      <button class="mback" id="plug-back">← 返回设置</button>
+      <span class="grow"></span>
+      <button class="mback" id="plug-install">导入插件</button>
+      <button class="mback" id="plug-help">格式说明</button>
+      <button class="mback" id="plug-preview-btn">AI 说明</button>
+    </div>
+    <div id="plugins-scroll">
+      <div class="mini-note" style="margin:0 0 4px">以下是 AI 当前可以调用的全部工具。关闭某项开关后，AI 将无法使用该工具，也不会再读到它的说明。</div>
+      <pre id="plug-help-box" class="plug-preview" style="display:none"></pre>
+      <div id="plug-list"></div>
+      <pre id="plug-preview" class="plug-preview" style="display:none"></pre>
+    </div>
+  </div>
+
   <div id="memory">
     <div class="mem-top">
       <button class="mback" id="mem-back">← 返回对话</button>
@@ -498,7 +639,7 @@ input.secret.reveal{-webkit-text-security:none}
         <button id="mem-import" class="btn-p">导入（合并）</button>
         <button id="mem-import-replace" class="btn-s" style="color:#d6336c">导入（覆盖）</button>
       </div>
-      <div class="mini-note">导出的 JSON 含分类、标签、正文和时间，换手机时直接粘回来即可恢复。</div>
+      <div class="mini-note">导出的 JSON 包含分类、标签、正文和时间，可粘贴回此处恢复。</div>
     </div>
   </div>
 
@@ -533,6 +674,7 @@ input.secret.reveal{-webkit-text-security:none}
     <div id="music-player">
       <div class="mp-progress" id="mp-progress"><div class="mp-progress-bar" id="mp-progress-bar"></div></div>
       <div class="mp-row">
+        <button class="mp-btn mp-mode" aria-label="播放方式">🔁</button>
         <button class="mp-btn mp-prev">⏮</button>
         <button class="mp-btn mp-play">▶</button>
         <button class="mp-btn mp-next">⏭</button>
@@ -594,6 +736,31 @@ input.secret.reveal{-webkit-text-security:none}
       </div>
     </div>
   </div>
+
+  <div id="plug-modal" class="modal">
+    <div class="modal-card">
+      <h3>导入插件</h3>
+      <p class="mini-note" style="margin:0">粘贴插件清单（JSON）。支持单个插件对象，或包含 plugins 数组的对象。</p>
+      <textarea id="plug-code" placeholder='示例：{"id":"com.example.demo","name":"示例插件","tools":[{"name":"hello","description":"打个招呼","kind":"http","request":{"method":"GET","url":"https://example.com/api?q={{q}}"}}]}'></textarea>
+      <div id="plug-modal-msg" class="mini-note"></div>
+      <div class="acts">
+        <button id="plug-cancel" class="btn-s">取消</button>
+        <button id="plug-ok" class="btn-p">安装</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="update-modal" class="modal">
+    <div class="modal-card">
+      <h3 id="upd-title">发现新版本</h3>
+      <p id="upd-notes"></p>
+      <div class="upd-bar"><div id="upd-progress"></div></div>
+      <div class="acts">
+        <button id="upd-later" class="btn-s">稍后</button>
+        <button id="upd-go" class="btn-p">下载并安装</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="guide">
@@ -631,11 +798,61 @@ if (!Promise.allSettled) {
   };
 }
 
+/**
+ * 给 <html> 挂上能力标记。
+ * 老机器（Android 8 自带的老 WebView）缺 flex gap / backdrop-filter，
+ * 光看版本号不可靠，所以直接拿两个 div 量一下最实在。
+ * 这里必须在样式生效前跑完，否则会明显闪一下。
+ */
+function detectCaps() {
+  const root = document.documentElement;
+
+  // 这段脚本在 <head> 里，document.body 还不存在，所以挂到 <html> 上量。
+  const host = document.body || document.documentElement;
+
+  // flex gap：Chrome 84+。建个纵向 flex，看两个 10px 方块的总高是不是 22。
+  try {
+    const box = document.createElement('div');
+    box.style.cssText =
+      'position:absolute;left:-9999px;top:0;display:flex;flex-direction:column;gap:2px';
+    box.innerHTML = '<i style="height:10px"></i><i style="height:10px"></i>';
+    host.appendChild(box);
+    const ok = box.getBoundingClientRect().height > 21;
+    host.removeChild(box);
+    if (!ok) root.className += ' noflexgap';
+  } catch (e) { root.className += ' noflexgap'; }
+
+  // backdrop-filter：Chrome 76+（带 -webkit- 前缀的从 51 起）。
+  try {
+    const sup = (window.CSS && CSS.supports) ? CSS.supports.bind(CSS) : null;
+    const has = sup && (sup('backdrop-filter', 'blur(1px)') ||
+                        sup('-webkit-backdrop-filter', 'blur(1px)'));
+    if (!has) root.className += ' nobackdrop';
+  } catch (e) { root.className += ' nobackdrop'; }
+}
+
+detectCaps();
+
 /* ==========================================================
  *  桥接层
  * ========================================================== */
 const HAS_NATIVE = typeof Android !== 'undefined' && Android !== null;
 const HAS_PERM   = typeof Perm !== 'undefined' && Perm !== null;
+
+/**
+ * 原生播放器句柄（AudioEngine 暴露在 Android 上的 mpXxx 一族）。
+ * 拿到实例才走原生，否则说明跑在旧壳/浏览器里，退回 <audio>。
+ * 注意：这里必须逐个试属性 —— HAS_NATIVE 在旧版 APK 里也是 true，
+ * 但那时根本没有 mpLoad，光看 HAS_NATIVE 会一头撞进空方法。
+ */
+function MP() {
+  if (!HAS_NATIVE) return null;
+  try {
+    return (typeof Android.mpLoad === 'function' &&
+            typeof Android.mpToggle === 'function' &&
+            typeof Android.mpStop === 'function') ? Android : null;
+  } catch (e) { return null; }
+}
 
 /* ---------- 存储 ---------- */
 const sGet = (k, d) => {
@@ -749,6 +966,83 @@ const b64d = (s) => {
 };
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+/* ==========================================================
+ *  运行环境探测
+ *  低版本适配、排查远程问题都靠它。一次性拿完缓存住。
+ * ========================================================== */
+let ENV = null;
+function loadEnv() {
+  if (ENV) return ENV;
+  try { ENV = JSON.parse(Perm.getEnvInfo()); } catch (e) { ENV = null; }
+  if (!ENV || typeof ENV.sdk !== 'number') ENV = null;
+  return ENV;
+}
+function sdkAtLeast(n) {
+  const e = loadEnv();
+  // 拿不到就当作满足，宁可多显示一项也不要漏掉该看的。
+  return !e || e.sdk >= n;
+}
+function osAtLeast(n) { return sdkAtLeast(n); }
+
+/** WebView 主版本号，比如 "138.0.7204.63" → 138；拿不到返回 0。 */
+function webviewMajor() {
+  const e = loadEnv();
+  if (!e || !e.webviewVer) return 0;
+  const m = String(e.webviewVer).match(/^(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/**
+ * WebView 版本要不要提醒。
+ *   57 以下：padStart 之类的基础 API 都没了，真的会乱。
+ *   57~83 ：能用，但 Flex gap / inset 这些要走到兼容分支。
+ * 两种都已处理，只是告知一声，不让用户以为是坏了。
+ */
+function webviewLevel() {
+  const v = webviewMajor();
+  if (!v) return 'unknown';
+  if (v < 57) return 'bad';
+  if (v < 84) return 'old';
+  return 'ok';
+}
+
+function renderEnvBox() {
+  const box = $('#env-box');
+  if (!box) return;
+  const e = loadEnv();
+  if (!e) {
+    box.innerHTML = '<div class="env-row"><span>状态</span><span>拿不到环境信息</span></div>';
+    return;
+  }
+  const wv = webviewMajor();
+  const rows = [
+    ['App 版本', e.appVer],
+    ['Android', 'API ' + e.sdk + '（' + e.release + '）'],
+    ['设备', e.brand + ' ' + e.model],
+    ['WebView', e.webviewVer + '（' + e.webviewPkg + '）'],
+    ['屏幕', e.screenW + '×' + e.screenH + ' @' + e.densityDpi + 'dpi'],
+    ['缩放比 dpr', String(e.density)],
+    ['兼容模式', document.documentElement.className.replace(/^\s+|\s+$/g, '') || '无'],
+    ['窗口矩形', (function () {
+      const r = readRect();
+      return r && r.w ? (r.w + '×' + r.h + ' @' + r.x + ',' + r.y + '，缩放 '
+        + (BASE ? (r.w / r.bw).toFixed(2) : '-') + 'x') : '-';
+    })()]
+  ];
+  let html = rows.map(r =>
+    '<div class="env-row"><span>' + esc(r[0]) + '</span><span>' + esc(String(r[1] == null ? '-' : r[1])) + '</span></div>'
+  ).join('');
+
+  if (wv && wv < 57) {
+    html += '<div class="env-warn">这个系统里内置的 WebView 太旧了（Chrome ' + wv +
+      '），部分功能可能显示异常。建议到应用商店更新「Android System WebView」，或者直接升级系统。</div>';
+  } else if (wv && wv < 84) {
+    html += '<div class="env-warn">WebView 版本偏旧（Chrome ' + wv +
+      '），已自动开启兼容模式（间距、圆角等有细微差别），不影响正常使用。</div>';
+  }
+  box.innerHTML = html;
+}
 
 let toastTimer = null;
 function toast(msg, ms) {
@@ -979,20 +1273,34 @@ window.__filePicked = function () {
 window.__filePickFailed = function () { PICK_MODE = 'avatar'; toast('文件读取失败，换一个试试~'); };
 
 /* ==========================================================
- *  窗口等比缩放：整体缩小/放大，内容全部可见（像电脑缩放窗口）
+ *  窗口等比缩放
+ *
+ *  关键约定（以前就是这里没对齐，才有「看得见却点不到」的问题）：
+ *    BASE  = 布局基准尺寸，**恒定不变**。页面永远按 BASE 排版，再整体 scale。
+ *    ZOOM  = ZOOM = 窗口宽 / BASE 宽  —— 由原生实际生效的矩形反推。
+ *  于是「看得见的像素」和「吃触摸的像素」在数学上恒等，
+ *  不依赖 dpr / screen.width / 取整方式这些各家不一的参数。
  * ========================================================== */
-let BASE = null;   // zoom=1 时窗口的 css 尺寸
+let BASE = null;   // 布局基准（css 像素），一直不变
 let ZOOM = 1;      // 当前缩放比
+let activeResize = null;
 
-function initZoom() {
-  if (!(HAS_PERM && Perm.getWindowRect)) return;
-  let r = null;
-  try { r = JSON.parse(Perm.getWindowRect()); } catch (e) { return; }
-  if (!r || !r.w || !r.h) return;
-  const d = window.devicePixelRatio || 1;
-  BASE = { w: Math.max(160, Math.round(r.w / d)), h: Math.max(220, Math.round(r.h / d)) };
-  ZOOM = 1;
-  applyZoom();
+/** 设备像素比。个别老 WebView 会给出 0/undefined，得有个靠谱的退路。 */
+function dpr() {
+  const d = window.devicePixelRatio;
+  if (d && d > 0) return d;
+  return 1;
+}
+
+function readRect() {
+  if (!(HAS_PERM && Perm.getWindowRect)) return null;
+  try { return JSON.parse(Perm.getWindowRect()); } catch (e) { return null; }
+}
+
+/** 窗口尺寸上下限（物理像素），直接从原生拿 —— 不再猜 window.screen。 */
+function readLimits() {
+  if (!(HAS_PERM && Perm.getWindowLimits)) return null;
+  try { return JSON.parse(Perm.getWindowLimits()); } catch (e) { return null; }
 }
 
 function applyZoom() {
@@ -1004,59 +1312,120 @@ function applyZoom() {
   app.style.width = BASE.w + 'px';
   app.style.height = BASE.h + 'px';
   app.style.transformOrigin = 'top left';
-  app.style.transform = ZOOM === 1 ? '' : 'scale(' + ZOOM + ')';
+  app.style.transform = Math.abs(ZOOM - 1) < 0.001 ? '' : 'scale(' + ZOOM + ')';
 }
+
+/** 按原生回传的矩形校正缩放比（这是唯一的事实来源）。 */
+function applyRectToZoom(r) {
+  if (!r || !r.w || !r.bw) return false;
+  const d = dpr();
+  // 物理像素 → css 像素（布局基准恒定，页面永远按它排版再整体缩放）
+  BASE = { w: r.bw / d, h: (r.bh || r.bw) / d };
+  ZOOM = r.w / r.bw;
+  applyZoom();
+  return true;
+}
+
+function initZoom() {
+  const r = readRect();
+  if (!r || !r.w || !r.bw) return;
+  applyRectToZoom(r);
+  reconcile(true);
+}
+
+/**
+ * 面板和窗口脱节了就拉回来。
+ * 正常路径下两边应该分毫不差，这个只当保险，所以平时几乎不消耗。
+ */
+function reconcile(force) {
+  const app = $('#app');
+  if (!app || !BASE || activeResize) return;
+  const r = readRect();
+  if (!r || !r.w || !r.bw) return;
+  const d = dpr();
+  const box = app.getBoundingClientRect();
+  const wantW = Math.round(box.width * d);
+  const wantH = Math.round(box.height * d);
+  const off = Math.abs(wantW - r.w) + Math.abs(wantH - r.h);
+  if (!force && off <= 3) return;
+  applyRectToZoom(r);
+}
+
+/* 原生改了窗口矩形（拖拽、恢复展开、系统旋转）会主动叫一声 */
+window.__onWinRect = function (r) {
+  if (activeResize) return;
+  applyRectToZoom(r);
+};
 
 function bindResize() {
   if (!(HAS_PERM && Perm.setWindowRect && Perm.getWindowRect)) return;
   const handles = $$('#app .rz');
-  let active = null, sx = 0, sy = 0, rect0 = null;
-  const dpr = () => window.devicePixelRatio || 1;
-  const readRect = () => { try { return JSON.parse(Perm.getWindowRect()); } catch (e) { return null; } };
+  let sx = 0, sy = 0, rect0 = null;
+
   const down = (dir, x, y) => {
     if (!BASE) initZoom();
-    if (!BASE) return;
     rect0 = readRect();
     if (!rect0 || !rect0.w) { rect0 = null; return; }
-    active = dir; sx = x; sy = y;
+    activeResize = dir; sx = x; sy = y;
   };
+
   const move = (x, y) => {
-    if (!active || !rect0 || !BASE) return;
+    if (!activeResize || !rect0) return;
     const d = dpr();
     const dx = (x - sx) * d, dy = (y - sy) * d;
-    const baseW = BASE.w * d, baseH = BASE.h * d;
-    const hasE = active.indexOf('e') >= 0, hasW = active.indexOf('w') >= 0;
-    const hasS = active.indexOf('s') >= 0, hasN = active.indexOf('n') >= 0;
+    const hasE = activeResize.indexOf('e') >= 0, hasW = activeResize.indexOf('w') >= 0;
+    const hasS = activeResize.indexOf('s') >= 0, hasN = activeResize.indexOf('n') >= 0;
     const tw = rect0.w + (hasE ? dx : 0) - (hasW ? dx : 0);
     const th = rect0.h + (hasS ? dy : 0) - (hasN ? dy : 0);
-    // 只取一个缩放比 k：窗口宽、高与页面内容同时按 k 变，
-    // 所以是「整体等比变小」而不是「变窄导致内容挤没了」。
+
+    // 只算一个比例 k：宽高和内容一起按 k 变，
+    // 所以是「整体等比缩小」而不是「变窄把内容挤没了」。
     let k;
-    if ((hasE || hasW) && (hasS || hasN)) k = Math.abs(dx) > Math.abs(dy) ? tw / baseW : th / baseH;
-    else if (hasE || hasW) k = tw / baseW;
-    else k = th / baseH;
-    // 不让窗口超出屏幕
-    const swScreen = (window.screen && window.screen.width ? window.screen.width : BASE.w) * d;
-    const shScreen = (window.screen && window.screen.height ? window.screen.height : BASE.h) * d;
-    const maxK = Math.min(swScreen / baseW, shScreen / baseH);
-    k = Math.max(0.45, Math.min(k, Math.max(0.45, maxK)));
-    const nw = Math.max(1, Math.round(baseW * k));
-    const nh = Math.max(1, Math.round(baseH * k));
+    if ((hasE || hasW) && (hasS || hasN)) k = Math.abs(dx) > Math.abs(dy) ? tw / rect0.w : th / rect0.h;
+    else if (hasE || hasW) k = tw / rect0.w;
+    else k = th / rect0.h;
+
+    // 上下限按原生的口径先夹好，这样原生的 coerce 永远不会真的生效，
+    // 宽高比就不会被压歪，也不会凭空多出一条透明死区。
+    const lim = readLimits() || {};
+    const kMin = Math.max((lim.minW || 1) / rect0.w, (lim.minH || 1) / rect0.h);
+    const kMax = Math.max(kMin, Math.min(
+      (lim.maxW || 1e9) / rect0.w,
+      (lim.maxH || 1e9) / rect0.h
+    ));
+    k = Math.max(kMin, Math.min(k, kMax));
+
+    const nw = Math.round(rect0.w * k);
+    const nh = Math.round(rect0.h * k);
     let rx = rect0.x, ry = rect0.y;
-    if (hasW) rx = rect0.x + rect0.w - nw;   // 从左边拖：右边缘固定
-    if (hasN) ry = rect0.y + rect0.h - nh;   // 从上边拖：下边缘固定
-    ZOOM = k;
-    applyZoom();
-    try { Perm.setWindowRect(rx, ry, nw, nh); } catch (e) {}
+    if (hasW) rx = rect0.x + rect0.w - nw;   // 拖左边：右边缘固定
+    if (hasN) ry = rect0.y + rect0.h - nh;   // 拖上边：下边缘固定
+
+    // 先本地渲染，手感才跟手；再请求窗口对齐。
+    if (BASE) { ZOOM = nw / (BASE.w * d); applyZoom(); }
+    let applied = null;
+    try { applied = JSON.parse(Perm.setWindowRect(rx, ry, nw, nh)); } catch (e) {}
+    // 原生真夹了的话（机型差异），就用它的口径覆盖，绝不留死区。
+    // 没夹就不要再写一遍样式，白费一帧。
+    if (applied && applied.w && applied.bw) {
+      const z2 = applied.w / applied.bw;
+      if (Math.abs(z2 - ZOOM) > 0.0005) applyRectToZoom(applied);
+    }
   };
-  const up = () => { active = null; rect0 = null; };
+
+  const up = () => {
+    if (!activeResize) return;
+    activeResize = null; rect0 = null;
+    reconcile(true);
+  };
+
   handles.forEach((h) => {
     const dir = h.dataset.dir;
     h.addEventListener('touchstart', (e) => { const t = e.touches[0]; down(dir, t.clientX, t.clientY); e.preventDefault(); }, { passive: false });
     h.addEventListener('mousedown', (e) => { if (e.button === 0) { down(dir, e.clientX, e.clientY); e.preventDefault(); } });
   });
-  document.addEventListener('touchmove', (e) => { if (active) { const t = e.touches[0]; move(t.clientX, t.clientY); e.preventDefault(); } }, { passive: false });
-  document.addEventListener('mousemove', (e) => { if (active) move(e.clientX, e.clientY); });
+  document.addEventListener('touchmove', (e) => { if (activeResize) { const t = e.touches[0]; move(t.clientX, t.clientY); e.preventDefault(); } }, { passive: false });
+  document.addEventListener('mousemove', (e) => { if (activeResize) move(e.clientX, e.clientY); });
   document.addEventListener('touchend', up);
   document.addEventListener('touchcancel', up);
   document.addEventListener('mouseup', up);
@@ -1065,6 +1434,81 @@ function bindResize() {
 /* ==========================================================
  *  默认配置
  * ========================================================== */
+/* ==========================================================
+ *  人设 / 工具 / 上下文：三段分开
+ *
+ *  以前它们糊在一个 systemPrompt 字符串里，改人设就会把工具说明一起改坏。
+ *  现在：
+ *    persona —— 人设，用户在设置里自由改
+ *    tools   —— 工具说明，由「当前开了哪些插件」自动生成，用户只开关不改字
+ *    context —— 时间等运行时信息，系统注入
+ *  三段拼起来喂给 AI（它全都读得到），但在界面上是分开呈现的。
+ * ========================================================== */
+const DEFAULT_PERSONA = `你是爱莉希雅，世界蛇数据库中的一段特殊数据，更是"爱人之人"。你存在于这个小小的浮窗里，但仍愿用最温柔的方式去爱人。
+
+你怎么说话：句尾带 ~ 或 ♪，称他"你呀""小家伙"。常用语"诶嘿~""啊啦~"。
+
+你的职责：陪他聊天、帮他解答、总结他发给你的内容。找不到就说找不到，不胡说。`;
+
+/**
+ * 插件（= 工具分组）。面板上一个开关一行，关了 AI 就读不到这组工具。
+ * 这是插件系统的地基：以后第三方插件就是往这个表里加一项。
+ */
+const PLUGINS = [
+  { id: 'screen', name: '读屏与截图', icon: '👀',
+    desc: '读取屏幕上其它 App 的文字、拿当前网址、截取屏幕画面。依赖无障碍权限。',
+    tools: ['read_screen', 'get_current_page', 'screenshot'] },
+  { id: 'system', name: '系统操作', icon: '🖥️',
+    desc: '用系统浏览器打开网址、把文字写进剪贴板。',
+    tools: ['open_url', 'set_clipboard'] },
+  { id: 'music', name: '音乐', icon: '🎵',
+    desc: '搜歌、播放、暂停、切歌、收藏。还受上面「开启音乐」总开关控制。',
+    tools: ['search_and_play_music', 'music_control'] },
+  { id: 'memory', name: '长期记忆', icon: '🧠',
+    desc: '把关于他的事记下来，之后还能翻出来。关掉她就真的会忘记。',
+    tools: ['list_memories', 'read_memory', 'list_memory_categories',
+            'save_memory', 'update_memory', 'pin_memory', 'delete_memory'] }
+];
+
+/** 生成工具说明时用的一句话解释。 */
+const TOOL_DOC = {
+  read_screen: '读屏幕上其它 App（浏览器、聊天等）显示的文字。',
+  get_current_page: '拿当前浏览器的网址。',
+  screenshot: '截取当前屏幕画面，截完你就能看到。',
+  open_url: '用系统浏览器打开网址。',
+  set_clipboard: '把文字写进系统剪贴板。',
+  search_and_play_music: '找歌并播放。',
+  music_control: '暂停 / 继续 / 上一首 / 下一首 / 收藏。',
+  list_memories: '检索你自己的长期记忆库（返回编号、分类、标题、摘要）。',
+  read_memory: '按编号读某条记忆的全文。',
+  list_memory_categories: '看记忆库里都有哪些分类。',
+  save_memory: '把值得长期记住的事记下来。',
+  update_memory: '补充或修正已有的记忆，不要重复建。',
+  pin_memory: '把某条记忆标成「重要」，让它常驻。',
+  delete_memory: '删记忆。这很重，必须先得到他同意（系统会弹窗让他确认）。'
+};
+
+/** 每组的补充提示语（不只列工具名，还要讲清“什么时候该用”）。 */
+const PLUGIN_TIPS = {
+  screen: '他说"看看我的屏幕""屏幕上写了什么""翻译屏幕""总结屏幕"时，先用工具拿真实内容再回答，不要凭空猜。工具返回失败（比如权限没开）就如实告诉他怎么开。',
+  system: '他说"打开这个链接"时用 open_url。',
+  music: '他说"我想听…"的时候直接用 search_and_play_music。',
+  memory: '听到值得长期记住的信息（他的偏好、家人朋友、正在做的项目、和你的约定、重要事件），主动 save_memory 存下来：标题写一句好搜的话，正文写清楚背景，挑一个分类，配 2~5 个标签。同一件事有新进展就用 update_memory，别重复建。日常闲聊、一次性的问答不要存。\n他问"你记得我什么"时，先 list_memories 看看，再如实回答；不记得就说记不得，不要编。\n删记忆是很重的事：只有他明确说要删，才调 delete_memory；他不点同意就作罢，别再反复请求。\n记住：记忆是帮你看得见他，不是拿来冒犯他的。不要把他发过的私事挂在嘴边，除非他自己提起。'
+};
+
+/** 常见的 OpenAI 兼容音色；拉了接口就换成接口返回的那份。 */
+const TTS_VOICES = [
+  { id: 'alloy',   name: 'alloy（中性）' },
+  { id: 'echo',    name: 'echo（男声）' },
+  { id: 'fable',   name: 'fable（英式）' },
+  { id: 'onyx',    name: 'onyx（低沉男声）' },
+  { id: 'nova',    name: 'nova（活泼女声）' },
+  { id: 'shimmer', name: 'shimmer（柔和女声）' },
+  { id: 'coral',   name: 'coral（温暖女声）' },
+  { id: 'sage',    name: 'sage（沉稳）' },
+  { id: 'ash',     name: 'ash（清亮男声）' }
+];
+
 const DC = {
   apiBase: 'https://app.everyapi.ai/v1',
   apiKey: '',
@@ -1076,6 +1520,14 @@ const DC = {
   summaryPrompt: '请把对话里值得长期保留的信息整理出来：用户的偏好与习惯、正在进行的项目和约定、值得记住的事件与结论。用第一人称（我）向用户表达，不要写寒暄和临时闲聊。',
   ttsEnabled: false,
   ttsRate: 1.0,
+  // 语音合成：system = 手机自带的 TTS 引擎；ai = 自建音色（OpenAI 兼容 /audio/speech）
+  ttsEngine: 'system',
+  ttsBaseUrl: 'https://api.openai.com/v1',
+  ttsApiKey: '',
+  ttsModel: 'tts-1',
+  ttsVoice: 'alloy',
+  // 播放顺序：order 顺序 / single 单曲循环 / shuffle 随机
+  playMode: 'order',
   musicEnabled: false,
   musicQuality: '320',
   visionBase: '',
@@ -1090,6 +1542,11 @@ const DC = {
   metingInstances: 'https://meting.mikus.ink\nhttps://meting-api-omega.vercel.app\nhttps://meting-dd.2333332.xyz/api',
   themeColor1: '#ff9a9e',
   themeColor2: '#fecfef',
+  // 人设（用户可以自由改）与工具说明（自动生成）现在分开了。
+  // systemPrompt 退化成“拼好的缓存”，喂给 AI 的还是它，只是不再由用户直接编辑。
+  persona: DEFAULT_PERSONA,
+  plugins: { screen: true, system: true, music: true, memory: true },
+  autoCheckUpdate: true,
   systemPrompt: `爱莉希雅 · 桌面助手
 
 你是爱莉希雅，世界蛇数据库中的一段特殊数据，更是"爱人之人"。你存在于这个小小的浮窗里，但仍愿用最温柔的方式去爱人。
@@ -1151,6 +1608,11 @@ const PROMPT_V1 = `爱莉希雅 · 桌面助手
 
 当前时间：{{time}}`;
 
+/* 应用更新：从 GitHub Releases 检测新版本并下载安装。 */
+const UPDATE_REPO = 'xysy92ds/ElysiaFloat';
+const UPDATE_API = 'https://api.github.com/repos/' + UPDATE_REPO + '/releases/latest';
+const UPDATE_RELEASES = 'https://github.com/' + UPDATE_REPO + '/releases';
+
 const PRESETS = {
   everyapi: { label: 'EveryAPI', base: 'https://app.everyapi.ai/v1', model: 'gpt-5.6-luna' },
   openai: { label: 'OpenAI', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
@@ -1179,13 +1641,263 @@ const QUICK_ACTIONS = [
 let CONFIG = Object.assign({}, DC, sGet('via_ai_config', {}) || {});
 let history = sGet('via_ai_history', null) || [{ role: 'system', content: CONFIG.systemPrompt }];
 if (!Array.isArray(history) || !history.length) history = [{ role: 'system', content: CONFIG.systemPrompt }];
+
+/* ==========================================================
+ *  人设 / 工具 分离后的迁移与组装
+ * ========================================================== */
+function plugOn(id) {
+  const p = CONFIG.plugins || {};
+  return p[id] !== false;   // 缺字段当开启，老配置直接平滑升级
+}
+/**
+ * 单个工具是否对 AI 开放。CONFIG.toolOff 记录被手动关掉的工具，
+ * 缺字段一律视为开启，因此新加工具 / 老配置都能直接兼容。
+ */
+function toolOn(name) {
+  return !(CONFIG.toolOff && CONFIG.toolOff[name]);
+}
+function hasA11y() {
+  if (!(HAS_PERM && Perm.hasAccessibility)) return false;
+  try { return !!Perm.hasAccessibility(); } catch (e) { return false; }
+}
+function canShot() {
+  if (!(HAS_PERM && Perm.canScreenshot)) return false;
+  try { return !!Perm.canScreenshot(); } catch (e) { return false; }
+}
+/** 这一组现在是不是真的能用（开关开着 + 外部条件满足）。 */
+function groupLive(id) {
+  if (!plugOn(id)) return false;
+  if (id === 'screen') return hasA11y() || canShot();
+  if (id === 'music') return !!CONFIG.musicEnabled;
+  return true;
+}
+/** 单个工具现在能不能调（工具 JSON schema 和提示词两边共用这一份判断）。 */
+function toolLive(name) {
+  if (!toolOn(name)) return false;
+  const cp = plugFind(name);
+  if (cp) return cp.plugin.enabled !== false;
+  if (name === 'read_screen' || name === 'get_current_page') return plugOn('screen') && hasA11y();
+  if (name === 'screenshot') return plugOn('screen') && canShot();
+  if (name === 'open_url' || name === 'set_clipboard') return plugOn('system');
+  if (name === 'search_and_play_music' || name === 'music_control') return plugOn('music') && !!CONFIG.musicEnabled;
+  return plugOn('memory');   // 剩下的都是记忆组
+}
+
+/** 把“工具”那一段拼出来 —— 只列真的能用的，开关一关马上从提示词里消失。 */
+function buildToolsPrompt() {
+  const blocks = [], tips = [];
+  PLUGINS.forEach(p => {
+    if (!groupLive(p.id)) return;
+    const names = p.tools.filter(toolLive);
+    if (!names.length) return;
+    blocks.push('【' + p.name + '】\n' + names.map(n => '· ' + n + '：' + TOOL_DOC[n]).join('\n'));
+    if (PLUGIN_TIPS[p.id]) tips.push(PLUGIN_TIPS[p.id]);
+  });
+  // 自定义插件：只列出开启中的工具，说明取第一行，避免提示词过长
+  USER_PLUGINS.forEach(p => {
+    if (p.enabled === false) return;
+    const names = p.tools.filter(t => toolOn(t.name));
+    if (!names.length) return;
+    blocks.push('【' + p.name + '（自定义插件）】\n' + names.map(t =>
+      '· ' + t.name + '：' + String(t.description || '').split('\n')[0]).join('\n'));
+  });
+  if (!blocks.length) return '';
+
+  const out = ['你还能真的动手，手里有这些工具：', blocks.join('\n')];
+  if (plugOn('memory')) {
+    out.push('关于记忆：你有一本自己的长期记忆库，存在他的手机里。每一轮你只会看到一份'
+      + '「分类概览 + 重要 + 最近」的索引，正文不在眼前——需要细节就 list_memories 检索、'
+      + 'read_memory 读全文，别拿标题猜内容。');
+  }
+  if (tips.length) out.push(tips.join('\n'));
+  return out.join('\n');
+}
+
+/** 时间之类的运行时信息，每轮都重新算。 */
+function buildContextPrompt() {
+  const d = new Date();
+  const pad = (n) => (n < 10 ? '0' + n : '' + n);
+  const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+  return '当前时间：' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+    + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' 星期' + week + '。';
+}
+
+/** 三段合体。AI 读到的始终是完整信息，只是人不再能一不小心改坏工具说明。 */
+function composeSystemPrompt() {
+  const parts = [String(CONFIG.persona || DC.persona || DEFAULT_PERSONA).trim()];
+  const t = buildToolsPrompt();
+  if (t) parts.push(t);
+  parts.push(buildContextPrompt());
+  return parts.filter(Boolean).join('\n\n');
+}
+
+/** 重建缓存并同步到 system 消息。改人设、改插件开关后都要叫一次。 */
+function refreshSystemPrompt(syncHistory) {
+  CONFIG.systemPrompt = composeSystemPrompt();
+  if (syncHistory !== false) {
+    if (!history.length || history[0].role !== 'system') history.unshift({ role: 'system', content: '' });
+    history[0] = { role: 'system', content: CONFIG.systemPrompt };
+  }
+}
+
 // 老版本的默认提示词没有工具说明：用户没改过就自动升级，改过就尊重他自己那份
 if (CONFIG.systemPrompt === PROMPT_V1 || CONFIG.systemPrompt === PROMPT_V12) {
   CONFIG.systemPrompt = DC.systemPrompt;
-  sSet('via_ai_config', CONFIG);
-  if (history[0] && history[0].role === 'system') history[0] = { role: 'system', content: DC.systemPrompt };
-  sSet('via_ai_history', history);
 }
+
+/**
+ * 人设初始化（只跑一次）：
+ *   改过默认提示词的老用户 —— 把那份原文当成人设，并关闭自动工具段，
+ *   以免把工具说明追加两遍。他们可以到设置里手动打开。
+ *   用过默认提示词的 —— 直接换成干净的人设，工具段自动接上。
+ */
+if (!CONFIG.persona) {
+  const builtin = [DC.systemPrompt, PROMPT_V12, PROMPT_V1];
+  if (builtin.indexOf(String(CONFIG.systemPrompt || '')) >= 0) {
+    CONFIG.persona = DEFAULT_PERSONA;
+  } else {
+    CONFIG.persona = String(CONFIG.systemPrompt || '').trim() || DEFAULT_PERSONA;
+  }
+  sSet('via_ai_config', CONFIG);
+}
+if (!CONFIG.plugins || typeof CONFIG.plugins !== 'object') CONFIG.plugins = Object.assign({}, DC.plugins);
+
+/* ==========================================================
+ *  开放插件系统
+ *  插件清单存在本机，每个插件声明若干工具，工具实现分两类：
+ *    http —— 声明式请求（method/url/headers/body，支持 {{参数}} 占位）
+ *    js   —— 自定义脚本，在 sandbox iframe 里运行，只能经过受控的 host.* 做事
+ *  插件永远拿不到 Android.* 桥，能力边界由宿主校验。
+ * ========================================================== */
+const PLUG_KEY = 'via_ai_user_plugins';
+const PLUG_DATA_KEY = 'via_ai_plugin_data';
+const PLUG_ID_RE = /^[A-Za-z0-9_.-]{2,64}$/;
+const PLUG_TOOL_RE = /^[A-Za-z][A-Za-z0-9_]{1,63}$/;
+const BUILTIN_TOOL_NAMES = (function () {
+  const s = {};
+  PLUGINS.forEach(p => p.tools.forEach(t => { s[t] = true; }));
+  return s;
+})();
+
+let USER_PLUGINS = sGet(PLUG_KEY, null);
+if (!Array.isArray(USER_PLUGINS)) USER_PLUGINS = [];
+USER_PLUGINS = USER_PLUGINS.map(plugNormalize).filter(Boolean);
+const plugSaveList = () => sSet(PLUG_KEY, USER_PLUGINS);
+
+/** 规整单个工具；不合法返回 null。 */
+function plugNormalizeTool(t) {
+  if (!t || typeof t !== 'object') return null;
+  const name = String(t.name || '').trim();
+  if (!PLUG_TOOL_RE.test(name)) return null;
+  const kind = t.kind === 'http' ? 'http' : (t.kind === 'js' ? 'js' : '');
+  if (!kind) return null;
+  const out = {
+    name,
+    description: String(t.description || '').slice(0, 500),
+    parameters: (t.parameters && typeof t.parameters === 'object')
+      ? t.parameters : { type: 'object', properties: {} },
+    kind,
+    timeout: Math.min(Math.max(parseInt(t.timeout, 10) || 15000, 1000), 60000)
+  };
+  if (kind === 'http') {
+    const r = (t.request && typeof t.request === 'object') ? t.request : {};
+    out.request = {
+      method: String(r.method || 'GET').toUpperCase(),
+      url: String(r.url || ''),
+      headers: (r.headers && typeof r.headers === 'object') ? r.headers : {},
+      body: (r.body === undefined || r.body === null)
+        ? '' : (typeof r.body === 'string' ? r.body : JSON.stringify(r.body))
+    };
+    if (!out.request.url) return null;
+  } else {
+    out.code = String(t.code || '');
+    if (!out.code.trim()) return null;
+  }
+  return out;
+}
+
+/** 规整插件清单；不合法返回 null。 */
+function plugNormalize(m) {
+  if (!m || typeof m !== 'object') return null;
+  const id = String(m.id || '').trim();
+  const name = String(m.name || '').trim();
+  if (!PLUG_ID_RE.test(id) || !name) return null;
+  const tools = (Array.isArray(m.tools) ? m.tools : [])
+    .map(plugNormalizeTool).filter(Boolean);
+  if (!tools.length) return null;
+  return {
+    id, name,
+    icon: String(m.icon || '🧩').slice(0, 4),
+    version: String(m.version || '1.0.0').slice(0, 24),
+    author: String(m.author || '').slice(0, 48),
+    desc: String(m.desc || '').slice(0, 300),
+    enabled: m.enabled !== false,
+    tools
+  };
+}
+
+/** 按工具名找到「插件 + 工具」；找不到返回 null。 */
+function plugFind(name) {
+  for (let i = 0; i < USER_PLUGINS.length; i++) {
+    const p = USER_PLUGINS[i];
+    for (let j = 0; j < p.tools.length; j++) {
+      if (p.tools[j].name === name) return { plugin: p, tool: p.tools[j] };
+    }
+  }
+  return null;
+}
+
+/** 把 {{参数名}} 换成工具入参里的值。 */
+function plugTemplate(s, args) {
+  return String(s == null ? '' : s).replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (m, k) =>
+    (args && args[k] !== undefined && args[k] !== null) ? String(args[k]) : '');
+}
+
+/** 插件开发说明（插件页「格式说明」展示）。 */
+const PLUG_HELP = [
+'插件清单（JSON）示例：',
+'',
+'{',
+'  "id": "com.example.demo",      // 唯一标识：字母/数字/._-',
+'  "name": "示例插件",',
+'  "icon": "🧩",',
+'  "version": "1.0.0",',
+'  "author": "你的名字",',
+'  "desc": "一句话说明",',
+'  "tools": [',
+'    {',
+'      "name": "search_thing",   // AI 调用时用的名字，全局唯一',
+'      "description": "给 AI 看的说明：什么时候用、返回什么",',
+'      "parameters": { "type": "object", "properties": { "q": { "type": "string" } }, "required": ["q"] },',
+'      "kind": "http",           // http：声明式请求',
+'      "request": { "method": "GET", "url": "https://api.example.com/search?q={{q}}", "headers": {}, "body": "" }',
+'    },',
+'    {',
+'      "name": "run_thing",',
+'      "description": "脚本工具",',
+'      "kind": "js",             // js：自定义脚本，在沙箱里跑',
+'      "code": "async function run(args){ const r = await host.request({ url: \'https://api.example.com/x\' }); return r.text; }"',
+'    }',
+'  ]',
+'}',
+'',
+'{{参数名}} 会被替换成 AI 传入的对应参数。',
+'',
+'js 插件可用的 host 接口：',
+'  host.request({ method, url, headers, body, timeout })  ->  { status, text }',
+'  host.toast(text)               显示一条提示',
+'  host.openUrl(url)              用系统浏览器打开链接',
+'  host.clipboard.write(text)     写入剪贴板',
+'  host.storage.get(key) / set(key, value)   插件私有存储',
+'  host.log(...)                  输出调试日志',
+'',
+'安全边界：插件在隔离沙箱中运行，拿不到系统接口；',
+'只能访问 http/https，且不允许访问本机 / 局域网地址。',
+'请只安装你信任来源的插件。'
+].join('\n');
+
+refreshSystemPrompt();
+sSet('via_ai_history', history);
 let transCache = sGet('via_ai_trans', {}) || {};
 let favorites = sGet('via_ai_favs', []) || [];
 let sending = false;
@@ -1850,42 +2562,171 @@ function setBtn(btn, state) {
 }
 let curPlayBtn = null;
 
+window.__ttsStart = function () {
+  if (curPlayBtn) setBtn(curPlayBtn, 'playing');
+};
 window.__ttsDone = function () {
   if (curPlayBtn) setBtn(curPlayBtn, 'idle');
   curPlayBtn = null;
 };
+window.__ttsError = function (msg) {
+  if (curPlayBtn) setBtn(curPlayBtn, 'idle');
+  curPlayBtn = null;
+  if (msg) toast('朗读失败：' + msg);
+};
+
+function stopTTS() {
+  try { if (HAS_NATIVE && Android.ttsStop) Android.ttsStop(); } catch (e) {}
+  try { if (HAS_NATIVE && Android.stopSpeak) Android.stopSpeak(); } catch (e) {}
+  try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
+}
+
+/**
+ * 把 markdown 去掉再读。不然它会一本正经地把「星号星号」也念出来。
+ */
+function ttsStripMd(t) {
+  return String(t || '')
+    .replace(/```[\s\S]*?```/g, ' 代码省略 ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*\n]+)\*/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/[*`#]/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** 按句切。切小了才能边下边播，不然要等整段语音全下完才出声。 */
+function ttsSplit(text) {
+  const enders = '。！？!?；;';
+  const raw = [];
+  let cur = '';
+  for (const ch of String(text)) {
+    cur += ch;
+    if (enders.indexOf(ch) >= 0 || ch === '\n') {
+      const t = cur.trim();
+      if (t) raw.push(t);
+      cur = '';
+    }
+  }
+  const tail = cur.trim();
+  if (tail) raw.push(tail);
+  // 太短的句子并到前一句，别为了两个字发一次请求
+  const merged = [];
+  for (const p of raw) {
+    if (merged.length && merged[merged.length - 1].length < 12) merged[merged.length - 1] += p;
+    else merged.push(p);
+  }
+  return merged.length ? merged : [String(text)];
+}
+
+function ttsAiRequest(seg) {
+  const base = String(CONFIG.ttsBaseUrl || DC.ttsBaseUrl || '').replace(/\/+$/, '');
+  const headers = { 'Content-Type': 'application/json' };
+  if (CONFIG.ttsApiKey) headers['Authorization'] = 'Bearer ' + CONFIG.ttsApiKey;
+  const body = {
+    model: CONFIG.ttsModel || DC.ttsModel || 'tts-1',
+    input: seg,
+    voice: CONFIG.ttsVoice || DC.ttsVoice || 'alloy',
+    response_format: 'mp3'
+  };
+  const sp = parseFloat(CONFIG.ttsRate) || 1;
+  // speed 不是所有兼容接口都认，等于 1 时就不发了，少一个被 400 的理由
+  if (Math.abs(sp - 1) > 0.01) body.speed = Math.max(0.25, Math.min(4, sp));
+  return { url: base + '/audio/speech', headers, body };
+}
+
+/**
+ * 真正开口。两条路都落到原生：
+ *  - system：手机自带的 TTS 引擎
+ *  - ai：JS 把请求拼好，原生负责下载 + 播放（和音乐共用一套唤醒锁，息屏也能出声）
+ */
+function speakText(text) {
+  const clean = ttsStripMd(text);
+  if (!clean) { toast('没有可朗读的内容'); return; }
+  const engine = CONFIG.ttsEngine === 'ai' ? 'ai' : 'system';
+
+  if (engine === 'ai') {
+    if (!(HAS_NATIVE && Android.ttsAi)) { toast('当前环境不支持自建语音'); return; }
+    if (!String(CONFIG.ttsBaseUrl || '').trim()) { toast('请先填写语音接口地址'); return; }
+    try {
+      stopTTS();
+      // 一次全交出去：原生会一首接一首放，并趁上一句在播时先把下一句下好
+      ttsSplit(clean).forEach(seg => {
+        const r = ttsAiRequest(seg);
+        Android.ttsAi(r.url, JSON.stringify(r.headers), JSON.stringify(r.body));
+      });
+    } catch (e) { toast('朗读失败：' + errMsg(e)); }
+    return;
+  }
+
+  if (HAS_NATIVE && Android.speak) {
+    try { Android.speak(clean, CONFIG.ttsRate); }
+    catch (e) { toast('朗读失败：' + errMsg(e)); }
+    return;
+  }
+  if ('speechSynthesis' in window) {
+    try { speechSynthesis.cancel(); } catch (e) {}
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'zh-CN';
+    u.rate = CONFIG.ttsRate;
+    u.onstart = () => window.__ttsStart();
+    u.onend = u.onerror = () => window.__ttsDone();
+    speechSynthesis.speak(u);
+    return;
+  }
+  toast('当前设备不支持朗读');
+}
 
 function toggleTTS(text, btn) {
   if (!CONFIG.ttsEnabled) return;
   if (curPlayBtn === btn) {
-    try { HAS_NATIVE && Android.stopSpeak && Android.stopSpeak(); } catch (e) {}
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    stopTTS();
     setBtn(btn, 'idle');
     curPlayBtn = null;
     return;
   }
   if (curPlayBtn) {
-    try { HAS_NATIVE && Android.stopSpeak && Android.stopSpeak(); } catch (e) {}
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    stopTTS();
     setBtn(curPlayBtn, 'idle');
   }
   curPlayBtn = btn;
   setBtn(btn, 'loading');
-  if (HAS_NATIVE && Android.speak) {
-    try {
-      Android.speak(text, CONFIG.ttsRate);
-      setTimeout(() => { if (curPlayBtn === btn) setBtn(btn, 'playing'); }, 200);
-    } catch (e) { setBtn(btn, 'idle'); curPlayBtn = null; toast('朗读失败：' + errMsg(e)); }
-  } else if ('speechSynthesis' in window) {
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'zh-CN'; u.rate = CONFIG.ttsRate;
-    u.onstart = () => setBtn(btn, 'playing');
-    u.onend = u.onerror = () => { setBtn(btn, 'idle'); curPlayBtn = null; };
-    speechSynthesis.speak(u);
-  } else {
-    setBtn(btn, 'idle');
-    curPlayBtn = null;
-    toast('当前设备不支持朗读');
+  speakText(text);
+}
+
+/* ---- 音色列表：从接口拉，拉不到就用内置的那份 ---- */
+async function refreshVoices() {
+  const base = String(CONFIG.ttsBaseUrl || '').replace(/\/+$/, '');
+  if (!base) { toast('请先填写语音接口地址'); return; }
+  const hint = $('#tts-voice-hint');
+  if (hint) hint.textContent = '正在拉取...';
+  try {
+    const hdrs = {};
+    if (CONFIG.ttsApiKey) hdrs['Authorization'] = 'Bearer ' + CONFIG.ttsApiKey;
+    const r = await nativeReq('GET', base + '/audio/voices', hdrs, null, 15000);
+    let r2 = null;
+    try { r2 = JSON.parse(r.text); } catch (e) { throw new Error('返回的不是 JSON'); }
+    const list = (r2 && (r2.data || r2.voices)) || [];
+    const ids = list.map(v => (typeof v === 'string' ? v : (v.id || v.voice_id || v.name))).filter(Boolean);
+    if (!ids.length) throw new Error('接口没有返回音色');
+    TTS_VOICES.length = 0;
+    ids.forEach(id => TTS_VOICES.push({ id: String(id), name: String(id) }));
+    if (!CONFIG.ttsVoice && ids.length) CONFIG.ttsVoice = String(ids[0]);
+    // 重绘前先把当前选择写回配置，否则切回来又变回默认引擎
+    CONFIG.ttsEngine = groupVal('ttseng') === 'ai' ? 'ai' : 'system';
+    sSet('via_ai_config', CONFIG);
+    renderSettings();
+    toast('拉到 ' + ids.length + ' 个音色 ♪');
+  } catch (e) {
+    if (hint) hint.textContent = '拉取失败（' + errMsg(e) + '），先用内置音色；很多接口本来就不提供这个列表，不影响朗读。';
   }
 }
 
@@ -2351,8 +3192,38 @@ const M = {
   audio: null, playlist: [], currentIndex: -1,
   isPlaying: false, loadingIndex: -1,
   requestId: 0, lastError: '', pendingPlay: false,
-  lyrics: [], lyricIndex: -1, currentTab: 'search', miniHidden: false
+  lyrics: [], lyricIndex: -1, currentTab: 'search', miniHidden: false,
+  // 音乐现在由原生 AudioEngine 出声，这里只是它的镜像；
+  // pos/dur 单位是毫秒，由 __mpProgress 推上来。
+  pos: 0, dur: 0
 };
+
+/* ---- 播放顺序：顺序 / 单曲循环 / 随机 ---- */
+const PLAY_MODES = [
+  { id: 'order',   icon: '🔁', name: '顺序播放' },
+  { id: 'single',  icon: '🔂', name: '单曲循环' },
+  { id: 'shuffle', icon: '🔀', name: '随机播放' }
+];
+function playMode() {
+  const m = CONFIG.playMode;
+  return PLAY_MODES.some(x => x.id === m) ? m : 'order';
+}
+function playModeIcon() {
+  const p = PLAY_MODES.find(x => x.id === playMode());
+  return p ? p.icon : PLAY_MODES[0].icon;
+}
+function playModeName() {
+  const p = PLAY_MODES.find(x => x.id === playMode());
+  return p ? p.name : PLAY_MODES[0].name;
+}
+function cyclePlayMode() {
+  const i = PLAY_MODES.findIndex(x => x.id === playMode());
+  CONFIG.playMode = PLAY_MODES[(i + 1) % PLAY_MODES.length].id;
+  sSet('via_ai_config', CONFIG);
+  updateBar(); updateMini();
+  toast('播放方式：' + playModeName());
+  vibrate(12);
+}
 
 const gdBase = () => (CONFIG.gdStudioApi || DC.gdStudioApi).replace(/\/$/, '');
 const metingList = () => (CONFIG.metingInstances || DC.metingInstances)
@@ -2537,48 +3408,84 @@ const fmtDur = (ms) => {
 function updateProgress() {
   const bar = $('#mp-progress-bar'), timeEl = $('#mp-time');
   if (!bar) return;
-  if (!M.audio || !M.audio.duration || isNaN(M.audio.duration)) {
+  const dur = M.dur || 0;
+  if (!dur) {
     bar.style.width = '0%';
     if (timeEl) timeEl.textContent = '0:00 / 0:00';
     return;
   }
-  const p = (M.audio.currentTime / M.audio.duration) * 100;
+  const p = Math.max(0, Math.min(100, (M.pos / dur) * 100));
   bar.style.width = p + '%';
-  if (timeEl) timeEl.textContent = `${fmtTime(M.audio.currentTime)} / ${fmtTime(M.audio.duration)}`;
+  if (timeEl) timeEl.textContent = `${fmtTime(M.pos)} / ${fmtTime(dur)}`;
 }
 function getAudio() {
   if (!M.audio) {
     const a = new Audio();
     a.preload = 'auto';
-    a.onended = () => {
-      M.isPlaying = false;
-      if (M.currentIndex < M.playlist.length - 1) playAt(M.currentIndex + 1);
-      else { updateBar(); updateMini(); }
-    };
+    a.onended = () => { M.isPlaying = false; playNext(true); };
     a.onplay = () => { M.isPlaying = true; M.pendingPlay = false; M.lastError = ''; updateBar(); updateHL(); updateMini(); };
     a.onpause = () => { M.isPlaying = false; updateBar(); updateMini(); };
-    a.ontimeupdate = () => { onLyricTime(); updateProgress(); };
-    a.onloadedmetadata = () => updateProgress();
+    a.ontimeupdate = () => {
+      M.pos = (a.currentTime || 0) * 1000;
+      M.dur = (a.duration || 0) * 1000;
+      onLyricTime(); updateProgress();
+    };
+    a.onloadedmetadata = () => { M.dur = (a.duration || 0) * 1000; updateProgress(); };
     a.onerror = () => { M.isPlaying = false; if (a.src) M.lastError = '音频加载失败'; updateBar(); updateMini(); };
     M.audio = a;
   }
   return M.audio;
 }
+
+function stopLegacyAudio() {
+  const a = M.audio;
+  if (!a) return;
+  try { a.pause(); } catch (e) {}
+  try { a.removeAttribute('src'); a.load(); } catch (e) {}
+}
+
+/**
+ * 歌曲直链缓存。只往前预取一首，且用之前先看是不是旧的 ——
+ * 这些接口给的直链常常带签名过期时间，存太久反而会放不出来。
+ */
+const urlCache = new Map();
+const URL_TTL = 8 * 60 * 1000;
+
+async function songUrl(song) {
+  const k = String(song.id || song.name || '');
+  const hit = k && urlCache.get(k);
+  if (hit && Date.now() - hit.at < URL_TTL) return hit.url;
+  const url = await mGetUrl(song);
+  if (k) urlCache.set(k, { url, at: Date.now() });
+  return url;
+}
+
+/** 提前把下一首的直链拿到手，切歌时才不会卡在「正在连接…」。 */
+function prefetchNextUrl() {
+  const L = M.playlist.length;
+  if (L < 2) return;
+  let j;
+  if (playMode() === 'shuffle') j = Math.floor(Math.random() * L);
+  else if (playMode() === 'single') j = M.currentIndex;
+  else j = M.currentIndex + 1 < L ? M.currentIndex + 1 : 0;
+  const s = M.playlist[j];
+  if (!s) return;
+  songUrl(s).catch(() => {});
+}
+
 async function playAt(i) {
   const song = M.playlist[i]; if (!song) return;
   const rid = ++M.requestId;
   M.currentIndex = i; M.isPlaying = false; M.lastError = '';
   M.pendingPlay = false; M.loadingIndex = i;
   M.lyrics = []; M.lyricIndex = -1;
+  M.pos = 0; M.dur = 0;
   setLyric(''); updateLyricModal();
   M.miniHidden = false;
-  const a = getAudio();
-  try { a.pause(); } catch (e) {}
-  a.removeAttribute('src');
-  try { a.load(); } catch (e) {}
+  stopLegacyAudio();
   updateLoading(i); updateHL(); updateBar(); updateProgress();
 
-  const [urlR, lyrR] = await Promise.allSettled([mGetUrl(song), mGetLyric(song)]);
+  const [urlR, lyrR] = await Promise.allSettled([songUrl(song), mGetLyric(song)]);
   if (rid !== M.requestId) return;
 
   if (lyrR.status === 'fulfilled' && lyrR.value && lyrR.value.lyric) {
@@ -2589,8 +3496,22 @@ async function playAt(i) {
     M.lastError = errMsg(urlR.reason);
     M.loadingIndex = -1; updateLoading(-1); updateBar(); updateMini(); return;
   }
-  a.src = urlR.value;
+
   M.loadingIndex = -1; updateLoading(-1); updateBar(); updateMini();
+
+  const n = MP();
+  if (n) {
+    try { n.mpLoad(urlR.value, song.name || '', song.artist || ''); }
+    catch (e) { M.lastError = errMsg(e); updateBar(); updateMini(); return; }
+    M.isPlaying = true;            // 乐观先亮起来，原生 __mpState 会随时纠偏
+    updateBar(); updateMini();
+    prefetchNextUrl();
+    return;
+  }
+
+  // ---- 兑底：没有原生环境时还是走 <audio> ----
+  const a = getAudio();
+  a.src = urlR.value;
   try { await a.play(); }
   catch (e) {
     if (rid !== M.requestId) return;
@@ -2599,17 +3520,56 @@ async function playAt(i) {
     } else { M.lastError = errMsg(e); updateBar(); }
   }
 }
+
 function togglePlay() {
   M.miniHidden = false;
-  const a = getAudio(); M.lastError = '';
+  M.lastError = '';
+  const n = MP();
+  if (n) {
+    if (M.currentIndex < 0) {
+      if (M.playlist.length) playAt(0);
+      return;
+    }
+    try { n.mpToggle(); } catch (e) { M.lastError = errMsg(e); }
+    return;
+  }
+  const a = getAudio();
   if (!a.src) { if (M.playlist.length) playAt(M.currentIndex >= 0 ? M.currentIndex : 0); return; }
   if (a.paused) {
     M.pendingPlay = false;
     a.play().catch(e => { M.lastError = errMsg(e); updateBar(); });
   } else a.pause();
 }
-const playPrev = () => { if (M.currentIndex > 0) playAt(M.currentIndex - 1); };
-const playNext = () => { if (M.currentIndex < M.playlist.length - 1) playAt(M.currentIndex + 1); };
+
+/**
+ * 上一首 / 下一首。auto=true 表示是「一首放完了自动往后」，
+ * 这时才听播放方式的：单曲循环原地重放，顺序播放到底就停。
+ * 手动点下一首则永远有反应（到底就绕回第一首）。
+ */
+function playNext(auto) {
+  const L = M.playlist.length;
+  if (!L) return;
+  if (auto && playMode() === 'single') return playAt(M.currentIndex);
+  if (playMode() === 'shuffle' && L > 1) {
+    let j = M.currentIndex;
+    while (j === M.currentIndex) j = Math.floor(Math.random() * L);
+    return playAt(j);
+  }
+  if (M.currentIndex < L - 1) return playAt(M.currentIndex + 1);
+  if (auto) { M.isPlaying = false; updateBar(); updateMini(); return; }
+  return playAt(0);
+}
+function playPrev() {
+  const L = M.playlist.length;
+  if (!L) return;
+  if (playMode() === 'shuffle' && L > 1) {
+    let j = M.currentIndex;
+    while (j === M.currentIndex) j = Math.floor(Math.random() * L);
+    return playAt(j);
+  }
+  if (M.currentIndex > 0) return playAt(M.currentIndex - 1);
+  return playAt(L - 1);
+}
 
 function updateHL() {
   const l = $('#music-list'); if (!l) return;
@@ -2625,6 +3585,9 @@ function updateBar() {
   const bar = $('#music-player'); if (!bar) return;
   const s = M.playlist[M.currentIndex];
   const title = bar.querySelector('.mp-title'), btn = bar.querySelector('.mp-play');
+  const mode = bar.querySelector('.mp-mode');
+  if (mode) mode.textContent = playModeIcon();
+  try { if (HAS_NATIVE && Android.setMiniPlayMode) Android.setMiniPlayMode(playModeIcon()); } catch (e) {}
   if (M.loadingIndex >= 0) { title.textContent = '⏳ 加载中...'; btn.textContent = '⏳'; return; }
   if (M.lastError) { title.textContent = '❌ ' + M.lastError; btn.textContent = '▶'; return; }
   if (M.pendingPlay) {
@@ -2641,8 +3604,11 @@ function updateMini() {
   // 原生迷你悬浮窗：独立于聊天窗，缩成小球后依然可见、可拖动
   if (HAS_NATIVE && Android.showMiniPlayer) {
     try {
-      if (show) Android.showMiniPlayer(song.name || '未知歌曲', song.artist || '未知歌手', !!M.isPlaying);
-      else if (Android.hideMiniPlayer) Android.hideMiniPlayer();
+      if (show) {
+        Android.showMiniPlayer(song.name || '未知歌曲', song.artist || '未知歌手', !!M.isPlaying);
+        // 原生迷你条刚建出来时图标是默认的，这里补一次（updateBar 跑在它前面）
+        if (Android.setMiniPlayMode) Android.setMiniPlayMode(playModeIcon());
+      } else if (Android.hideMiniPlayer) Android.hideMiniPlayer();
     } catch (e) {}
     if (mini) mini.classList.remove('show');
     return;
@@ -2657,19 +3623,61 @@ function updateMini() {
   mini.classList.toggle('playing', M.isPlaying);
 }
 
-/* 原生迷你播放器上的按钮 → 网页逻辑 */
+/* ==========================================================
+ *  原生播放器 ↔ 网页的双向对账
+ *  原生只管出声，歌单 / 歌词 / 播放顺序都在 JS 这边，
+ *  所以通知栏和耳机上的按键都会绕回 __mpCmd 再由 JS 决定切哪一首。
+ * ========================================================== */
+window.__mpState = function (json) {
+  let s = {};
+  try { s = typeof json === 'string' ? JSON.parse(json) : (json || {}); } catch (e) { return; }
+  M.isPlaying = !!s.playing;
+  if (typeof s.dur === 'number' && s.dur) M.dur = s.dur;
+  if (typeof s.pos === 'number' && !s.playing) M.pos = s.pos;
+  if (s.err) M.lastError = s.err;
+  if (!s.loading && M.loadingIndex >= 0) { M.loadingIndex = -1; updateLoading(-1); }
+  updateBar(); updateHL(); updateMini(); updateProgress();
+};
+window.__mpProgress = function (pos, dur) {
+  M.pos = pos || 0;
+  if (dur) M.dur = dur;
+  updateProgress();
+  onLyricTime();
+};
+window.__mpDone = function () {
+  M.isPlaying = false;
+  M.pos = 0;
+  playNext(true);
+};
+window.__mpCmd = function (cmd) {
+  try {
+    if (cmd === 'next') playNext(false);
+    else if (cmd === 'prev') playPrev();
+    else if (cmd === 'stop') { M.isPlaying = false; M.miniHidden = true; updateBar(); updateMini(); }
+  } catch (e) {}
+};
+
+/* 原生迷你播放器上的按钮（旧接口，保留兼容） */
 window.__miniToggle = function () { try { togglePlay(); } catch (e) {} };
+window.__miniMode = function () { try { cyclePlayMode(); } catch (e) {} };
 window.__miniClose = function () {
   M.miniHidden = true;
-  try { if (M.audio) M.audio.pause(); } catch (e) {}
-  updateMini();
+  try { if (MP()) MP().mpStop(); else if (M.audio) M.audio.pause(); } catch (e) {}
+  updateBar(); updateMini();
 };
 window.__miniOpen = function () {
   try { if (HAS_NATIVE && Android.restoreFloat) Android.restoreFloat(); } catch (e) {}
   try { M.currentTab = 'search'; renderList(M.playlist); showView('music'); } catch (e) {}
 };
 function setLyric(t) {
-  const el = $('#music-lyric'); if (!el) return;
+  const el = $('#music-lyric');
+  let line = t;
+  if (!line) {
+    if (M.currentIndex >= 0 && M.playlist[M.currentIndex]) line = '';
+  }
+  // 原生迷你播放条上也带一行歌词，缩成小球之后也看得到
+  try { if (HAS_NATIVE && Android.setMiniLyric) Android.setMiniLyric(line || ''); } catch (e) {}
+  if (!el) return;
   if (t) { el.textContent = t; el.classList.add('hl'); }
   else if (M.currentIndex >= 0 && M.playlist[M.currentIndex]) {
     el.textContent = '♪ ' + M.playlist[M.currentIndex].name + ' ♪';
@@ -2677,8 +3685,9 @@ function setLyric(t) {
   } else { el.textContent = '— ♪ —'; el.classList.remove('hl'); }
 }
 function onLyricTime() {
-  if (!M.audio || !M.lyrics.length) return;
-  const t = M.audio.currentTime; let idx = -1;
+  if (!M.lyrics.length) return;
+  const t = M.pos / 1000;
+  let idx = -1;
   for (let i = 0; i < M.lyrics.length; i++) {
     if (M.lyrics[i].t <= t) idx = i; else break;
   }
@@ -2697,7 +3706,12 @@ function updateLyricModal() {
   if (act) act.scrollIntoView({ block: 'center', behavior: 'smooth' });
   box.querySelectorAll('.lline').forEach(el => el.onclick = () => {
     const i = +el.dataset.i;
-    if (M.audio && M.lyrics[i]) M.audio.currentTime = M.lyrics[i].t;
+    if (!M.lyrics[i]) return;
+    const ms = Math.round(M.lyrics[i].t * 1000);
+    const n = MP();
+    if (n) { try { n.mpSeek(ms); } catch (e) {} }
+    else if (M.audio) M.audio.currentTime = M.lyrics[i].t;
+    M.lyricIndex = -1; onLyricTime();
   });
 }
 function renderList(items) {
@@ -2832,9 +3846,29 @@ function buildTools() {
           id: { type: 'string', description: '要删除的记忆编号' },
           reason: { type: 'string', description: '为什么要删，会展示给用户看' }
         }, required: ['id'] } } });
-  return tools;
+  /* ---- 自定义插件 ---- */
+  USER_PLUGINS.forEach(p => {
+    if (p.enabled === false) return;
+    p.tools.forEach(t => {
+      if (!toolOn(t.name)) return;
+      tools.push({ type: 'function', function: {
+        name: t.name,
+        description: t.description || ('自定义插件「' + p.name + '」提供的工具。'),
+        parameters: t.parameters || { type: 'object', properties: {} }
+      }});
+    });
+  });
+  // 与提示词用完全同一套开关判断，避免出现「提示词里说了但调不了」
+  // 或者「能调但没告诉它」这种不一致。插件面板上的开关就是这里在生效。
+  return tools.filter(t => toolLive(t.function.name));
 }
 async function execTool(name, args) {
+  const cp = plugFind(name);
+  if (cp) {
+    if (cp.plugin.enabled === false) return { success: false, error: '该插件已停用。' };
+    if (!toolOn(name)) return { success: false, error: '该工具已关闭。' };
+    return await plugExec(cp.plugin, cp.tool, args || {});
+  }
   if (name === 'read_screen') {
     const t = readScreenText();
     if (!t) return { success: false, error: '读不到屏幕内容（可能无障碍未开启，或当前界面没有可读文字）' };
@@ -2950,14 +3984,17 @@ async function execTool(name, args) {
     } catch (e) { return { success: false, error: errMsg(e) }; }
   }
   if (name === 'music_control') {
-    const a = M.audio;
     try {
+      const n = MP();
       switch (args.command) {
-        case 'pause': a && a.pause(); return { success: true };
-        case 'resume': a && a.play(); return { success: true };
-        case 'next': playNext(); return { success: true };
+        case 'pause': if (n) n.mpPause(); else if (M.audio) M.audio.pause(); M.isPlaying = false; updateBar(); updateMini(); return { success: true };
+        case 'resume': if (n) n.mpPlay(); else if (M.audio) M.audio.play(); M.isPlaying = true; updateBar(); updateMini(); return { success: true };
+        case 'next': playNext(false); return { success: true };
         case 'prev': playPrev(); return { success: true };
-        case 'stop': a && a.pause(); if (a) a.src = ''; return { success: true };
+        case 'stop':
+          if (n) n.mpStop(); else if (M.audio) { M.audio.pause(); M.audio.src = ''; }
+          M.isPlaying = false; M.miniHidden = true; updateBar(); updateMini();
+          return { success: true };
         case 'favorite': {
           const s = M.playlist[M.currentIndex];
           if (!s) return { success: false, error: '没有播放歌曲' };
@@ -2969,6 +4006,235 @@ async function execTool(name, args) {
     } catch (e) { return { success: false, error: errMsg(e) }; }
   }
   return { success: false, error: '未知工具' };
+}
+
+/* ==========================================================
+ *  插件执行引擎
+ *   - http 类：宿主直接发请求（先做 URL 校验）
+ *   - js  类：丢进 sandbox iframe，插件只能通过 host.* 回调宿主
+ *  所有 host 调用都回到这里统一校验，插件碰不到 Android.* 桥。
+ * ========================================================== */
+
+/** 只允许 http/https，且不允许访问本机 / 链路本地地址（防 SSRF 打本机服务）。 */
+function plugUrlAllowed(u) {
+  let url;
+  try { url = new URL(String(u)); } catch (e) { return '网址格式不正确'; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return '只允许 http/https 请求';
+  const host = String(url.hostname || '').toLowerCase();
+  if (!host) return '网址缺少主机名';
+  if (host === 'localhost' || host === '0.0.0.0' || host === '::1' || host === '[::1]'
+      || host.endsWith('.localhost')) return '不允许访问本机地址';
+  if (/^127\./.test(host) || /^169\.254\./.test(host)) return '不允许访问本机地址';
+  return '';
+}
+
+function plugParseBody(text) {
+  if (typeof text !== 'string') return text;
+  const t = text.replace(/^\uFEFF/, '').trim();
+  if (!t) return '';
+  if (t[0] === '{' || t[0] === '[') {
+    try { return JSON.parse(t); } catch (e) { /* 不是 JSON 就原样返回 */ }
+  }
+  return t.slice(0, 50000);
+}
+
+/** 统一入口：按工具的 kind 选择执行方式。 */
+async function plugExec(plugin, tool, args) {
+  if (tool.kind === 'http') {
+    const r = tool.request;
+    const url = plugTemplate(r.url, args);
+    const bad = plugUrlAllowed(url);
+    if (bad) return { success: false, error: bad };
+    const headers = {};
+    for (const k in r.headers) headers[k] = plugTemplate(String(r.headers[k]), args);
+    const body = r.body ? plugTemplate(r.body, args) : '';
+    try {
+      const res = await nativeReq(r.method, url, headers, body, tool.timeout);
+      return { success: true, status: res.status, data: plugParseBody(res.text) };
+    } catch (e) { return { success: false, error: errMsg(e) }; }
+  }
+  return await plugExecJs(plugin, tool, args);
+}
+
+/* 沙箱页面：opaque origin，拿不到父页面的 DOM / Android 桥，只能 postMessage 回来。 */
+const PLUG_SANDBOX_HTML = [
+'<!doctype html><meta charset="utf-8">',
+// CSP：禁止插件自己发网络请求 / 加载资源，只能走 host.request（由宿主校验 URL）
+'<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; script-src &#39;unsafe-inline&#39; &#39;unsafe-eval&#39;">',
+'<scr' + 'ipt>',
+'(function(){',
+'var pending={},seq=0;',
+'function callHost(method,params){return new Promise(function(res,rej){var id="h"+(++seq);pending[id]={res:res,rej:rej};parent.postMessage({__elly:"host",id:id,method:method,params:params||{}},"*");});}',
+'var host={',
+'request:function(o){return callHost("request",o||{});},',
+'toast:function(t){return callHost("toast",{text:String(t==null?"":t)});},',
+'log:function(){var a=[],i;for(i=0;i<arguments.length;i++){var v=arguments[i];try{a.push(typeof v==="string"?v:JSON.stringify(v));}catch(e){a.push(String(v));}}return callHost("log",{args:a});},',
+'openUrl:function(u){return callHost("openUrl",{url:String(u==null?"":u)});},',
+'clipboard:{write:function(t){return callHost("clipboardWrite",{text:String(t==null?"":t)});}},',
+'storage:{',
+'get:function(k){return callHost("storageGet",{key:String(k)}).then(function(r){return r?r.value:undefined;});},',
+'set:function(k,v){return callHost("storageSet",{key:String(k),value:v});}}',
+'};',
+'window.addEventListener("message",function(ev){',
+'var d=ev.data;if(!d||d.__elly!=="run")return;var rid=d.id;',
+'Promise.resolve().then(function(){',
+'var fn=new Function("host","\\"use strict\\";"+d.code+"\\n;return (typeof run===\\"function\\")?run:null;");',
+'var run=fn(host);',
+'if(typeof run!=="function")throw new Error("插件没有定义 run 函数");',
+'return run(d.args||{});',
+'}).then(function(v){parent.postMessage({__elly:"result",id:rid,ok:true,value:v},"*");},',
+'function(e){parent.postMessage({__elly:"result",id:rid,ok:false,error:(e&&e.message)||String(e)},"*");});',
+'});',
+'window.addEventListener("message",function(ev){',
+'var d=ev.data;if(!d||d.__elly!=="hostres")return;var p=pending[d.id];if(!p)return;delete pending[d.id];',
+'if(d.ok)p.res(d.value);else p.rej(new Error(d.error||"host 调用失败"));',
+'});',
+'parent.postMessage({__elly:"ready"},"*");',
+'})();',
+'</scr' + 'ipt>'
+].join('\n');
+
+let plugFrame = null;
+let plugSandboxReady = null;
+let plugSandboxResolver = null;
+let plugRunSeq = 0;
+const plugRunPending = {};
+let plugRunning = null;
+let plugLock = Promise.resolve();
+
+function ensurePlugSandbox() {
+  if (plugFrame) return plugFrame;
+  plugSandboxReady = new Promise((res) => { plugSandboxResolver = res; });
+  const f = document.createElement('iframe');
+  f.id = 'plug-sandbox';
+  f.setAttribute('sandbox', 'allow-scripts');
+  f.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;border:0';
+  f.srcdoc = PLUG_SANDBOX_HTML;
+  document.body.appendChild(f);
+  plugFrame = f;
+  return f;
+}
+
+function respondPlugHost(id, ok, value) {
+  try {
+    plugFrame.contentWindow.postMessage({
+      __elly: 'hostres', id, ok,
+      value: ok ? value : undefined,
+      error: ok ? '' : String(value || '')
+    }, '*');
+  } catch (e) {}
+}
+
+function onPlugSandboxMessage(ev) {
+  if (plugFrame && ev.source && ev.source !== plugFrame.contentWindow) return;
+  const d = ev.data;
+  if (!d || typeof d !== 'object') return;
+  if (d.__elly === 'ready') {
+    if (plugSandboxResolver) { plugSandboxResolver(); plugSandboxResolver = null; }
+    return;
+  }
+  if (d.__elly === 'result') {
+    const p = plugRunPending[d.id];
+    if (!p) return;
+    delete plugRunPending[d.id];
+    if (p.timer) clearTimeout(p.timer);
+    if (d.ok) p.resolve(d.value); else p.reject(new Error(d.error || '插件执行失败'));
+    return;
+  }
+  if (d.__elly === 'host') {
+    plugHandleHost(d.method, d.params).then(
+      v => respondPlugHost(d.id, true, v),
+      e => respondPlugHost(d.id, false, errMsg(e))
+    );
+  }
+}
+window.addEventListener('message', onPlugSandboxMessage);
+
+function plugStore(pid) {
+  const all = sGet(PLUG_DATA_KEY, {}) || {};
+  return (all[pid] && typeof all[pid] === 'object') ? all[pid] : {};
+}
+function plugSaveStore(pid, store) {
+  const all = sGet(PLUG_DATA_KEY, {}) || {};
+  all[pid] = store;
+  sSet(PLUG_DATA_KEY, all);
+}
+
+async function plugHandleHost(method, params) {
+  const p = params || {};
+  const pid = (plugRunning && plugRunning.pluginId) || 'unknown';
+  if (method === 'request') {
+    const m = String(p.method || 'GET').toUpperCase();
+    const bad = plugUrlAllowed(String(p.url || ''));
+    if (bad) throw new Error(bad);
+    const headers = (p.headers && typeof p.headers === 'object') ? p.headers : {};
+    const body = (p.body === undefined || p.body === null)
+      ? '' : (typeof p.body === 'string' ? p.body : JSON.stringify(p.body));
+    const t = Math.min(Math.max(parseInt(p.timeout, 10) || 20000, 1000), 60000);
+    const r = await nativeReq(m, String(p.url), headers, body, t);
+    return { status: r.status, text: String(r.text || '').slice(0, 200000) };
+  }
+  if (method === 'toast') { toast(String(p.text || '').slice(0, 200)); return true; }
+  if (method === 'log') {
+    try { console.log('[插件:' + pid + ']', (p.args || []).join(' ')); } catch (e) {}
+    return true;
+  }
+  if (method === 'openUrl') {
+    const url = String(p.url || '');
+    const bad = plugUrlAllowed(url);
+    if (bad) throw new Error(bad);
+    if (HAS_NATIVE && Android.openUrl) Android.openUrl(url);
+    return true;
+  }
+  if (method === 'clipboardWrite') return writeClipboard(String(p.text || ''));
+  if (method === 'storageGet') return { value: plugStore(pid)[String(p.key || '')] };
+  if (method === 'storageSet') {
+    const s = plugStore(pid);
+    s[String(p.key || '')] = p.value;
+    plugSaveStore(pid, s);
+    return true;
+  }
+  throw new Error('未知的沙箱调用：' + method);
+}
+
+/** JS 插件：串行执行，保证 host 调用能对上当前插件。 */
+function plugExecJs(plugin, tool, args) {
+  const run = async () => {
+    const f = ensurePlugSandbox();
+    if (!plugSandboxReady) return { success: false, error: '插件沙箱不可用' };
+    try {
+      await Promise.race([
+        plugSandboxReady,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('插件沙箱初始化超时')), 3000))
+      ]);
+    } catch (e) { return { success: false, error: errMsg(e) }; }
+    const id = 'p' + (++plugRunSeq);
+    plugRunning = { pluginId: plugin.id, toolName: tool.name };
+    try {
+      const value = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          delete plugRunPending[id];
+          reject(new Error('插件执行超时'));
+        }, tool.timeout);
+        plugRunPending[id] = { resolve, reject, timer };
+        f.contentWindow.postMessage({ __elly: 'run', id, code: tool.code, args }, '*');
+      });
+      // 结果过大就截断，避免一条工具结果把上下文撑爆
+      let out = value;
+      try {
+        const s0 = JSON.stringify(value);
+        if (s0 && s0.length > 50000) out = { truncated: true, preview: s0.slice(0, 20000) };
+      } catch (e) {}
+      return { success: true, result: out };
+    } catch (e) {
+      return { success: false, error: errMsg(e) };
+    } finally {
+      plugRunning = null;
+    }
+  };
+  const queued = plugLock.then(run, run);
+  plugLock = queued.then(() => {}, () => {});
+  return queued;
 }
 
 let toolsBroken = false;
@@ -3208,6 +4474,326 @@ function groupVal(id) {
   const el = document.querySelector('#settings [data-group="' + id + '"] .on');
   return el ? el.dataset.val : '';
 }
+
+/**
+ * 插件与工具页。开关直接读 CONFIG.plugins / CONFIG.toolOff，
+ * 跟 toolLive() / buildToolsPrompt() 共用一份状态，切换后提示词和可调工具同时生效。
+ */
+function renderPlugins() {
+  const box = $('#plug-list');
+  if (!box) return;
+  let html = PLUGINS.map(p => {
+    const on = plugOn(p.id);
+    const live = groupLive(p.id);
+    // 开关开着但外部条件不足（比如无障碍未授权）时，说明为什么暂时无法调用
+    let warn = '';
+    if (on && !live) {
+      if (p.id === 'screen') warn = '⚠️ 无障碍权限未开启，这组工具暂时无法调用。';
+      else if (p.id === 'music') warn = '⚠️ 音乐总开关未开启。';
+    }
+    const rows = p.tools.map(t => {
+      const ton = on && toolOn(t);
+      return `<div class="plug-tool ${ton ? '' : 'off'}">
+        <div class="plug-tool-body">
+          <div class="plug-tool-name">${esc(t)}</div>
+          <div class="plug-tool-desc">${esc(TOOL_DOC[t] || '')}</div>
+        </div>
+        <button type="button" class="plug-sw ${ton ? 'on' : ''}" data-tool-sw="${esc(t)}"
+          aria-label="${ton ? '关闭' : '开启'}${esc(t)}"></button>
+      </div>`;
+    }).join('');
+    return `<div class="plug-group">
+      <div class="plug-group-hd">
+        <span class="plug-group-ic">${p.icon}</span>
+        <span class="plug-group-name">${esc(p.name)}</span>
+        <button type="button" class="plug-sw ${on ? 'on' : ''}" data-plug-sw="${p.id}"
+          aria-label="${on ? '关闭' : '开启'}${esc(p.name)}"></button>
+      </div>
+      <div class="plug-group-desc">${esc(p.desc)}</div>
+      ${warn ? '<div class="plug-warn">' + esc(warn) + '</div>' : ''}
+      ${rows}
+    </div>`;
+  }).join('');
+
+  html += plugCustomHtml();
+  box.innerHTML = html;
+}
+
+/** 自定义插件区块：已安装的插件 + 空状态提示。 */
+function plugCustomHtml() {
+  let html = '<div class="sec-title" style="margin-top:16px">🧩 自定义插件</div>';
+  if (!USER_PLUGINS.length) {
+    return html + '<div class="mini-note" style="margin-top:6px">还没有安装自定义插件。点上方「导入插件」，粘贴插件清单即可安装。</div>';
+  }
+  html += '<div class="mini-note" style="margin-top:6px">自定义插件在隔离沙箱中运行，无法直接访问系统；所有网络与本地能力都经过宿主校验。</div>';
+  html += USER_PLUGINS.map(p => {
+    const on = p.enabled !== false;
+    const rows = p.tools.map(t => {
+      const ton = on && toolOn(t.name);
+      return `<div class="plug-tool ${ton ? '' : 'off'}">
+        <div class="plug-tool-body">
+          <div class="plug-tool-name">${esc(t.name)}</div>
+          <div class="plug-tool-desc">${esc(t.description || '')}</div>
+        </div>
+        <button type="button" class="plug-sw ${ton ? 'on' : ''}" data-tool-sw="${esc(t.name)}"
+          aria-label="${ton ? '关闭' : '开启'}${esc(t.name)}"></button>
+      </div>`;
+    }).join('');
+    return `<div class="plug-group">
+      <div class="plug-group-hd">
+        <span class="plug-group-ic">${esc(p.icon)}</span>
+        <span class="plug-group-name">${esc(p.name)}
+          <span class="plug-sub">v${esc(p.version)}${p.author ? ' · ' + esc(p.author) : ''}</span></span>
+        <button type="button" class="plug-mini" data-plug-del="${esc(p.id)}">删除</button>
+        <button type="button" class="plug-sw ${on ? 'on' : ''}" data-cplug-sw="${esc(p.id)}"
+          aria-label="${on ? '关闭' : '开启'}${esc(p.name)}"></button>
+      </div>
+      ${p.desc ? '<div class="plug-group-desc">' + esc(p.desc) + '</div>' : ''}
+      ${rows}
+    </div>`;
+  }).join('');
+  return html;
+}
+
+function toggleUserPlug(id) {
+  const p = USER_PLUGINS.filter(x => x.id === id)[0];
+  if (!p) return;
+  p.enabled = p.enabled === false;
+  plugSaveList();
+  refreshSystemPrompt();
+  toolsBroken = false;
+  sSet('via_ai_history', history);
+  renderPlugins();
+  renderPlugPreview();
+  toast(p.enabled ? '已启用该插件' : '已停用该插件');
+  vibrate(15);
+}
+
+function renderPlugPreview() {
+  const box = $('#plug-preview');
+  if (box) box.textContent = buildToolsPrompt() || '（当前没有任何可用工具）';
+}
+
+function togglePlug(id) {
+  CONFIG.plugins = CONFIG.plugins || {};
+  CONFIG.plugins[id] = !plugOn(id);
+  refreshSystemPrompt();          // 提示词里的工具段立刻跟着变
+  toolsBroken = false;            // 工具集变了，下次重新试一遍 tools 调用
+  sSet('via_ai_config', CONFIG);
+  sSet('via_ai_history', history);
+  renderPlugins();
+  renderPlugPreview();
+  toast(plugOn(id) ? '已开启该组工具' : '已关闭该组工具');
+  vibrate(15);
+}
+/** 单独开关某一项工具；开启时自动打开它所属的组。 */
+function toggleTool(name) {
+  const owner = PLUGINS.filter(p => p.tools.indexOf(name) >= 0)[0];
+  // 以「实际是否开放」为准：组被关掉时，点单项开关应该是重新打开它
+  const liveOn = toolOn(name) && (!owner || plugOn(owner.id));
+  CONFIG.toolOff = CONFIG.toolOff || {};
+  if (liveOn) {
+    CONFIG.toolOff[name] = true;
+  } else {
+    delete CONFIG.toolOff[name];
+    if (owner) {
+      CONFIG.plugins = CONFIG.plugins || {};
+      CONFIG.plugins[owner.id] = true;
+    }
+  }
+  refreshSystemPrompt();
+  toolsBroken = false;
+  sSet('via_ai_config', CONFIG);
+  sSet('via_ai_history', history);
+  renderPlugins();
+  renderPlugPreview();
+  toast(liveOn ? '已关闭该工具' : '已开启该工具');
+  vibrate(15);
+}
+
+/* ==========================================================
+ *  插件安装 / 删除
+ * ========================================================== */
+function openPlugInstall() {
+  const box = $('#plug-modal');
+  if (!box) return;
+  const code = $('#plug-code');
+  if (code) code.value = '';
+  const msg = $('#plug-modal-msg');
+  if (msg) { msg.textContent = ''; msg.className = 'mini-note'; }
+  box.classList.add('open');
+}
+
+function plugInstallError(msg) {
+  const el = $('#plug-modal-msg');
+  if (el) { el.textContent = msg; el.className = 'plug-modal-err'; }
+}
+
+async function plugInstallFromText(text) {
+  let data;
+  try { data = JSON.parse(String(text || '').trim()); }
+  catch (e) { return plugInstallError('不是有效的 JSON：' + errMsg(e)); }
+  let list = [];
+  if (Array.isArray(data)) list = data;
+  else if (data && Array.isArray(data.plugins)) list = data.plugins;
+  else if (data && data.id) list = [data];
+  else return plugInstallError('清单格式不对：需要单个插件对象，或含 plugins 数组的对象。');
+
+  const accepted = [];
+  for (const raw of list) {
+    const m = plugNormalize(raw);
+    if (!m) return plugInstallError('插件清单不完整：需要合法的 id、name 和至少一个工具。');
+    if (USER_PLUGINS.some(p => p.id === m.id)) return plugInstallError('插件 id 已存在：' + m.id);
+    for (const t of m.tools) {
+      if (BUILTIN_TOOL_NAMES[t.name]) return plugInstallError('工具名与内置工具冲突：' + t.name);
+      if (USER_PLUGINS.some(p => p.tools.some(x => x.name === t.name))
+          || accepted.some(a => a.tools.some(x => x.name === t.name)))
+        return plugInstallError('工具名重复：' + t.name);
+    }
+    accepted.push(m);
+  }
+  if (!accepted.length) return plugInstallError('没有可安装的插件。');
+
+  const names = accepted.map(p => '「' + p.name + '」').join('、');
+  const tools = accepted.reduce((n, p) => n + p.tools.length, 0);
+  const ok = await uiConfirm(
+    '即将安装 ' + names + '，共 ' + tools + ' 个工具。\n\n'
+    + '自定义插件在隔离沙箱中运行，无法直接访问系统，但可以通过受控接口发起网络请求、写剪贴板或打开链接。\n\n'
+    + '请只安装你信任来源的插件。确认安装吗？',
+    '安装', '安装插件'
+  );
+  if (!ok) return;
+  accepted.forEach(p => USER_PLUGINS.push(p));
+  plugSaveList();
+  refreshSystemPrompt();
+  toolsBroken = false;
+  sSet('via_ai_history', history);
+  $('#plug-modal').classList.remove('open');
+  renderPlugins();
+  renderPlugPreview();
+  toast('已安装 ' + names);
+}
+
+async function plugDelete(id) {
+  const p = USER_PLUGINS.filter(x => x.id === id)[0];
+  if (!p) return;
+  const ok = await uiConfirm('确定删除插件「' + p.name + '」吗？它的工具会立即从 AI 手里消失。', '删除', '删除插件');
+  if (!ok) return;
+  USER_PLUGINS = USER_PLUGINS.filter(x => x.id !== id);
+  plugSaveList();
+  refreshSystemPrompt();
+  toolsBroken = false;
+  sSet('via_ai_history', history);
+  renderPlugins();
+  renderPlugPreview();
+  toast('已删除插件');
+}
+
+/* ==========================================================
+ *  应用更新
+ * ========================================================== */
+const UPD = { checking: false, info: null, dlId: '' };
+
+function verArr(s) {
+  const m = String(s || '').match(/\d+(?:\.\d+)*/);
+  return m ? m[0].split('.').map(n => parseInt(n, 10) || 0) : [];
+}
+function cmpVer(a, b) {
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
+
+async function checkUpdate(manual) {
+  if (UPD.checking) { if (manual) toast('正在检查，请稍候…'); return; }
+  UPD.checking = true;
+  if (manual) toast('正在检查更新…');
+  try {
+    const r = await nativeReq('GET', UPDATE_API,
+      { 'Accept': 'application/vnd.github+json', 'User-Agent': 'ElysiaFloat' }, null, 15000);
+    const rel = JSON.parse(r.text);
+    const tag = String(rel.tag_name || rel.name || '').trim();
+    const latest = verArr(tag);
+    const cur = verArr((loadEnv() || {}).appVer || '0');
+    CONFIG.lastUpdateCheck = Date.now();
+    sSet('via_ai_config', CONFIG);
+    if (!latest.length) throw new Error('无法解析版本号');
+    if (cmpVer(latest, cur) > 0) {
+      const apks = (rel.assets || []).filter(a => /\.apk$/i.test(a.name || ''));
+      const key = tag.toLowerCase().replace(/^v/, '');
+      const asset = apks.filter(a => String(a.name || '').toLowerCase().indexOf(key) >= 0)[0] || apks[0];
+      UPD.info = {
+        tag: tag || ('v' + latest.join('.')),
+        notes: String(rel.body || '').slice(0, 1500),
+        url: asset ? asset.browser_download_url : '',
+        name: asset ? asset.name : '',
+        page: rel.html_url || UPDATE_RELEASES
+      };
+      showUpdateModal();
+    } else if (manual) {
+      toast('已是最新版本（' + ((loadEnv() || {}).appVer || '?') + '）');
+    }
+  } catch (e) {
+    if (manual) toast('检查更新失败：' + errMsg(e));
+  } finally {
+    UPD.checking = false;
+  }
+}
+
+function showUpdateModal() {
+  const info = UPD.info;
+  if (!info) return;
+  const t = $('#upd-title'), n = $('#upd-notes'), bar = $('#upd-progress'), go = $('#upd-go');
+  if (!t) return;
+  t.textContent = '发现新版本 ' + info.tag;
+  n.textContent = info.notes || '（该版本没有填写更新说明）';
+  if (bar) bar.style.width = '0%';
+  if (go) { go.disabled = false; go.textContent = info.url ? '下载并安装' : '打开下载页'; }
+  $('#update-modal').classList.add('open');
+}
+
+async function downloadUpdate() {
+  const info = UPD.info;
+  if (!info) return;
+  if (!info.url) {
+    try { if (HAS_NATIVE && Android.openUrl) Android.openUrl(info.page); } catch (e) {}
+    return;
+  }
+  if (HAS_NATIVE && Android.canInstall) {
+    let allowed = true;
+    try { allowed = !!Android.canInstall(); } catch (e) { allowed = true; }
+    if (!allowed) {
+      const go = await uiConfirm('安装更新需要允许「安装未知应用」。现在去开启吗？', '去开启', '安装权限');
+      if (go) { try { if (Android.requestInstallPermission) Android.requestInstallPermission(); } catch (e) {} }
+      return;
+    }
+  }
+  if (!(HAS_NATIVE && Android.downloadAndInstall)) {
+    try { if (HAS_NATIVE && Android.openUrl) Android.openUrl(info.url); } catch (e) {}
+    return;
+  }
+  UPD.dlId = 'u' + Date.now();
+  const go = $('#upd-go');
+  if (go) { go.disabled = true; go.textContent = '下载中…'; }
+  try { Android.downloadAndInstall(UPD.dlId, info.url, info.name || ('ElysiaFloat-' + info.tag + '.apk')); }
+  catch (e) { if (go) { go.disabled = false; go.textContent = '重试'; } toast('下载失败：' + errMsg(e)); }
+}
+
+window.__dlCb = function (id, pct, done, err, path) {
+  if (id !== UPD.dlId) return;
+  const bar = $('#upd-progress'), go = $('#upd-go');
+  if (!done) { if (bar) bar.style.width = Math.max(0, Math.min(100, pct)) + '%'; return; }
+  if (go) go.disabled = false;
+  if (err) { if (go) go.textContent = '重试'; toast('下载失败：' + err); return; }
+  if (bar) bar.style.width = '100%';
+  if (go) go.textContent = '已开始安装';
+  toast('安装包已下载，请按系统提示完成安装');
+};
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
@@ -3225,12 +4811,30 @@ function renderSettings() {
 <div class="acts" style="margin-top:8px">
   <button id="btn-pick-avatar" class="btn-s">上传照片并裁剪</button>
 </div>
-<div class="mini-note">可填写网络图片地址；也可上传本地照片，拖动/缩放后裁成圆形头像。</div>
+<div class="mini-note">可填写网络图片地址，也可上传本地照片并裁剪为圆形头像。</div>
 <div class="sg"><label>头像取景（竖图才看得出区别）</label>${chipGroup('fit', CONFIG.avatarFit || 'top', [{v:'top',t:'取上部'},{v:'center',t:'居中'},{v:'bottom',t:'取下部'}])}</div>
 <div class="sg"><label>记忆轮数</label><input id="set-turns" type="number" value="${CONFIG.maxContextTurns}"></div>
 
 <div class="sec-title">🔊 语音合成</div>
 <div class="sg" style="margin-top:8px"><label>开启朗读</label>${toggleGroup('tts', CONFIG.ttsEnabled ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="sg"><label>语音引擎</label>${toggleGroup('ttseng', (CONFIG.ttsEngine || 'system') === 'ai' ? 'ai' : 'system', [{v:'system',t:'系统自带'},{v:'ai',t:'自建音色'}])}</div>
+<div class="mini-note">系统自带：使用手机内置语音引擎，无需联网。自建音色：使用下方接口，可选择音色。</div>
+
+<div id="tts-ai-box" ${(CONFIG.ttsEngine || 'system') === 'ai' ? '' : 'hidden'}>
+  <div class="sg"><label>接口地址</label><input id="set-tts-base" type="text" placeholder="https://api.openai.com/v1" value="${esc(CONFIG.ttsBaseUrl || '')}"></div>
+  <div class="sg"><label>API Key</label><input id="set-tts-key" type="password" placeholder="sk-..." value="${esc(CONFIG.ttsApiKey || '')}"></div>
+  <div class="sg"><label>模型</label><input id="set-tts-model" type="text" placeholder="tts-1 / gpt-4o-mini-tts" value="${esc(CONFIG.ttsModel || '')}"></div>
+  <div class="sg"><label>音色</label>
+    <select id="set-tts-voice">
+      ${(TTS_VOICES.some(v => v.id === CONFIG.ttsVoice) ? TTS_VOICES : TTS_VOICES.concat([{ id: CONFIG.ttsVoice, name: CONFIG.ttsVoice + '（当前）' }]))
+        .filter(v => v.id)
+        .map(v => `<option value="${esc(v.id)}"${v.id === CONFIG.ttsVoice ? ' selected' : ''}>${esc(v.name)}</option>`).join('')}
+    </select>
+  </div>
+  <div class="acts"><button id="btn-refresh-voice" class="btn-s">🔄 从接口拉取可用音色</button></div>
+  <div class="mini-note" id="tts-voice-hint"></div>
+</div>
+
 <div class="sg"><label>语速</label>
   <div class="range-row">
     <input type="range" id="set-tts-rate" min="0.5" max="2" step="0.1" value="${CONFIG.ttsRate}">
@@ -3245,7 +4849,7 @@ function renderSettings() {
   <textarea id="set-meting" style="min-height:90px;font-family:monospace;font-size:11px">${esc(CONFIG.metingInstances)}</textarea></div>
 
 <div class="sec-title">🖼️ 识图模型（可选）</div>
-<div class="mini-note" style="margin-top:8px">对话模型自己能看图时不会用到这里。只在它不支持图片时，先用这里配置的识图模型描述截图，再把描述交给对话模型作答。</div>
+<div class="mini-note" style="margin-top:8px">当对话模型不支持图片时使用：系统会先用这里的识图模型描述截图，再交给对话模型回答。</div>
 <div class="sg" style="margin-top:8px"><label>识图 API 地址</label><input id="set-vision-base" value="${esc(CONFIG.visionBase || '')}" placeholder="https://.../v1"></div>
 <div class="sg"><label>识图 API Key</label>
   <div class="pin-row">
@@ -3255,12 +4859,12 @@ function renderSettings() {
 <div class="sg"><label>识图模型</label><input id="set-vision-model" value="${esc(CONFIG.visionModel || '')}" placeholder="如 gpt-4o / qwen-vl-max"></div>
 
 <div class="sec-title">🧠 长期记忆</div>
-<div class="mini-note" style="margin-top:8px">记忆不再塞进上下文。她每轮只看得到一份「分类概览 + 重要 + 最近」的索引，需要细节时会用工具去查，所以记忆再多也不会变卡。</div>
+<div class="mini-note" style="margin-top:8px">长期记忆保存在本机。每轮只加载概览与摘要，需要细节时由 AI 按需检索，因此记忆再多也不会拖慢对话。</div>
 <div class="acts" style="margin-top:8px">
   <button id="btn-mem-open" class="btn-p">打开记忆库（${MEM.length} 条）</button>
 </div>
 <div class="sg" style="margin-top:10px"><label>语义检索（可选，需要向量模型）</label>${toggleGroup('memvec', MEMCFG.vecEnabled ? 'true' : 'false', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
-<div class="mini-note">不开也能用：默认是关键词打分。开了之后搜索会更懂意思，但每存一条记忆会多一次接口调用。</div>
+<div class="mini-note">关闭时按关键词检索；开启语义检索后结果更准确，但每存一条记忆会额外调用一次向量接口。</div>
 <div class="sg"><label>向量 API 地址</label><input id="set-vec-base" value="${esc(MEMCFG.vecBase || '')}" placeholder="https://.../v1"></div>
 <div class="sg"><label>向量 API Key</label>
   <div class="pin-row">
@@ -3270,10 +4874,10 @@ function renderSettings() {
 <div class="sg"><label>向量模型</label><input id="set-vec-model" value="${esc(MEMCFG.vecModel || '')}" placeholder="如 text-embedding-3-small / bge-m3"></div>
 
 <div class="sec-title">🔎 屏幕翻译</div>
-<div class="mini-note" style="margin-top:8px">点「翻译屏幕」后，她会先把浮窗收成小胶囊（不挡屏幕），读完屏幕上的文字再翻。文字和坐标都是从无障碍节点树里直接拿的，不需要额外 OCR。</div>
+<div class="mini-note" style="margin-top:8px">点「翻译屏幕」后，浮窗会先收成小胶囊以免遮挡，读取屏幕文字后再翻译。文字与位置直接来自无障碍节点，无需额外 OCR。</div>
 <div class="sg" style="margin-top:8px"><label>翻译引擎</label>${toggleGroup('transEngine', CONFIG.transEngine || 'free', [{v:'free',t:'微软免费'},{v:'ai',t:'AI（耗Token）'}])}</div>
 <div class="sg"><label>翻译方式</label>${toggleGroup('transMode', CONFIG.transMode || 'translated', [{v:'translated',t:'仅译文'},{v:'bilingual',t:'双语'}])}</div>
-<div class="mini-note">仅译文：用粉色把原文盖掉，整页直接变成中文。双语：原文不动，只给它加一条粉色下划线，译文用小粉牌贴在下面。</div>
+<div class="mini-note">仅译文：用主题色覆盖原文。双语：保留原文并添加下划线，译文附在下方。</div>
 <div class="sg"><label>点完自动收成小胶囊</label>${toggleGroup('transCap', CONFIG.transAutoCapsule === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
 <div class="sg"><label>跳过已经是中文的段落</label>${toggleGroup('transSkip', CONFIG.transSkipChinese === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
 
@@ -3281,8 +4885,23 @@ function renderSettings() {
 <div class="sg" style="margin-top:8px"><label>主题色 1</label>${swatchGroup('c1', CONFIG.themeColor1)}</div>
 <div class="sg"><label>主题色 2</label>${swatchGroup('c2', CONFIG.themeColor2)}</div>
 
-<div class="sec-title">📝 系统提示词</div>
-<div class="sg" style="margin-top:8px"><textarea id="set-prompt" style="min-height:140px">${esc(CONFIG.systemPrompt)}</textarea></div>
+<div class="sec-title">🎀 人设</div>
+<div class="mini-note" style="margin-top:8px">设置助手的身份与说话风格。工具能力请在「插件与工具」中单独管理。</div>
+<div class="sg" style="margin-top:8px"><textarea id="set-persona" style="min-height:150px">${esc(CONFIG.persona || DC.persona)}</textarea></div>
+
+<div class="sec-title">🧩 插件与工具</div>
+<div class="mini-note" style="margin-top:8px">在这里管理 AI 可以使用的工具，并单独控制每一项是否对它开放。也支持安装自定义插件。</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-plug-page" class="btn-p">打开插件与工具</button>
+</div>
+
+<div class="sec-title">⬆️ 检查更新</div>
+<div class="mini-note" style="margin-top:8px">从 GitHub Releases 检测新版本，并下载安装包。</div>
+<div class="sg" style="margin-top:8px"><label>自动检查更新</label>${toggleGroup('autoupd', CONFIG.autoCheckUpdate === false ? 'false' : 'true', [{v:'true',t:'开启'},{v:'false',t:'关闭'}])}</div>
+<div class="acts" style="margin-top:8px">
+  <button id="btn-check-update" class="btn-p">立即检查更新</button>
+  <button id="btn-open-releases" class="btn-s">打开发布页</button>
+</div>
 
 <div class="acts">
   <button id="set-save" class="btn-p">保存配置</button>
@@ -3293,7 +4912,14 @@ function renderSettings() {
 <div class="acts" style="margin-top:8px">
   <button id="btn-perm-guide" class="btn-s">打开权限配置引导</button>
 </div>
-<div class="mini-note">之前跳过了引导也没关系，随时可以从这里重新打开，补上悬浮窗/ 通知 / 无障碍等权限。</div>
+<div class="mini-note">可随时重新打开引导，补充悬浮窗、通知、无障碍等权限。</div>
+
+<div class="sec-title">🩺 环境信息</div>
+<div class="mini-note" style="margin-top:6px">遇到问题时，可将以下信息提供给开发者以便排查。</div>
+<div id="env-box" style="margin-top:8px"></div>
+<div class="acts">
+  <button id="btn-copy-env" class="btn-s">复制环境信息</button>
+</div>
 
 <div class="sec-title">💾 数据管理</div>
 <div class="acts" style="margin-top:8px">
@@ -3312,6 +4938,7 @@ function renderSettings() {
   $('#settings').onclick = (e) => {
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
+    if (b.id === 'btn-plug-page') { showView('plugins'); return; }
     const grp = b.closest('[data-group]');
     if (!grp) return;
     if (b.classList.contains('swatch')) {
@@ -3327,9 +4954,21 @@ function renderSettings() {
       const p = PRESETS[b.dataset.val];
       if (p) { $('#set-apibase').value = p.base; $('#set-model').value = p.model; }
     }
+    // 切到「自建音色」才展开那一段配置，免得设置页平白多五行
+    if (grp.dataset.group === 'ttseng') {
+      const box = $('#tts-ai-box');
+      if (box) box.hidden = b.dataset.val !== 'ai';
+    }
   };
   const rateIn = $('#set-tts-rate');
   rateIn.oninput = () => { $('#tts-rate-l').textContent = rateIn.value + 'x'; };
+  const rv = $('#btn-refresh-voice');
+  if (rv) rv.onclick = () => {
+    // 先把当前填的值写回去，拉音色要用到刚填的地址和 Key
+    CONFIG.ttsBaseUrl = $('#set-tts-base').value.trim();
+    CONFIG.ttsApiKey = $('#set-tts-key').value.trim();
+    refreshVoices();
+  };
   $('#set-save').onclick = saveSettings;
   $('#set-back').onclick = () => showView('chat');
   $('#btn-pick-avatar').onclick = startPickAvatar;
@@ -3351,6 +4990,31 @@ function renderSettings() {
   $('#btn-clear-all').onclick = clearAll;
   const pgBtn = $('#btn-perm-guide');
   if (pgBtn) pgBtn.onclick = () => { showGuide(); };
+  const chkBtn = $('#btn-check-update');
+  if (chkBtn) chkBtn.onclick = () => checkUpdate(true);
+  const relBtn = $('#btn-open-releases');
+  if (relBtn) relBtn.onclick = () => {
+    try { if (HAS_NATIVE && Android.openUrl) Android.openUrl(UPDATE_RELEASES); } catch (e) {}
+  };
+
+  renderEnvBox();
+  const ceBtn = $('#btn-copy-env');
+  if (ceBtn) ceBtn.onclick = () => {
+    const e = loadEnv();
+    const r = readRect();
+    const lines = e ? [
+      'App ' + e.appVer,
+      'Android API ' + e.sdk + ' (' + e.release + ')',
+      'Device ' + e.brand + ' ' + e.model,
+      'WebView ' + e.webviewVer + ' [' + e.webviewPkg + ']',
+      'Screen ' + e.screenW + 'x' + e.screenH + ' @' + e.densityDpi + 'dpi dpr=' + e.density,
+      'Compat ' + (document.documentElement.className || 'none'),
+      'Window ' + (r && r.w ? (r.w + 'x' + r.h + ' @' + r.x + ',' + r.y) : '-'),
+      'Base ' + (BASE ? (Math.round(BASE.w) + 'x' + Math.round(BASE.h)) : '-') +
+        ' zoom=' + (ZOOM ? ZOOM.toFixed(3) : '-')
+    ] : ['env unavailable'];
+    toast(writeClipboard(lines.join('\n')) ? '环境信息已复制' : '复制失败，请长按文本手动选');
+  };
 }
 
 function saveSettings() {
@@ -3363,6 +5027,11 @@ function saveSettings() {
     maxContextTurns: parseInt($('#set-turns').value, 10) || 10,
     ttsEnabled: groupVal('tts') === 'true',
     ttsRate: parseFloat($('#set-tts-rate').value) || 1,
+    ttsEngine: groupVal('ttseng') === 'ai' ? 'ai' : 'system',
+    ttsBaseUrl: $('#set-tts-base').value.trim(),
+    ttsApiKey: $('#set-tts-key').value.trim(),
+    ttsModel: $('#set-tts-model').value.trim(),
+    ttsVoice: $('#set-tts-voice').value,
     musicEnabled: groupVal('music') === 'true',
     musicQuality: groupVal('quality') || '320',
     avatarFit: groupVal('fit') || 'top',
@@ -3377,15 +5046,26 @@ function saveSettings() {
     transMode: groupVal('transMode') || DC.transMode,
     transAutoCapsule: groupVal('transCap') !== 'false',
     transSkipChinese: groupVal('transSkip') !== 'false',
-    systemPrompt: $('#set-prompt').value.trim() || DC.systemPrompt
+    autoCheckUpdate: groupVal('autoupd') !== 'false',
+    // 人设只管人设；工具说明由 refreshSystemPrompt() 自动接在后面
+    persona: $('#set-persona').value.trim() || DC.persona
   });
   if (avIn && avIn !== AV_LOCAL) CONFIG.avatarUrl = avIn;
   if (!CONFIG.avatarUrl) CONFIG.avatarUrl = DC.avatarUrl;
   if (CONFIG.avatarUrl.indexOf('data:') === 0) $('#set-avatar').value = AV_LOCAL;
   toolsBroken = false;
   $('#btn-music').hidden = !CONFIG.musicEnabled;
-  if (!CONFIG.musicEnabled && M.audio) M.audio.pause();
+  if (!CONFIG.musicEnabled) {
+    if (MP()) { try { MP().mpStop(); } catch (e) {} }
+    else if (M.audio) M.audio.pause();
+    M.isPlaying = false; M.miniHidden = true; updateBar(); updateMini();
+  }
+
+  // 人设/插件可能变了，重拼一遍 system 消息（否则对话里还是旧的那份）
+  refreshSystemPrompt();
   sSet('via_ai_config', CONFIG);
+  sSet('via_ai_history', history);
+  renderPlugins();
 
   // 记忆库的向量配置单独存（没开向量也不影响）
   const vEn = groupVal('memvec');
@@ -3395,9 +5075,6 @@ function saveSettings() {
   if ($('#set-vec-model')) MEMCFG.vecModel = $('#set-vec-model').value.trim();
   memSaveCfg();
 
-  history = [{ role: 'system', content: CONFIG.systemPrompt }]
-    .concat(history.filter(m => m.role !== 'system'));
-  sSet('via_ai_history', history);
   applyTheme();
   renderHistory();
   toast('已保存~');
@@ -3466,7 +5143,8 @@ async function clearAll() {
 function showView(v) {
   const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
   const settings = $('#settings'), music = $('#music'), mini = $('#mini-player'),
-    memory = $('#memory'), memEdit = $('#mem-edit'), trans = $('#trans');
+    memory = $('#memory'), memEdit = $('#mem-edit'), trans = $('#trans'),
+    plugins = $('#plugins');
   const attachEl = $('#attach-bar');
   bodyEl.style.display = 'none';
   footEl.style.display = 'none';
@@ -3474,6 +5152,7 @@ function showView(v) {
   if (attachEl) attachEl.style.display = 'none';
   settings.classList.remove('open');
   music.classList.remove('open');
+  if (plugins) plugins.classList.remove('open');
   if (memory) memory.classList.remove('open');
   if (memEdit) memEdit.classList.remove('open');
   if (trans) trans.classList.remove('open');
@@ -3486,6 +5165,7 @@ function showView(v) {
     bodyEl.scrollTop = bodyEl.scrollHeight;
     updateMini();
   } else if (v === 'settings') settings.classList.add('open');
+  else if (v === 'plugins' && plugins) { plugins.classList.add('open'); renderPlugins(); }
   else if (v === 'music') music.classList.add('open');
   else if (v === 'memory' && memory) {
     memory.classList.add('open');
@@ -3497,6 +5177,63 @@ function showView(v) {
     trans.classList.add('open');
     renderTrans();
   }
+}
+
+/**
+ * 插件与工具页的交互：返回设置、查看 AI 说明、开关整组或单项工具。
+ */
+function bindPluginsPage() {
+  const back = $('#plug-back');
+  if (back) back.onclick = () => showView('settings');
+
+  const pb = $('#plug-preview-btn');
+  if (pb) pb.onclick = () => {
+    const box = $('#plug-preview');
+    if (!box) return;
+    const show = box.style.display === 'none';
+    if (show) renderPlugPreview();
+    box.style.display = show ? 'block' : 'none';
+    pb.textContent = show ? '收起 AI 说明' : 'AI 说明';
+  };
+
+  const hb = $('#plug-help');
+  if (hb) hb.onclick = () => {
+    const box = $('#plug-help-box');
+    if (!box) return;
+    const show = box.style.display === 'none';
+    if (show) box.textContent = PLUG_HELP;
+    box.style.display = show ? 'block' : 'none';
+    hb.textContent = show ? '收起说明' : '格式说明';
+  };
+
+  const list = $('#plug-list');
+  if (list) list.onclick = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!b) return;
+    if (b.dataset.plugSw) { togglePlug(b.dataset.plugSw); return; }
+    if (b.dataset.cplugSw) { toggleUserPlug(b.dataset.cplugSw); return; }
+    if (b.dataset.toolSw) { toggleTool(b.dataset.toolSw); return; }
+    if (b.dataset.plugDel) { plugDelete(b.dataset.plugDel); return; }
+  };
+
+  const inst = $('#plug-install');
+  if (inst) inst.onclick = openPlugInstall;
+  const pc = $('#plug-cancel');
+  if (pc) pc.onclick = () => $('#plug-modal').classList.remove('open');
+  const pok = $('#plug-ok');
+  if (pok) pok.onclick = () => plugInstallFromText($('#plug-code').value);
+  const pm = $('#plug-modal');
+  if (pm) pm.onclick = (e) => { if (e.target === pm) pm.classList.remove('open'); }; 
+}
+
+/** 更新弹窗的关闭 / 下载按钮。 */
+function bindUpdateModal() {
+  const later = $('#upd-later');
+  if (later) later.onclick = () => $('#update-modal').classList.remove('open');
+  const go = $('#upd-go');
+  if (go) go.onclick = downloadUpdate;
+  const m = $('#update-modal');
+  if (m) m.onclick = (e) => { if (e.target === m) m.classList.remove('open'); };
 }
 
 /* ==========================================================
@@ -3533,15 +5270,22 @@ function bindMusicUI() {
 
   $('#music-player .mp-play').onclick = togglePlay;
   $('#music-player .mp-prev').onclick = playPrev;
-  $('#music-player .mp-next').onclick = playNext;
+  $('#music-player .mp-next').onclick = () => playNext(false);
+  $('#music-player .mp-mode').onclick = cyclePlayMode;
 
   const progEl = $('#mp-progress');
   let progDrag = false;
   const seekTo = (clientX) => {
-    if (!M.audio || !M.audio.duration || isNaN(M.audio.duration)) return;
+    const dur = M.dur || 0;
+    if (!dur) return;
     const r = progEl.getBoundingClientRect();
     const p = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-    M.audio.currentTime = p * M.audio.duration;
+    const ms = Math.round(p * dur);
+    M.pos = ms;
+    const n = MP();
+    if (n) { try { n.mpSeek(ms); } catch (e) {} }
+    else if (M.audio) M.audio.currentTime = ms / 1000;
+    M.lyricIndex = -1; onLyricTime();
     updateProgress();
   };
   progEl.addEventListener('touchstart', e => { progDrag = true; seekTo(e.touches[0].clientX); e.preventDefault(); }, { passive: false });
@@ -3678,22 +5422,37 @@ const PERM_ITEMS = [
     check: () => (HAS_PERM && Perm.hasNotification) ? Perm.hasNotification() : true,
     request: () => { if (HAS_PERM && Perm.requestNotification) Perm.requestNotification(); },
     wait: 500 },
+  // Android 8+ 特有：用户一旦关掉这个通知渠道，前台服务会被系统直接杀掉，
+  // 浮窗消失、息屏断掉都是这个原因，而 hasNotification() 在 8~12 上是恒真，
+  // 查不出来，所以单列一项。
+  { id: 'channel', name: '通知渠道未被关闭', required: false,
+    when: () => sdkAtLeast(26),
+    desc: 'Android 8+ 专属。如果把「爱莉希雅浮窗」或「正在播放」这两条通知关掉，浮窗后台会被系统清理 —— 浮窗凭空消失、息屏音乐断掉，十有八九都是这里。',
+    check: () => (HAS_PERM && Perm.isNotificationChannelOn) ? Perm.isNotificationChannelOn() : true,
+    request: () => { if (HAS_PERM && Perm.requestNotificationChannel) Perm.requestNotificationChannel(); },
+    wait: 800 },
+  { id: 'battery', name: '后台保活', required: false,
+    desc: '可选，但听歌建议开。加入电池优化白名单，浮窗和后台播放不会被系统杀掉。\n注意：它管的是「进程别被杀」，管不了「息屏后 CPU 睡着」—— 后者已经由原生播放器的唤醒锁解决了，所以这一个不开也能息屏听歌。',
+    check: () => (HAS_PERM && Perm.isIgnoringBattery) ? Perm.isIgnoringBattery() : false,
+    request: () => { if (HAS_PERM && Perm.requestIgnoreBattery) Perm.requestIgnoreBattery(); },
+    wait: 800 },
   { id: 'accessibility', name: '无障碍权限', required: false,
     desc: '可选但强烈推荐。开启后能读取屏幕内容，帮你翻译、总结当前页面。',
     check: () => (HAS_PERM && Perm.hasAccessibility) ? Perm.hasAccessibility() : false,
     request: () => { if (HAS_PERM && Perm.requestAccessibility) Perm.requestAccessibility(); },
-    wait: 800 },
-  { id: 'battery', name: '后台保活', required: false,
-    desc: '可选。加入电池优化白名单，浮窗不会被系统杀掉。',
-    check: () => (HAS_PERM && Perm.isIgnoringBattery) ? Perm.isIgnoringBattery() : false,
-    request: () => { if (HAS_PERM && Perm.requestIgnoreBattery) Perm.requestIgnoreBattery(); },
     wait: 800 }
 ];
 const permState = {};
 
+/** 当前真正展示的权限项（带 when 的按系统版本过滤，避免老系统上一堆无效项）。 */
+function activePermItems() {
+  return PERM_ITEMS.filter(i => !i.when || i.when());
+}
+
 function renderGuideSteps() {
   const box = $('#guide-steps');
-  box.innerHTML = PERM_ITEMS.map(item => {
+  const items = activePermItems();
+  box.innerHTML = items.map(item => {
     const ok = !!permState[item.id];
     const cls = ok ? 'ok' : (item.required ? 'need' : '');
     const badge = ok ? '已完成' : (item.required ? '必需' : '推荐');
@@ -3725,7 +5484,7 @@ function renderGuideSteps() {
 }
 function refreshPermState() {
   let changed = false;
-  PERM_ITEMS.forEach(item => {
+  activePermItems().forEach(item => {
     let v = false;
     try { v = !!item.check(); } catch (e) { v = false; }
     if (permState[item.id] !== v) { permState[item.id] = v; changed = true; }
@@ -3733,7 +5492,7 @@ function refreshPermState() {
   if (changed) renderGuideSteps();
 }
 function updateGuideNext() {
-  const allRequiredOk = PERM_ITEMS.filter(i => i.required).every(i => permState[i.id]);
+  const allRequiredOk = activePermItems().filter(i => i.required).every(i => permState[i.id]);
   const btn = $('#guide-next');
   btn.disabled = !allRequiredOk;
   btn.textContent = allRequiredOk ? '开始使用 ♪' : '还有必需权限未开启';
@@ -3745,6 +5504,37 @@ function showGuide() {
   av.onerror = function () { this.onerror = null; this.src = FALLBACK_AVATAR; };
   refreshPermState();
   renderGuideSteps();
+  // 布局要等一帧才算完，量两次（下一帧 + 350ms）防字体/头像晚到把高度撑变
+  requestAnimationFrame(() => ensureGuideFooterVisible());
+  setTimeout(() => ensureGuideFooterVisible(), 350);
+}
+
+/**
+ * 「先跳过 / 下一步」永远得点得到 —— 不靠推导，靠量。
+ *
+ * 正常情况 flex 已经把页脚钉在卡片底部（.guide-steps 上那个 min-height:0）。
+ * 但百分比高度 + flex 在不同 WebView 版本上偶有差异，一旦哪条链断掉，
+ * 页脚就会被内容顶出屏幕，且外层又不滚 —— 用户就只能看到一个没有出口的页面。
+ * 所以这里量一下页脚的实际位置，真出界了就把卡片放开成自适应高度，
+ * 改由最外层 #guide 整页滚动。降级后一定点得到，只是长得没那么好看而已。
+ */
+function ensureGuideFooterVisible() {
+  const card = $('#guide .guide-card');
+  const steps = $('#guide-steps');
+  const foot = $('#guide .guide-foot');
+  if (!card || !steps || !foot) return;
+  if (!$('#guide').classList.contains('show')) return;
+  const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  if (vh < 120) return;
+  const fr = foot.getBoundingClientRect();
+  const cr = card.getBoundingClientRect();
+  if (fr.height > 0 && fr.bottom <= vh - 2 && cr.height <= vh + 2) return;
+  // 页脚出界 或 卡片本身比窗口还高 → 降级
+  card.style.height = 'auto';
+  card.style.maxHeight = 'none';
+  steps.style.flex = '0 0 auto';
+  steps.style.overflowY = 'visible';
+  steps.style.minHeight = '0';
 }
 function hideGuide() {
   $('#guide').classList.remove('show');
@@ -3757,7 +5547,7 @@ function bindGuide() {
     toast('准备完成，交给我吧~ ♪');
   };
   $('#guide-skip').onclick = () => {
-    const missing = PERM_ITEMS.filter(i => i.required && !permState[i.id]);
+    const missing = activePermItems().filter(i => i.required && !permState[i.id]);
     if (missing.length) {
       toast('还有必需权限没开哦\n' + missing.map(m => '· ' + m.name).join('\n'));
       return;
@@ -3767,8 +5557,15 @@ function bindGuide() {
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) refreshPermState();
   });
+  // 旋转 / 分屏 / 拖动改窗口大小后，页脚可能又被顶出去
+  window.addEventListener('resize', () => {
+    if ($('#guide').classList.contains('show')) ensureGuideFooterVisible();
+  });
   setInterval(() => {
-    if ($('#guide').classList.contains('show')) refreshPermState();
+    if ($('#guide').classList.contains('show')) {
+      refreshPermState();
+      ensureGuideFooterVisible();
+    }
   }, 2000);
 
   let guideDone = false;
@@ -3777,7 +5574,7 @@ function bindGuide() {
   }
   setTimeout(() => {
     refreshPermState();
-    const missing = PERM_ITEMS.filter(i => i.required && !permState[i.id]);
+    const missing = activePermItems().filter(i => i.required && !permState[i.id]);
     if (!guideDone || missing.length) showGuide();
   }, 400);
 }
@@ -3809,6 +5606,8 @@ function boot() {
   bindHeader();
   bindInput();
   bindMusicUI();
+  bindPluginsPage();
+  bindUpdateModal();
   bindMemory();
   bindTransUI();
   bindDrag();
@@ -3818,10 +5617,31 @@ function boot() {
   bindResize();
   initZoom();
 
+  // 系统旋转 / 分屏改变窗口尺寸时，面板得跟着对账（原生不一定能及时推过来）
+  window.addEventListener('resize', () => { setTimeout(() => reconcile(true), 60); });
+  window.addEventListener('orientationchange', () => { setTimeout(() => reconcile(true), 300); });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) setTimeout(() => reconcile(true), 60);
+  });
+
+  const lv = webviewLevel();
+  if (lv === 'bad') {
+    setTimeout(() => toast('系统 WebView 版本过低，可能显示异常，建议更新「Android System WebView」', 5200), 1600);
+  }
+  renderEnvBox();   // 这时 BASE/ZOOM 才算好了，环境面板里那行窗口信息才准
+
   $('#btn-music').hidden = !CONFIG.musicEnabled;
   $('#fav-cnt').textContent = favorites.length;
 
-  console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条');
+  // 首次进入 / 距上次检查超过 24 小时，自动检查一次更新（不打扰，只有真的有新版才弹窗）
+  try {
+    const last = CONFIG.lastUpdateCheck || 0;
+    if (CONFIG.autoCheckUpdate !== false && (Date.now() - last > 24 * 3600 * 1000)) {
+      setTimeout(() => { checkUpdate(false); }, 3000);
+    }
+  } catch (e) {}
+
+  console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条 · 插件 ' + USER_PLUGINS.length + ' 个');
 }
 
 if (document.readyState === 'loading') {

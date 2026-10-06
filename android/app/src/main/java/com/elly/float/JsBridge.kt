@@ -10,21 +10,20 @@ import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
+import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Locale
 
 class JsBridge(private val ctx: Context, private val webView: WebView) {
 
-    private var tts: TextToSpeech? = null
-    private var ttsReady = false
+    private val audio get() = (ctx as? FloatService)?.audio()
 
     /* ---------- 存储 ---------- */
     @JavascriptInterface
@@ -114,6 +113,76 @@ class JsBridge(private val ctx: Context, private val webView: WebView) {
         (ctx as? FloatService)?.hideMiniPlayer()
     }
 
+    /** 迷你播放条上那一行歌词，由 JS 解析 LRC 后送过来。 */
+    @JavascriptInterface
+    fun setMiniLyric(text: String) {
+        (ctx as? FloatService)?.setMiniLyric(text)
+    }
+
+    /** 迷你播放条上的播放方式图标。 */
+    @JavascriptInterface
+    fun setMiniPlayMode(icon: String) {
+        (ctx as? FloatService)?.setMiniPlayMode(icon)
+    }
+
+    /* ---------- 音乐播放（原生引擎） ----------
+     * 以前音乐是 WebView 里的 <audio> 放的，浮窗没有 Activity，WebView 一直
+     * 「不可见」，Chromium 既不申请唤醒锁、息屏还会挂起渲染进程，
+     * 所以给了电池白名单也照样断。现在全部交给原生 MediaPlayer。 */
+
+    @JavascriptInterface
+    fun mpLoad(url: String, name: String, artist: String) {
+        audio?.load(url, name, artist)
+    }
+
+    @JavascriptInterface
+    fun mpPlay() { audio?.play() }
+
+    @JavascriptInterface
+    fun mpPause() { audio?.pause() }
+
+    @JavascriptInterface
+    fun mpToggle() { audio?.toggle() }
+
+    @JavascriptInterface
+    fun mpSeek(ms: Int) { audio?.seekTo(ms) }
+
+    @JavascriptInterface
+    fun mpStop() { audio?.stop() }
+
+    /** 主动查询播放器状态，息屏回来 / 重进音乐页时对账用。 */
+    @JavascriptInterface
+    fun mpState(): String = audio?.stateJson() ?: "{}"
+
+    /* ---------- TTS ---------- */
+
+    /** 系统语音引擎（旧接口，保留兼容）。 */
+    @JavascriptInterface
+    fun speak(text: String, rate: Float) {
+        audio?.speakSystem(text, rate)
+    }
+
+    /**
+     * 自建语音：JS 拼好 OpenAI 兼容的 /audio/speech 请求，原生负责下载 + 播放。
+     * 走的是和音乐同一条原生通道，所以息屏也能出声。
+     */
+    @JavascriptInterface
+    fun ttsAi(url: String, headersJson: String, bodyJson: String) {
+        audio?.speakAi(url, headersJson, bodyJson)
+    }
+
+    @JavascriptInterface
+    fun ttsStop() {
+        audio?.stopSpeech()
+        audio?.stopSystem()
+    }
+
+    @JavascriptInterface
+    fun stopSpeak() {
+        audio?.stopSpeech()
+        audio?.stopSystem()
+    }
+
     /* ---------- 头像 / 相册 ---------- */
     @JavascriptInterface
     fun setAvatar(url: String, fit: String) {
@@ -194,51 +263,89 @@ class JsBridge(private val ctx: Context, private val webView: WebView) {
         } catch (e: Exception) {}
     }
 
-    /* ---------- TTS ---------- */
+    /* ---------- 应用更新（下载 + 交给系统安装器） ---------- */
+
+    /** 当前是否允许安装未知来源应用。Android 8 以下默认允许。 */
     @JavascriptInterface
-    fun speak(text: String, rate: Float) {
-        if (!ttsReady && tts == null) {
-            tts = TextToSpeech(ctx) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    ttsReady = true
-                    tts?.language = Locale.CHINA
-                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                        override fun onStart(id: String?) {}
-                        override fun onError(id: String?) { notifyTtsDone() }
-                        override fun onDone(id: String?) { notifyTtsDone() }
-                    })
-                    doSpeak(text, rate)
-                } else {
-                    notifyTtsDone()
-                }
-            }
-        } else if (ttsReady) {
-            doSpeak(text, rate)
-        }
+    fun canInstall(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        return try { ctx.packageManager.canRequestPackageInstalls() } catch (e: Exception) { false }
     }
 
-    private fun doSpeak(text: String, rate: Float) {
+    /** 跳到「安装未知应用」授权页，用户开启后返回再点一次下载即可。 */
+    @JavascriptInterface
+    fun requestInstallPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         try {
-            tts?.setSpeechRate(rate)
-            val id = "elly_" + System.currentTimeMillis()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
-            } else {
-                @Suppress("DEPRECATION") tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
-            }
-        } catch (e: Exception) { notifyTtsDone() }
+            ctx.startActivity(Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:${ctx.packageName}")
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) { }
     }
 
-    private fun notifyTtsDone() {
+    /**
+     * 后台下载更新包到 cache/updates，完成后拉起系统安装器。
+     * 进度通过 window.__dlCb(id, pct, done, err, path) 回抛给网页。
+     */
+    @JavascriptInterface
+    fun downloadAndInstall(id: String, url: String, fileName: String) {
+        Thread {
+            try {
+                val safe = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "update.apk" }
+                val dir = File(ctx.cacheDir, "updates").apply { mkdirs() }
+                val out = File(dir, safe)
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    instanceFollowRedirects = true
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    setRequestProperty("User-Agent", "ElysiaFloat-Updater")
+                }
+                conn.connect()
+                val total = conn.contentLengthLong
+                conn.inputStream.use { input ->
+                    FileOutputStream(out).use { fos ->
+                        val buf = ByteArray(8192)
+                        var read: Int
+                        var done = 0L
+                        var last = -1
+                        while (input.read(buf).also { read = it } > 0) {
+                            fos.write(buf, 0, read)
+                            done += read
+                            if (total > 0) {
+                                val pct = ((done * 100) / total).toInt()
+                                if (pct != last) { last = pct; postDl(id, pct, false, "", "") }
+                            }
+                        }
+                    }
+                }
+                conn.disconnect()
+                Handler(Looper.getMainLooper()).post { installApk(id, out) }
+            } catch (e: Exception) {
+                postDl(id, 0, true, e.message ?: "下载失败", "")
+            }
+        }.start()
+    }
+
+    private fun postDl(id: String, pct: Int, done: Boolean, err: String, path: String) {
+        val js = "window.__dlCb&&window.__dlCb(${JSONObject.quote(id)},$pct,$done,${JSONObject.quote(err)},${JSONObject.quote(path)})"
         Handler(Looper.getMainLooper()).post {
-            try { webView.evaluateJavascript("window.__ttsDone&&window.__ttsDone()", null) }
-            catch (e: Exception) {}
+            try { webView.evaluateJavascript(js, null) } catch (e: Exception) { }
         }
     }
 
-    @JavascriptInterface
-    fun stopSpeak() {
-        try { tts?.stop() } catch (e: Exception) {}
+    private fun installApk(id: String, file: File) {
+        try {
+            val uri = Uri.parse("content://${ctx.packageName}.fileprovider/${Uri.encode(file.name)}")
+            val i = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            ctx.startActivity(i)
+            postDl(id, 100, true, "", file.absolutePath)
+        } catch (e: Exception) {
+            postDl(id, 0, true, "安装启动失败：" + (e.message ?: ""), file.absolutePath)
+        }
     }
 
     /* ---------- 网络请求 ---------- */
