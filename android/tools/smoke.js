@@ -562,6 +562,7 @@ function step(name, fn) {
     const ungranted = T.plugNormalize(Object.assign({}, dangerous, { grantedPermissions: [] }));
     if (T.plugPermissionGranted(ungranted, 'files.public.write')) throw new Error('未授权危险能力仍然可用');
     if (!Array.isArray(T.PLUGIN_MARKET_INDEX) || !T.PLUGIN_MARKET_INDEX.length) throw new Error('本地插件市场索引为空');
+    if (!/sha256|HTTPS|远程/.test(T.PLUG_HELP)) throw new Error('插件说明缺少远程市场完整性说明');
   });
 
   await step('自定义插件：本机地址与危险协议被拦截', () => {

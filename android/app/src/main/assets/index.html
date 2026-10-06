@@ -5574,6 +5574,9 @@ async function installMarketPlugin(id, source) {
       if (!contentHash || contentHash !== String(raw.sha256).toLowerCase()) return toast('远程插件完整性校验失败，已拒绝安装');
       manifest = JSON.parse(String(res.text || '').replace(/^\uFEFF/, ''));
       if (manifest.id !== raw.id || String(manifest.version || '') !== String(raw.version || '')) return toast('远程清单与索引版本不一致，已拒绝安装');
+      const indexPerms = (Array.isArray(raw.permissions) ? raw.permissions : []).map(String).sort().join(',');
+      const manifestPerms = (Array.isArray(manifest.permissions) ? manifest.permissions : []).map(String).sort().join(',');
+      if (indexPerms !== manifestPerms) return toast('远程清单权限与索引不一致，已拒绝安装');
     } catch (e) { return toast('获取远程插件失败：' + errMsg(e)); }
   }
   const manifestError = plugManifestError(manifest);
