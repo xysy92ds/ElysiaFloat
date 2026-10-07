@@ -1,0 +1,12 @@
+{
+  "tag_name": "v0.6.2",
+  "name": "ElysiaFloat v0.6.2",
+  "html_url": "https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.6.2",
+  "body": "0.6.2 测试版：插件市场独立界面、搜索与分页、三种插件导入方式，以及真实无障碍屏幕读取修复。APK 为 Debug 测试包。SHA-256: 2fc4290fb94ac736780907faa338b496f0955106a56d11ef93a47eb215ee986a。", 
+  "assets": [
+    {
+      "name": "ElysiaFloat-v0.6.2-debug.apk",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat/releases/download/v0.6.2/ElysiaFloat-v0.6.2-debug.apk"
+    }
+  ]
+}

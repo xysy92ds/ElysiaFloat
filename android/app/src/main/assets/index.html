@@ -1756,7 +1756,9 @@ const PROMPT_V1 = `爱莉希雅 · 桌面助手
 
 /* 应用更新：从 GitHub Releases 检测新版本并下载安装。 */
 const UPDATE_REPO = 'xysy92ds/ElysiaFloat';
-const UPDATE_API = 'https://api.github.com/repos/' + UPDATE_REPO + '/releases/latest';
+// 不直接调用 GitHub API：未登录的手机请求很容易触发共享出口 IP 的 60 次/小时限制（403）。
+// 发布流程同步这个静态 JSON，客户端从 raw.githubusercontent.com 读取，避免 API 限流。
+const UPDATE_API = 'https://raw.githubusercontent.com/' + UPDATE_REPO + '/main/release/latest.json';
 const UPDATE_RELEASES = 'https://github.com/' + UPDATE_REPO + '/releases';
 
 const PRESETS = {
