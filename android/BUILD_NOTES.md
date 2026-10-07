@@ -3,7 +3,7 @@
 ## 一键构建
 
 ```sh
-cd /workspace/EllyFloat
+cd /workspace/gh-ElysiaFloat/android
 ./build.sh assembleDebug
 ```
 
