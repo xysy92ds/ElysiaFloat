@@ -67,7 +67,32 @@
 
 安装不等于授权。权限流程为：安装清单 → 用户启用并授权 → 每次调用再次校验。
 
-## 4. 工具字段
+## 4. Agent 能力与白名单（设备类插件必须阅读）
+
+插件权限只是插件的声明，不是 Android 权限，也不是 Agent 授权。涉及设备、屏幕或文件的插件调用，必须同时满足下面的门禁：
+
+| 插件声明 | 实际能力 | 宿主条件 |
+|---|---|---|
+| `device.read` | 查询应用、读取界面信息 | Agent 总开关 + L1 + 无障碍；应用操作还会检查目标应用策略 |
+| `device.screenshot` | 获取屏幕画面 | Agent + L1/L2 + 无障碍或系统截屏授权；可能弹出隐私确认 |
+| `device.action` | 点击、滑动、输入、按键、启动应用 | Agent + L3 + 安全开关 + 无障碍；启动/操作目标应用还必须通过白名单 |
+| `files.public.read` / `workspace.read` | 读取公共存储或工作区 | Android 文件权限、Agent 条件和路径校验 |
+| `files.public.write` / `workspace.write` | 写入、复制、建目录 | 上述条件，并且每次修改前用户确认 |
+
+### 应用白名单的工作方式
+
+白名单以 Android **包名**为键，不接受插件自行传入的“已授权”字段。正确的设备操作流程是：
+
+1. 先用内置 `find_app` 查询设备中的真实应用名和包名；
+2. 用户在 App 设置的 Agent 白名单中核对并加入目标包名；
+3. 再通过 `host.callTool` 调用设备工具；
+4. 宿主在每次调用时重新检查 Agent 等级、安全开关、前台应用和白名单。
+
+查询到应用不等于允许操作；未加入白名单的 `launch_app` 或设备行为会返回权限拒绝。插件不能调用 `Android.*`、修改白名单、伪造包名，也不能通过 `host.callTool` 绕过内置工具的门禁。点击、滑动、输入后应重新读取页面验证结果；密码、发送、删除、支付等高风险行为仍需用户确认。
+
+如果插件作者希望支持设备能力，应在 README 中写清：需要用户开启哪些 Agent 等级、无障碍/截图/文件权限、是否要求目标应用加入白名单，以及权限拒绝和用户取消时的行为。没有这些条件时，应提供只读或纯本地降级方案。
+
+## 5. 工具字段
 
 必填字段：
 
@@ -83,7 +108,7 @@
 - `request`：HTTP 工具请求模板；
 - `code`：JS 工具源码。
 
-## 5. HTTP 工具
+## 6. HTTP 工具
 
 示例：
 
@@ -110,7 +135,7 @@
 
 `{{city}}` 会替换为 AI 传入的参数。HTTP 工具必须声明 `network.public` 或 `network.local`。宿主会拒绝未授权地址、危险协议和未声明的局域网请求。
 
-## 6. JS 工具
+## 7. JS 工具
 
 ```json
 {
@@ -140,7 +165,7 @@ async function run(args) {
 
 不要使用 `eval` 读取宿主对象，不要尝试访问 `parent.document`、`Android` 或宿主存储。
 
-## 7. Host API
+## 8. Host API
 
 ### `host.request`
 
@@ -180,7 +205,7 @@ const value = await host.storage.get('key'); // 需要 storage.plugin
 await host.storage.set('key', value);        // 需要 storage.plugin
 ```
 
-## 8. 返回值和错误
+## 9. 返回值和错误
 
 工具可以返回 JSON 可序列化值。宿主保留 `success` 字段，并在失败时提供 `errorCode`。推荐：
 
@@ -195,7 +220,7 @@ await host.storage.set('key', value);        // 需要 storage.plugin
 
 不要把异常吞掉；可以让异常抛出，宿主会返回失败结果。错误应区分：参数错误、权限拒绝、用户取消、网络错误、HTTP 错误、目标不存在、超时和插件内部错误。常见宿主错误码包括 `PERMISSION_DENIED`、`NETWORK_PERMISSION_DENIED`、`INVALID_URL`、`NETWORK_ERROR`、`HTTP_ERROR`、`SANDBOX_INIT_ERROR` 和 `PLUGIN_RUNTIME_ERROR`。
 
-## 9. 开发文档最低要求
+## 10. 开发文档最低要求
 
 提交到市场的插件必须同时提供：
 
@@ -207,7 +232,7 @@ await host.storage.set('key', value);        // 需要 storage.plugin
 6. 版本记录和兼容的 `apiVersion`；
 7. 不包含密钥、Cookie、用户数据和设备路径的示例。
 
-## 10. 给 AI 的生成提示词
+## 11. 给 AI 的生成提示词
 
 可以把下面的任务交给代码生成模型：
 
