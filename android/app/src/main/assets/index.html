@@ -566,6 +566,25 @@ input.secret.reveal{-webkit-text-security:none}
 #plugins-scroll{flex:1;overflow-y:auto;padding:10px 12px;-webkit-overflow-scrolling:touch}
 #plugins-scroll::-webkit-scrollbar{width:4px}
 #plugins-scroll::-webkit-scrollbar-thumb{background:var(--c1);border-radius:4px}
+#plug-market-page{display:none;flex-direction:column;flex:1;overflow:hidden;background:#fff5f7}
+#plug-market-page.open{display:flex}
+#plug-market-scroll{flex:1;overflow-y:auto;padding:10px 12px;-webkit-overflow-scrolling:touch}
+#plug-market-list{min-height:120px}
+.plug-market-card{background:#fff;border:1px solid rgba(255,154,158,.25);border-radius:14px;padding:10px;margin-top:8px}
+.plug-market-card .plug-group-hd{padding:0}
+.plug-market-pager{display:flex;align-items:center;gap:8px;margin-top:10px}
+.plug-market-pager .grow{flex:1}
+.plug-market-count{font-size:11px;color:var(--muted)}
+.plug-risk{position:relative;padding-right:30px}
+.plug-risk-close{position:absolute;right:6px;top:4px;border:0;background:transparent;color:#8a4b16;font-size:18px;cursor:pointer;padding:2px 6px}
+.plug-import-choice{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.plug-import-choice button{flex:1;min-width:100px}
+.plug-import-source{display:none}
+.plug-import-source.open{display:block}
+.plug-import-url{display:flex;gap:8px;margin:8px 0}
+.plug-import-url input{flex:1;min-width:0}
+.plug-market-url-row{display:flex;gap:8px;margin:6px 0}
+.plug-market-url-row input{flex:1;min-width:0}
 .plug-group{margin-top:6px}
 .plug-group-hd{display:flex;align-items:center;gap:8px;padding:8px 2px 2px}
 .plug-group-ic{font-size:16px;flex-shrink:0}
@@ -642,6 +661,22 @@ input.secret.reveal{-webkit-text-security:none}
       <pre id="plug-help-box" class="plug-preview" style="display:none"></pre>
       <div id="plug-list"></div>
       <pre id="plug-preview" class="plug-preview" style="display:none"></pre>
+    </div>
+  </div>
+
+  <div id="plug-market-page">
+    <div class="mem-top">
+      <button class="mback" id="plug-market-back">← 返回插件管理</button>
+      <span class="grow"></span><span class="plug-market-count" id="plug-market-count"></span>
+    </div>
+    <div id="plug-market-scroll">
+      <div class="mini-note">浏览和安装插件。市场只展示清单，安装前仍会校验来源、权限和 SHA-256。</div>
+      <div class="plug-risk" id="market-risk">⚠️ 第三方插件可能存在隐私、稳定性或恶意行为风险，请自行核对来源、代码和权限。<button class="plug-risk-close" data-close-risk="market-risk" aria-label="关闭提示">×</button></div>
+      <div class="plug-market-url-row"><input id="plug-market-url" type="url" placeholder="远程市场地址（可选）"><button id="plug-market-sync" class="btn-s">同步</button></div>
+      <div id="plug-market-status" class="mini-note"></div>
+      <div class="msbar"><input id="plug-market-search" type="search" placeholder="搜索插件名称、描述或作者"><button id="plug-market-search-btn">搜索</button></div>
+      <div id="plug-market-list"></div>
+      <div class="plug-market-pager"><button id="plug-market-prev" class="btn-s">上一页</button><span class="grow"></span><span id="plug-market-page-no" class="plug-market-count"></span><span class="grow"></span><button id="plug-market-next" class="btn-s">下一页</button></div>
     </div>
   </div>
 
@@ -772,28 +807,22 @@ input.secret.reveal{-webkit-text-security:none}
     <div class="modal-card">
       <h3>导入插件</h3>
       <p class="mini-note" style="margin:0">粘贴插件清单（JSON）。必须声明 manifestVersion、apiVersion、permissions 和工具能力。</p>
-      <div class="plug-risk">⚠️ 第三方插件由用户自行提供。本地校验不能证明插件安全；请先审查代码和权限，不要导入来源不明或包含敏感数据处理的插件。</div>
+      <div class="plug-risk" id="import-risk">⚠️ 第三方插件由用户自行提供，请先审查代码和权限。<button class="plug-risk-close" data-close-risk="import-risk" aria-label="关闭提示">×</button></div>
+      <div class="plug-import-choice">
+        <button id="plug-mode-text" class="btn-p">直接创建</button>
+        <button id="plug-mode-file" class="btn-s">从文件导入</button>
+        <button id="plug-mode-url" class="btn-s">从 URL 导入</button>
+      </div>
+      <div id="plug-source-text" class="plug-import-source open">
       <textarea id="plug-code" placeholder='{"manifestVersion":1,"apiVersion":"0.1","id":"com.example.demo","name":"示例插件","permissions":[],"tools":[{"name":"hello","description":"处理输入","permissions":[],"kind":"js","code":"async function run(args){return args;}"}]}'></textarea>
+      </div>
+      <div id="plug-source-file" class="plug-import-source"><div class="mini-note">选择包含插件 JSON 清单的文件。</div><button id="plug-file-pick" class="btn-s">选择插件文件</button></div>
+      <div id="plug-source-url" class="plug-import-source"><div class="plug-import-url"><input id="plug-import-url" type="url" placeholder="https://example.com/plugin.json"><button id="plug-url-load" class="btn-s">读取</button></div></div>
       <div id="plug-modal-msg" class="mini-note"></div>
       <div class="acts">
         <button id="plug-cancel" class="btn-s">取消</button>
         <button id="plug-ok" class="btn-p">安装</button>
       </div>
-    </div>
-  </div>
-
-  <div id="plug-market-modal" class="modal">
-    <div class="modal-card">
-      <h3>插件市场</h3>
-      <p class="mini-note" style="margin:0">本地索引随 APK 提供；远程索引仅在你主动点击同步时以只读方式获取。安装前会校验清单和 SHA-256，并展示来源、信任状态与权限。</p>
-      <div class="plug-risk">⚠️ 第三方插件免责声明：插件可能存在代码错误、隐私泄露、数据损坏、网络请求或恶意行为风险。市场索引、权限声明、哈希校验和审核状态不代表 ElysiaFloat 对插件安全性、可用性或作者行为作保证。请在安装和启用前自行核对来源、代码及最小权限，不要向插件提供密码、API Key、Cookie 或其它敏感信息。启用插件即表示你理解并自行承担相应风险；文件修改仍会逐次弹窗确认。</div>
-      <div class="msbar" style="padding:6px 0;background:transparent;border:0">
-        <input id="plug-market-url" type="url" placeholder="远程市场 index.json 地址">
-        <button id="plug-market-sync" class="btn-s">同步</button>
-      </div>
-      <div id="plug-market-status" class="mini-note" style="margin:0 0 4px"></div>
-      <div id="plug-market-list"></div>
-      <div class="acts"><button id="plug-market-close" class="btn-s">关闭</button></div>
     </div>
   </div>
 
@@ -1323,12 +1352,19 @@ window.__imgPicked = function () {
 window.__imgPickFailed = function () { PICK_MODE = 'avatar'; toast('图片读取失败，换一张试试~'); };
 
 window.__filePicked = function () {
+  const pluginMode = PICK_MODE === 'plugin';
   PICK_MODE = 'avatar';
   let raw = '';
   try { if (HAS_NATIVE && Android.getPickedFile) raw = Android.getPickedFile() || ''; } catch (e) {}
   let f = null;
   try { f = JSON.parse(raw || '{}'); } catch (e) {}
-  if (!f || !f.name) { toast('没有读到文件'); return; }
+  if (!f || !f.name) { pluginMode ? plugInstallError('没有读到文件。') : toast('没有读到文件'); return; }
+  if (pluginMode) {
+    if (!f.ok || !f.text) return plugInstallError('文件不是可读取的文本 JSON。');
+    $('#plug-modal').classList.add('open');
+    setPlugImportMode('file');
+    return plugInstallFromText(f.text);
+  }
   if (f.ok && f.text) setAttachment({ kind: 'text', name: f.name, text: f.text });
   else setAttachment({ kind: 'file', name: f.name, size: f.size || 0 });
   toast((f.ok && f.text) ? '文件加上啦~' : '这个格式读不出正文，只能带上文件名了~');
@@ -3172,8 +3208,9 @@ function readScreenText() {
   return '';
 }
 function readScreen() {
+  // 快捷屏幕操作只能使用真实的无障碍屏幕内容，不能退回剪贴板冒充读屏。
   const t = readScreenText();
-  return t && t.length > 20 ? t : '';
+  return t && t.trim().length > 0 ? t.trim() : '';
 }
 function readClipboard() {
   try {
@@ -5213,10 +5250,13 @@ async function handleQuickAction(key) {
   else if (key === 'explain') { label = '通俗解释'; prompt = '请用通俗易懂的语言解释以下内容：'; }
   else return;
 
-  let content = readScreen();
-  if (!content) content = readClipboard();
+  if (!hasA11y() || !agentReadOn()) {
+    toast('这项功能需要先开启无障碍读屏权限~');
+    return;
+  }
+  const content = readScreen();
   if (!content) {
-    toast('读不到内容呀~\n请在引导里开启无障碍，或先复制一段文字');
+    toast('当前屏幕没有读到可用文字~ 请确认目标页面支持无障碍文本');
     return;
   }
 
@@ -5447,6 +5487,8 @@ async function toggleUserPlug(id) {
 
 let PLUG_REMOTE_MARKET = [];
 let PLUG_REMOTE_MARKET_URL = PLUG_MARKET_DEFAULT_URL;
+let PLUG_MARKET_PAGE = 1;
+const PLUG_MARKET_PAGE_SIZE = 6;
 try {
   const cachedMarket = sGet(PLUG_MARKET_CACHE_KEY, null);
   if (cachedMarket && Array.isArray(cachedMarket.plugins)) {
@@ -5537,7 +5579,11 @@ function renderPlugMarket() {
   if (!box) return;
   const input = $('#plug-market-url');
   if (input && !input.value) input.value = PLUG_REMOTE_MARKET_URL;
-  const entries = plugMarketEntries();
+  const query = String(($('#plug-market-search') && $('#plug-market-search').value) || '').trim().toLowerCase();
+  const all = plugMarketEntries().filter(p => !query || [p.name, p.description, p.desc, p.author, p.id].join(' ').toLowerCase().indexOf(query) >= 0);
+  const pages = Math.max(1, Math.ceil(all.length / PLUG_MARKET_PAGE_SIZE));
+  PLUG_MARKET_PAGE = Math.max(1, Math.min(PLUG_MARKET_PAGE, pages));
+  const entries = all.slice((PLUG_MARKET_PAGE - 1) * PLUG_MARKET_PAGE_SIZE, PLUG_MARKET_PAGE * PLUG_MARKET_PAGE_SIZE);
   box.innerHTML = entries.map(p => {
     const remote = p.marketSource === 'remote';
     const installed = USER_PLUGINS.some(x => x.id === p.id);
@@ -5547,12 +5593,17 @@ function renderPlugMarket() {
     const updateAvailable = !!(remote && installedPlugin && cmpVer(verArr(String(p.version || '0')), verArr(String(installedPlugin.version || '0'))) > 0);
     const buttonText = updateAvailable ? '更新' : (installedPlugin ? '已安装' : '安装');
     const buttonDisabled = installedPlugin && !updateAvailable;
-    return '<div class="plug-group" style="margin-top:8px">' +
+    return '<div class="plug-market-card">' +
       '<div class="plug-group-hd"><span class="plug-group-ic">' + esc(p.icon || '🧩') + '</span><span class="plug-group-name">' + esc(p.name) + '<span class="plug-sub">v' + esc(p.version) + '</span></span><button class="plug-mini" data-market-install="' + esc(p.id) + '" data-market-source="' + esc(p.marketSource) + '"' + (buttonDisabled ? ' disabled' : '') + '>' + buttonText + '</button></div>' +
       '<div class="plug-group-desc">' + esc(p.desc || p.description || '') + '</div>' +
       '<div class="plug-market-meta"><b>来源：</b>' + esc(remote ? '远程只读索引' : 'APK 内置索引') + '　<b>信任：</b>' + esc(trust) + '　<b>审核：</b>' + esc(status) +
       (remote ? '<br><b>完整性：</b>安装前校验 SHA-256' : '') + '</div>' + plugPermissionsHTML(p) + '</div>';
-  }).join('') || '<div class="mini-note">市场暂无插件。</div>';
+  }).join('') || '<div class="mini-note">没有匹配的插件。</div>';
+  const count = $('#plug-market-count'); if (count) count.textContent = all.length + ' 个插件';
+  const pageNo = $('#plug-market-page-no'); if (pageNo) pageNo.textContent = '第 ' + PLUG_MARKET_PAGE + ' / ' + pages + ' 页';
+  const prev = $('#plug-market-prev'), next = $('#plug-market-next');
+  if (prev) prev.disabled = PLUG_MARKET_PAGE <= 1;
+  if (next) next.disabled = PLUG_MARKET_PAGE >= pages;
 }
 async function installMarketPlugin(id, source) {
   let raw = source === 'remote'
@@ -5655,14 +5706,40 @@ function toggleTool(name) {
 /* ==========================================================
  *  插件安装 / 删除
  * ========================================================== */
-function openPlugInstall() {
+let PLUG_IMPORT_MODE = 'text';
+function setPlugImportMode(mode) {
+  PLUG_IMPORT_MODE = mode;
+  ['text', 'file', 'url'].forEach(x => {
+    const box = $('#plug-source-' + x); if (box) box.classList.toggle('open', x === mode);
+    const btn = $('#plug-mode-' + x); if (btn) btn.classList.toggle('btn-p', x === mode);
+  });
+}
+function openPlugInstall(mode) {
   const box = $('#plug-modal');
   if (!box) return;
   const code = $('#plug-code');
   if (code) code.value = '';
   const msg = $('#plug-modal-msg');
   if (msg) { msg.textContent = ''; msg.className = 'mini-note'; }
+  setPlugImportMode(mode || 'text');
   box.classList.add('open');
+}
+async function plugInstallFromUrl() {
+  const input = $('#plug-import-url');
+  const url = String((input && input.value) || '').trim();
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { return plugInstallError('URL 格式无效。'); }
+  if (parsed.protocol !== 'https:' || plugIsLocalHost(parsed.hostname)) return plugInstallError('URL 必须是 HTTPS 公网地址。');
+  try {
+    const r = await nativeReq('GET', url, { Accept: 'application/json' }, null, 20000);
+    if (r.status < 200 || r.status >= 300) throw new Error('HTTP ' + r.status);
+    await plugInstallFromText(r.text);
+  } catch (e) { plugInstallError('读取 URL 失败：' + errMsg(e)); }
+}
+function pickPlugFile() {
+  if (!HAS_NATIVE || !Android.pickFile) return plugInstallError('当前环境不支持文件选择。');
+  PICK_MODE = 'plugin';
+  try { Android.pickFile(); } catch (e) { plugInstallError('打开文件选择器失败：' + errMsg(e)); }
 }
 
 function plugInstallError(msg) {
@@ -6417,7 +6494,7 @@ function showView(v) {
   const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
   const settings = $('#settings'), music = $('#music'), mini = $('#mini-player'),
     memory = $('#memory'), memEdit = $('#mem-edit'), trans = $('#trans'),
-    plugins = $('#plugins');
+    plugins = $('#plugins'), plugMarketPage = $('#plug-market-page');
   const attachEl = $('#attach-bar');
   bodyEl.style.display = 'none';
   footEl.style.display = 'none';
@@ -6426,6 +6503,7 @@ function showView(v) {
   settings.classList.remove('open');
   music.classList.remove('open');
   if (plugins) plugins.classList.remove('open');
+  if (plugMarketPage) plugMarketPage.classList.remove('open');
   if (memory) memory.classList.remove('open');
   if (memEdit) memEdit.classList.remove('open');
   if (trans) trans.classList.remove('open');
@@ -6439,6 +6517,7 @@ function showView(v) {
     updateMini();
   } else if (v === 'settings') settings.classList.add('open');
   else if (v === 'plugins' && plugins) { plugins.classList.add('open'); renderPlugins(); }
+  else if (v === 'plug-market' && plugMarketPage) { plugMarketPage.classList.add('open'); renderPlugMarket(); }
   else if (v === 'music') music.classList.add('open');
   else if (v === 'memory' && memory) {
     memory.classList.add('open');
@@ -6490,7 +6569,9 @@ function bindPluginsPage() {
   };
 
   const market = $('#plug-market');
-  if (market) market.onclick = () => { renderPlugMarket(); $('#plug-market-modal').classList.add('open'); };
+  if (market) market.onclick = () => showView('plug-market');
+  const marketBack = $('#plug-market-back');
+  if (marketBack) marketBack.onclick = () => showView('plugins');
   const marketSync = $('#plug-market-sync');
   if (marketSync) marketSync.onclick = syncPlugMarket;
   const marketList = $('#plug-market-list');
@@ -6498,18 +6579,26 @@ function bindPluginsPage() {
     const b = e.target && e.target.closest ? e.target.closest('[data-market-install]') : null;
     if (b && !b.disabled) installMarketPlugin(b.dataset.marketInstall, b.dataset.marketSource || 'local');
   };
-  const marketClose = $('#plug-market-close');
-  if (marketClose) marketClose.onclick = () => $('#plug-market-modal').classList.remove('open');
-  const marketModal = $('#plug-market-modal');
-  if (marketModal) marketModal.onclick = (e) => { if (e.target === marketModal) marketModal.classList.remove('open'); };
+  const marketSearch = $('#plug-market-search');
+  if (marketSearch) marketSearch.oninput = () => { PLUG_MARKET_PAGE = 1; renderPlugMarket(); };
+  const marketSearchBtn = $('#plug-market-search-btn');
+  if (marketSearchBtn) marketSearchBtn.onclick = () => { PLUG_MARKET_PAGE = 1; renderPlugMarket(); };
+  const marketPrev = $('#plug-market-prev');
+  if (marketPrev) marketPrev.onclick = () => { PLUG_MARKET_PAGE--; renderPlugMarket(); };
+  const marketNext = $('#plug-market-next');
+  if (marketNext) marketNext.onclick = () => { PLUG_MARKET_PAGE++; renderPlugMarket(); };
   const inst = $('#plug-install');
-  if (inst) inst.onclick = openPlugInstall;
+  if (inst) inst.onclick = () => openPlugInstall('text');
+  ['text', 'file', 'url'].forEach(mode => { const b = $('#plug-mode-' + mode); if (b) b.onclick = () => setPlugImportMode(mode); });
+  const pick = $('#plug-file-pick'); if (pick) pick.onclick = pickPlugFile;
+  const loadUrl = $('#plug-url-load'); if (loadUrl) loadUrl.onclick = plugInstallFromUrl;
   const pc = $('#plug-cancel');
   if (pc) pc.onclick = () => $('#plug-modal').classList.remove('open');
   const pok = $('#plug-ok');
-  if (pok) pok.onclick = () => plugInstallFromText($('#plug-code').value);
+  if (pok) pok.onclick = () => PLUG_IMPORT_MODE === 'url' ? plugInstallFromUrl() : plugInstallFromText($('#plug-code').value);
   const pm = $('#plug-modal');
-  if (pm) pm.onclick = (e) => { if (e.target === pm) pm.classList.remove('open'); }; 
+  if (pm) pm.onclick = (e) => { if (e.target === pm) pm.classList.remove('open'); };
+  $$('.plug-risk-close').forEach(b => b.onclick = () => { const x = $('#' + b.dataset.closeRisk); if (x) x.remove(); });
 }
 
 /** 更新弹窗的关闭 / 下载按钮。 */

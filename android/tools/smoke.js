@@ -507,7 +507,7 @@ function step(name, fn) {
   });
 
   await step('插件页：结构存在且渲染不炸', () => {
-    for (const id of ['plugins', 'plug-list', 'btn-plug-page', 'plug-back', 'plug-market', 'plug-market-modal', 'plug-market-list', 'plug-preview-btn']) {
+    for (const id of ['plugins', 'plug-list', 'btn-plug-page', 'plug-back', 'plug-market', 'plug-market-page', 'plug-market-search', 'plug-market-list', 'plug-market-prev', 'plug-market-next', 'plug-preview-btn']) {
       if (!html.includes('id="' + id + '"')) throw new Error('index.html 里找不到 #' + id);
     }
     T.renderPlugins();
