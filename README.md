@@ -3,7 +3,7 @@
 > 一个常驻在安卓屏幕上的粉色悬浮窗 AI 助手。
 > 不占前台、不挡视线，随时能问、能看、能读屏、能翻译、能记事、能放歌。
 
-- **安卓 App**（主项目）：`android/` — 纯 Kotlin 原生外壳 + WebView 粉红 UI，当前版本 **0.6**（versionCode 10）
+- **安卓 App**（主项目）：`android/` — 纯 Kotlin 原生外壳 + WebView 粉红 UI，当前版本 **0.6.2**（versionCode 12，Debug 测试包）
 - **插件开发指南**：`PLUGINS.md` — 自定义插件的完整规范，见 [插件开发](#插件开发)
 - **浏览器用户脚本**（早期版本，功能较少）：`userscript/` — 见 [下文的区别说明](#浏览器用户脚本和-app-是什么关系)
 - **成品安装包**：`apk/` 与 [Releases](https://github.com/xysy92ds/ElysiaFloat/releases)
