@@ -584,7 +584,7 @@ input.secret.reveal{-webkit-text-security:none}
 .plug-import-url{display:flex;gap:8px;margin:8px 0}
 .plug-import-url input{flex:1;min-width:0}
 .plug-market-url-row{display:flex;gap:8px;margin:6px 0}
-.plug-market-url-row input{flex:1;min-width:0}
+.plug-market-url-row input{flex:1;min-width:0}.plug-market-url-row #plug-market-url-box{display:flex;gap:8px;flex:1;min-width:0}.plug-market-url-row #plug-market-url-box[hidden]{display:none}
 .plug-group{margin-top:6px}
 .plug-group-hd{display:flex;align-items:center;gap:8px;padding:8px 2px 2px}
 .plug-group-ic{font-size:16px;flex-shrink:0}
@@ -657,7 +657,7 @@ input.secret.reveal{-webkit-text-security:none}
     </div>
     <div id="plugins-scroll">
       <div class="mini-note" style="margin:0 0 4px">以下是 AI 当前可以调用的全部工具。关闭某项开关后，AI 将无法使用该工具，也不会再读到它的说明。</div>
-      <div class="plug-risk">⚠️ 第三方插件风险提示：插件可能由非 ElysiaFloat 作者提供，可能包含错误、隐私风险或恶意行为。市场展示和清单校验不等于安全审查或质量保证；安装、启用前请核对来源、代码和权限，勿输入 API Key、Cookie 等敏感信息。</div>
+      <div class="plug-risk" id="plugin-risk">⚠️ 第三方插件风险提示：插件可能由非 ElysiaFloat 作者提供，可能包含错误、隐私风险或恶意行为。市场展示和清单校验不等于安全审查或质量保证；安装、启用前请核对来源、代码和权限，勿输入 API Key、Cookie 等敏感信息。<button class="plug-risk-close" data-close-risk="plugin-risk" aria-label="关闭提示">×</button></div>
       <pre id="plug-help-box" class="plug-preview" style="display:none"></pre>
       <div id="plug-list"></div>
       <pre id="plug-preview" class="plug-preview" style="display:none"></pre>
@@ -672,7 +672,7 @@ input.secret.reveal{-webkit-text-security:none}
     <div id="plug-market-scroll">
       <div class="mini-note">浏览和安装插件。市场只展示清单，安装前仍会校验来源、权限和 SHA-256。</div>
       <div class="plug-risk" id="market-risk">⚠️ 第三方插件可能存在隐私、稳定性或恶意行为风险，请自行核对来源、代码和权限。<button class="plug-risk-close" data-close-risk="market-risk" aria-label="关闭提示">×</button></div>
-      <div class="plug-market-url-row"><input id="plug-market-url" type="url" placeholder="远程市场地址（可选）"><button id="plug-market-sync" class="btn-s">同步</button></div>
+      <div class="plug-market-url-row"><button id="plug-market-source-toggle" class="btn-s">远程源设置</button><div id="plug-market-url-box" hidden><input id="plug-market-url" type="url" placeholder="远程市场地址"><button id="plug-market-sync" class="btn-s">同步</button></div></div>
       <div id="plug-market-status" class="mini-note"></div>
       <div class="msbar"><input id="plug-market-search" type="search" placeholder="搜索插件名称、描述或作者"><button id="plug-market-search-btn">搜索</button></div>
       <div id="plug-market-list"></div>
@@ -6572,6 +6572,11 @@ function bindPluginsPage() {
   if (market) market.onclick = () => showView('plug-market');
   const marketBack = $('#plug-market-back');
   if (marketBack) marketBack.onclick = () => showView('plugins');
+  const marketSourceToggle = $('#plug-market-source-toggle');
+  if (marketSourceToggle) marketSourceToggle.onclick = () => {
+    const box = $('#plug-market-url-box');
+    if (box) box.hidden = !box.hidden;
+  };
   const marketSync = $('#plug-market-sync');
   if (marketSync) marketSync.onclick = syncPlugMarket;
   const marketList = $('#plug-market-list');
