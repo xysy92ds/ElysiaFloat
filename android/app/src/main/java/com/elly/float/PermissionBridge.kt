@@ -20,6 +20,41 @@ import java.nio.charset.StandardCharsets
 
 class PermissionBridge(private val ctx: Context) {
 
+    /* ---------- Agent 运行时与外部适配器 ---------- */
+    @JavascriptInterface
+    fun getAgentRuntimeState(): String = AgentRuntime.state(ctx).toString()
+
+    @JavascriptInterface
+    fun runRootOperation(operation: String, taskId: String): String {
+        val denied = AgentPolicy.checkAgentOnly(ctx, "L3")
+        if (denied != null) return JSONObject().put("ok", false).put("errorCode", "AGENT_DENIED").put("error", denied).toString()
+        return RootWorker.run(ctx, operation, taskId).toString()
+    }
+
+    @JavascriptInterface
+    fun getAgentRuntimeCapabilities(): String = JSONArray().apply {
+        CapabilityRuntimes.all().forEach { put(JSONObject().put("id", it.id).put("available", it.available(ctx))) }
+    }.toString()
+
+    @JavascriptInterface
+    fun getTermuxWorkerState(): String = TermuxWorker.state(ctx).toString()
+
+    @JavascriptInterface
+    fun createTermuxSession(): String = TermuxWorker.createSession(ctx).toString()
+
+    @JavascriptInterface
+    fun dispatchTermuxJob(jobJson: String): String = try {
+        TermuxWorker.dispatch(ctx, JSONObject(jobJson)).toString()
+    } catch (e: Exception) { JSONObject().put("ok", false).put("errorCode", "INVALID_JOB").put("error", "Termux 任务格式无效").toString() }
+
+    @JavascriptInterface
+    fun listExternalAgents(): String = ExternalAgentAdapter.list(ctx).toString()
+
+    @JavascriptInterface
+    fun registerExternalAgent(manifest: String): String = try {
+        ExternalAgentAdapter.register(ctx, JSONObject(manifest)).toString()
+    } catch (e: Exception) { JSONObject().put("ok", false).put("errorCode", "INVALID_ADAPTER").put("error", "外部 Agent 清单无效").toString() }
+
     /* ---------- 悬浮窗 ---------- */
     @JavascriptInterface
     fun hasOverlay(): Boolean = try { Settings.canDrawOverlays(ctx) } catch (e: Exception) { false }
@@ -296,6 +331,16 @@ class PermissionBridge(private val ctx: Context) {
 
     /* ---------- 读屏 ---------- */
     @JavascriptInterface
+    fun getScreenTextOnce(): String = try {
+        EllyAccessibilityService.instance?.dumpScreenText() ?: ""
+    } catch (_: Exception) { "" }
+
+    @JavascriptInterface
+    fun getScreenNodesOnce(): String = try {
+        EllyAccessibilityService.instance?.dumpScreenNodes() ?: "[]"
+    } catch (_: Exception) { "[]" }
+
+    @JavascriptInterface
     fun getScreenText(): String = try {
         if (AgentPolicy.check(ctx, "L1") != null) ""
         else EllyAccessibilityService.instance?.dumpScreenText() ?: ""
@@ -311,6 +356,11 @@ class PermissionBridge(private val ctx: Context) {
      * 「文字 + 坐标」一次性拿走，屏幕翻译原位覆盖就靠它。
      * 返回 JSON 数组：[{t,x,y,w,h}]，单位屏幕物理像素；拿不到返回 []。
      */
+    @JavascriptInterface
+    fun getScreenDigest(): String = try {
+        EllyAccessibilityService.instance?.dumpScreenDigest() ?: "{}"
+    } catch (e: Exception) { "{}" }
+
     @JavascriptInterface
     fun getScreenNodes(): String = try {
         if (AgentPolicy.check(ctx, "L1") != null) "[]"
@@ -431,6 +481,65 @@ class PermissionBridge(private val ctx: Context) {
         } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "工作区创建失败").toString() }
     }
 
+    /* ---------- P1：独立任务工作区 ---------- */
+    @JavascriptInterface
+    fun createTaskWorkspace(taskId: String, title: String, goal: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        if (!workspaceRoot().isDirectory) return JSONObject().put("ok", false).put("errorCode", "WORKSPACE_MISSING").put("error", "请先创建 ElysiaFloat 工作区").toString()
+        return TaskWorkspace.create(taskId, title, goal).toString()
+    }
+
+    @JavascriptInterface
+    fun taskWorkspaceState(taskId: String): String = TaskWorkspace.state(taskId).toString()
+
+    @JavascriptInterface
+    fun taskWorkspaceIndex(taskId: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.index(taskId).toString()
+    }
+
+    @JavascriptInterface
+    fun snapshotTaskFile(taskId: String, relative: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.snapshot(taskId, relative).toString()
+    }
+
+    @JavascriptInterface
+    fun listTaskSnapshots(taskId: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.listSnapshots(taskId).toString()
+    }
+
+    @JavascriptInterface
+    fun restoreTaskFile(taskId: String, snapshotName: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.restore(taskId, snapshotName).toString()
+    }
+
+    @JavascriptInterface
+    fun importTaskText(taskId: String, name: String, text: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.importText(taskId, name, text).toString()
+    }
+
+    @JavascriptInterface
+    fun deleteTaskWorkspace(taskId: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.delete(taskId).toString()
+    }
+
+    @JavascriptInterface
+    fun updateTaskWorkspace(taskId: String, status: String, phase: String, progress: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.update(taskId, status, phase, progress).toString()
+    }
+
+    @JavascriptInterface
+    fun appendTaskLog(taskId: String, eventJson: String): String {
+        if (!hasAllFilesAccess()) return JSONObject().put("ok", false).put("errorCode", "FILES_PERMISSION").put("error", "请先开启允许管理所有文件").toString()
+        return TaskWorkspace.appendLog(taskId, eventJson).toString()
+    }
+
     @JavascriptInterface
     fun agentWorkspaceList(relative: String): String {
         val denied = workspaceDenied("L3")
@@ -478,11 +587,23 @@ class PermissionBridge(private val ctx: Context) {
         val file = workspaceFile(relative) ?: return JSONObject().put("ok", false).put("error", "工作区路径不合法").toString()
         if (file.exists() && !overwrite) return JSONObject().put("ok", false).put("error", "文件已存在，需明确允许覆盖").toString()
         if (text.length > 500_000) return JSONObject().put("ok", false).put("error", "单个文件不能超过 500KB").toString()
+        if (SymlinkGuard.hasSymlink(file)) {
+            return JSONObject().put("ok", false).put("error", "目标路径包含符号链接，已拒绝写入").toString()
+        }
         return try {
             file.parentFile?.mkdirs()
-            FileOutputStream(file, false).use { it.write(text.toByteArray(StandardCharsets.UTF_8)) }
+            AtomicWrite.write(file, text.toByteArray(StandardCharsets.UTF_8))
             JSONObject().put("ok", true).put("relative", relative.trim()).put("bytes", file.length()).toString()
         } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "写入文件失败").toString() }
+    }
+
+    /** G7-3：给 WebView 用的本地文件地址，用于图片预览；仍受工作区路径限制 */
+    @JavascriptInterface
+    fun workspaceFileUrl(relative: String): String {
+        return try {
+            val f = workspaceFile(relative)
+            if (f == null || !f.exists() || !f.isFile) "" else "file://" + f.absolutePath
+        } catch (e: Exception) { "" }
     }
 
     @JavascriptInterface
@@ -564,9 +685,12 @@ class PermissionBridge(private val ctx: Context) {
         if (file.isDirectory) return JSONObject().put("ok", false).put("error", "目标是目录").toString()
         if (file.exists() && !overwrite) return JSONObject().put("ok", false).put("error", "文件已存在，需明确允许覆盖").toString()
         if (text.length > 500_000) return JSONObject().put("ok", false).put("error", "单个文本文件不能超过 500KB").toString()
+        if (SymlinkGuard.hasSymlink(file)) {
+            return JSONObject().put("ok", false).put("error", "目标路径包含符号链接，已拒绝写入").toString()
+        }
         return try {
             file.parentFile?.mkdirs()
-            FileOutputStream(file, false).use { it.write(text.toByteArray(StandardCharsets.UTF_8)) }
+            AtomicWrite.write(file, text.toByteArray(StandardCharsets.UTF_8))
             JSONObject().put("ok", true).put("path", file.absolutePath).put("bytes", file.length()).toString()
         } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "写入外部文件失败").toString() }
     }
@@ -606,7 +730,7 @@ class PermissionBridge(private val ctx: Context) {
         val file = externalPublicFile(path) ?: return JSONObject().put("ok", false).put("error", "外部文件路径不合法").toString()
         if (!file.exists()) return JSONObject().put("ok", false).put("error", "文件或目录不存在").toString()
         return try {
-            val deleted = if (recursive && file.isDirectory) file.deleteRecursively() else file.delete()
+            val deleted = if (recursive && file.isDirectory) SafeDelete.deleteTree(file) else file.delete()
             JSONObject().put("ok", deleted).put("path", file.absolutePath)
                 .put("error", if (deleted) JSONObject.NULL else "删除失败，非空目录需要 recursive=true")
         } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "删除外部文件失败") }.toString()
@@ -697,6 +821,21 @@ class PermissionBridge(private val ctx: Context) {
             put("screenH", dm.heightPixels)
         }.toString()
     } catch (e: Exception) { "{}" }
+
+    /** 屏幕尺寸兼容接口：全屏按钮直接读取真实显示尺寸。 */
+    @JavascriptInterface
+    fun getScreenMetrics(): String = try {
+        val dm = ctx.resources.displayMetrics
+        JSONObject().put("screenW", dm.widthPixels).put("screenH", dm.heightPixels).toString()
+    } catch (e: Exception) { "{}" }
+
+    @JavascriptInterface
+    fun setFullscreen(enabled: Boolean): String = try {
+        (ctx as? FloatService)?.setFullscreen(enabled)?.toString() ?: JSONObject().put("ok", false).put("error", "浮窗服务不可用").toString()
+    } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "全屏切换失败").toString() }
+
+    @JavascriptInterface
+    fun isFullscreen(): Boolean = (ctx as? FloatService)?.isFullscreen() == true
 
     /* ---------- 窗口移动 / 缩放 ---------- */
     @JavascriptInterface

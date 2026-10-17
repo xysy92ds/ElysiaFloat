@@ -31,6 +31,7 @@ import android.os.SystemClock
 import android.text.TextUtils
 import android.util.Base64
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewOutlineProvider
@@ -47,6 +48,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.CountDownLatch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -74,6 +76,10 @@ class FloatService : Service() {
     private var wm: WindowManager? = null
     private var webView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
+    private var fullscreenMode = false
+    private var fullscreenPrevRect: IntArray? = null
+    private var fullscreenPrevFlags = 0
+    private var fullscreenPrevUi = 0
 
     /**
      * 原生音频引擎（第二批）：音乐与语音合成都走它。
@@ -342,6 +348,24 @@ class FloatService : Service() {
         wv.setBackgroundColor(0x00000000)
         wv.isVerticalScrollBarEnabled = false
         wv.isHorizontalScrollBarEnabled = false
+        wv.isFocusableInTouchMode = true
+        // 悬浮窗里长按选中/系统粘贴菜单需要 WebView 自身可长按且窗口可获得焦点
+        wv.isLongClickable = true
+        wv.isHapticFeedbackEnabled = true
+        // 覆盖层窗口里 ActionMode（选区菜单）会因为焦点抖动被立刻 dismiss：
+        // 手指按下时主动把焦点交给 WebView，但不消费事件（返回 false 让 WebView 正常处理）。
+        wv.setOnTouchListener { v, e ->
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+                try { v.requestFocus() } catch (_: Exception) { }
+            }
+            false
+        }
+        wv.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                wv.evaluateJavascript("window.__nativeBack&&window.__nativeBack()", null)
+                true
+            } else false
+        }
         wv.webViewClient = WebViewClient()
         wv.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(m: ConsoleMessage): Boolean = true
@@ -397,6 +421,49 @@ class FloatService : Service() {
         schedulePersistWinRect()
         pushRectToJs(false)
     }
+
+    /** 真正扩展悬浮窗到整块显示区域，并请求隐藏系统栏；不是只改 WebView CSS。 */
+    fun setFullscreen(enabled: Boolean): JSONObject {
+        var result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode)
+        val done = CountDownLatch(1)
+        val apply = {
+            try {
+                val p = params
+                val wv = webView
+                if (p == null || wv == null) {
+                    result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode).put("error", "浮窗尚未就绪")
+                } else {
+                    val dm = resources.displayMetrics
+                    if (enabled && !fullscreenMode) {
+                        fullscreenPrevRect = intArrayOf(p.x, p.y, p.width, p.height)
+                        fullscreenPrevFlags = p.flags
+                        fullscreenPrevUi = wv.systemUiVisibility
+                        p.x = 0; p.y = 0; p.width = dm.widthPixels; p.height = dm.heightPixels
+                        p.flags = fullscreenPrevFlags or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_FULLSCREEN
+                        wv.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        fullscreenMode = true
+                    } else if (!enabled && fullscreenMode) {
+                        val r = fullscreenPrevRect
+                        if (r != null) { p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3] }
+                        p.flags = fullscreenPrevFlags
+                        wv.systemUiVisibility = fullscreenPrevUi
+                        fullscreenMode = false
+                    }
+                    winRect = intArrayOf(p.x, p.y, p.width, p.height)
+                    wm?.updateViewLayout(wv, p)
+                    schedulePersistWinRect()
+                    pushRectToJs()
+                    result = JSONObject().put("ok", true).put("fullscreen", fullscreenMode).put("w", p.width).put("h", p.height)
+                }
+            } catch (e: Exception) {
+                result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode).put("error", e.message ?: "窗口切换失败")
+            } finally { done.countDown() }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) apply() else { main.post(apply); try { done.await(1200, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {} }
+        return result
+    }
+
+    fun isFullscreen(): Boolean = fullscreenMode
 
     fun resize(w: Int, h: Int) = runOnMain {
         val p = params ?: return@runOnMain

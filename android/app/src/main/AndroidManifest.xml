@@ -7,6 +7,7 @@
             <action android:name="android.intent.action.MAIN"/>
             <category android:name="android.intent.category.LAUNCHER"/>
         </intent>
+        <package android:name="com.termux"/>
     </queries>
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
@@ -26,6 +27,8 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <!-- 用户明确开启后，用于 Documents/ElysiaFloat/workspace 工作区。Android 11+ 通过特殊设置页授权。 -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+    <!-- Termux RUN_COMMAND 会在未安装/未授权时自然失败；调用前仍由 Worker 校验。 -->
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
 

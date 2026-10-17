@@ -7,6 +7,11 @@
 # 因此必须在启动 Gradle 时带上 LD_PRELOAD。
 set -e
 cd "$(dirname "$0")"
+# 前端源在 assets/src/，构建产物 assets/index.html 由脚本拼接生成；
+# 不先跑这一步，打包进去的就是旧产物。
+if command -v node >/dev/null 2>&1; then
+  node tools/build-html.js
+fi
 export GRADLE_USER_HOME=/workspace/gradle-home
 export JAVA_HOME=/workspace/alpine-jdk/usr/lib/jvm/java-17-openjdk
 export LD_PRELOAD=/workspace/libremovefix.so

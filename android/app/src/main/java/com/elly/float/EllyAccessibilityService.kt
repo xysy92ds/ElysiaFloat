@@ -202,6 +202,80 @@ class EllyAccessibilityService : AccessibilityService() {
         return arr.toString()
     }
 
+    /**
+     * G5-2：给 Agent 用的结构化屏幕摘要。
+     * 与 dumpScreenNodes 的区别：
+     *  - 带屏幕尺寸，便于用比例坐标；
+     *  - 带可点击/可编辑/密码/可滚动/焦点等布尔标记；
+     *  - 超限只体现在 count 与 nodes 长度差，不抛错、不中断。
+     * 只返回 isPassword 布尔值，绝不返回任何密码内容。
+     */
+    fun dumpScreenDigest(): String {
+        val out = JSONObject()
+        val arr = JSONArray()
+        var total = 0
+        val root = externalRoot()
+        if (root != null) {
+            try {
+                total = collectDigestNodes(root, arr, 0, 0)
+            } catch (_: Exception) { }
+        }
+        val dm = resources.displayMetrics
+        try {
+            out.put("screen", JSONObject().apply {
+                put("w", dm.widthPixels)
+                put("h", dm.heightPixels)
+                put("density", dm.density.toDouble())
+            })
+            out.put("count", total)
+            out.put("nodes", arr)
+        } catch (_: Exception) { }
+        return out.toString()
+    }
+
+    /** 返回实际遍历到的节点总数（含未写入数组的部分）。 */
+    private fun collectDigestNodes(node: AccessibilityNodeInfo?, arr: JSONArray, depth: Int, seen: Int): Int {
+        if (node == null || depth > 40) return seen
+        var count = seen + 1
+        val pkg = node.packageName?.toString() ?: ""
+        if (pkg == applicationContext.packageName) return seen
+        val txt = node.text?.toString()?.trim().orEmpty()
+        val desc = node.contentDescription?.toString()?.trim().orEmpty()
+        val label = if (txt.isNotEmpty()) txt else desc
+        val clickable = try { node.isClickable } catch (_: Exception) { false }
+        val editable = try {
+            node.className?.toString()?.contains("EditText", ignoreCase = true) == true ||
+                node.isEditable
+        } catch (_: Exception) { false }
+        val password = try { node.isPassword } catch (_: Exception) { false }
+        val scrollable = try { node.isScrollable } catch (_: Exception) { false }
+        val focused = try { node.isFocused } catch (_: Exception) { false }
+        val want = label.isNotEmpty() && label.length <= 400 && (arr.length() < MAX_NODES) || (clickable || editable)
+        if (want && arr.length() < MAX_NODES) {
+            val r = android.graphics.Rect()
+            try { node.getBoundsInScreen(r) } catch (_: Exception) { r.setEmpty() }
+            if (!r.isEmpty && r.width() > 0 && r.height() > 0) {
+                try {
+                    arr.put(JSONObject().apply {
+                        put("t", if (label.length > 80) label.substring(0, 80) else label)
+                        put("x", r.left)
+                        put("y", r.top)
+                        put("w", r.width())
+                        put("h", r.height())
+                        put("clk", clickable)
+                        put("edt", editable)
+                        put("pwd", password)
+                        put("scr", scrollable)
+                        put("foc", focused)
+                        put("cls", (node.className?.toString() ?: "").substringAfterLast('.'))
+                    })
+                } catch (_: Exception) { }
+            }
+        }
+        for (i in 0 until node.childCount) count = collectDigestNodes(node.getChild(i), arr, depth + 1, count)
+        return count
+    }
+
     private fun collectNodes(node: AccessibilityNodeInfo?, arr: JSONArray, depth: Int) {
         if (node == null || depth > 40 || arr.length() >= MAX_NODES) return
         val pkg = node.packageName?.toString() ?: ""

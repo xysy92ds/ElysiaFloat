@@ -33,7 +33,7 @@
       "enum": [
         "network.public", "network.local", "system.open_url", "clipboard.write", "storage.plugin",
         "files.public.read", "files.public.write", "files.public.delete", "workspace.read", "workspace.write",
-        "device.read", "device.screenshot", "device.action", "memory.read", "memory.write", "memory.delete"
+        "device.read", "device.screenshot", "device.action", "memory.read", "memory.write", "memory.delete", "music.control"
       ]
     },
     "tool": {

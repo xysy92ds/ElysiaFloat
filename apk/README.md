@@ -1,5 +1,17 @@
 # 📦 安装包
 
+## 当前最新测试包
+
+```text
+apk/phases/ElysiaFloat-music-ui-debug.apk
+apk/phases/ElysiaFloat-music-ui-debug-SHA256SUMS
+```
+
+这是当前音乐系统 UI/队列/缓存面板阶段的 Debug 测试包。后续测试版 APK 继续统一放在 `apk/phases/`，不会只留在 Android Gradle 深层输出目录。
+
+---
+
+
 ## ElysiaFloat-v0.6-debug.apk ⭐ 最新
 
 | 项 | 值 |

@@ -1,0 +1,26 @@
+# 构建产物
+android/app/build/
+android/build/
+android/.gradle/
+.gradle/
+**/.gradle/
+
+# 依赖
+node_modules/
+
+# 本地迁移快照（体积大，不进仓库）
+*.zip
+
+# 历史阶段测试包（只留当前发布包；阶段包见本地 apk/phases/，不上传）
+apk/phases/
+
+# 系统与编辑器
+.DS_Store
+*.swp
+.idea/
+*.iml
+
+# 敏感信息（防御性：即使误放也绝不提交）
+.env
+.env.*
+*.local.properties

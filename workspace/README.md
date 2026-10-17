@@ -1,6 +1,16 @@
 # 爱莉希雅项目工作文档区
 
-这个目录专门保存项目过程文档和接手上下文，不放运行时代码。面向用户和发布审核的稳定技术文档位于项目根目录 `docs/`；构建产物位于 `release/`。
+> 当前执行入口：先读 `STATUS.md`，再读 `plans/MASTER-EXECUTION-PLAN.md` 和 `issues/ISSUE-REGISTER.md`。原有 `plans/current.md` 保留完整历史方案，但不再单独作为任务状态的唯一来源。
+
+## 当前入口
+
+- `STATUS.md`：工作区现状、目录边界、产物规则和阅读顺序；
+- `plans/MASTER-EXECUTION-PLAN.md`：唯一完整任务链、依赖图和阶段出口；
+- `issues/ISSUE-REGISTER.md`：唯一问题总表，所有问题必须关联任务和证据；
+- `plans/current.md`：原有总规划、架构目标和历史上下文；
+- `issues/2026-10-16-comprehensive-audit.md`：本轮综合代码审计；
+- `work-logs/`：实际工作证据，不能用计划代替。
+
 
 ## 目录结构
 

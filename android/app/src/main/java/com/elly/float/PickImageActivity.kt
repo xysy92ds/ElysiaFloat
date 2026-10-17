@@ -100,9 +100,20 @@ class PickImageActivity : Activity() {
             obj.put("name", name)
             obj.put("mime", mime)
             obj.put("size", sizeStr?.toLongOrNull() ?: 0L)
-            val text = if (isTextLike(name, mime)) readText(uri) else null
-            obj.put("ok", text != null)
-            obj.put("text", text ?: "")
+            // G7-1：纯文本直接读；docx/xlsx/pptx/epub/zip/pdf 交给 FileExtractor
+            val size = sizeStr?.toLongOrNull() ?: 0L
+            val extracted = contentResolver.openInputStream(uri)?.use { ins ->
+                FileExtractor.extract(ins, name, mime, size)
+            }
+            if (extracted != null) {
+                extracted.put("name", name)
+                extracted.put("mime", mime)
+                extracted.put("size", size)
+                return extracted.toString()
+            }
+            obj.put("ok", false)
+            obj.put("text", "")
+            obj.put("note", "读取这个文件失败了，可能没有访问权限或文件已损坏。")
             obj.toString()
         } catch (e: Exception) {
             null

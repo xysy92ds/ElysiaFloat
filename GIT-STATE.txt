@@ -1,0 +1,22 @@
+本快照不包含 .git 目录。
+
+原因：历史提交里有 18 个早期 APK（合计约 26MB），对迁移没有价值。
+需要的只是下面这份状态，移植后重新 `git init` 即可继续。
+
+== 原仓库状态（导出时） ==
+分支: main
+HEAD: c83b082  (docs: define multi-mode agent and workspace roadmap)
+remote:
+  origin	https://github.com/xysy92ds/ElysiaFloat.git (fetch)
+  origin	https://github.com/xysy92ds/ElysiaFloat.git (push)
+工作区: 脏（未提交/未跟踪），这是预期状态，最近的工作都在工作区里
+
+== 最近 3 个提交 ==
+  c83b082  2026-10-08  docs: define multi-mode agent and workspace roadmap
+  f93a00a  2026-10-07  docs: explain agent capabilities and app whitelist
+  42781ad  2026-10-07  fix: avoid GitHub API rate limit for updates
+
+== 建议 ==
+  1. git init && git add -A && git commit -m 'import: ElysiaFloat G3 baseline'
+  2. 需要远程时再加 remote（不要复用旧 token，用新的最小权限 Fine-grained Token）
+  3. 推送前先跑 android/tools/smoke.js，并做一次凭据扫描

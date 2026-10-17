@@ -3,7 +3,7 @@
 > 一个常驻在安卓屏幕上的粉色悬浮窗 AI 助手。
 > 不占前台、不挡视线，随时能问、能看、能读屏、能翻译、能记事、能放歌。
 
-- **安卓 App**（主项目）：`android/` — 纯 Kotlin 原生外壳 + WebView 粉红 UI，当前版本 **0.6.2**（versionCode 12，Debug 测试包）
+- **安卓 App**（主项目）：`android/` — 纯 Kotlin 原生外壳 + WebView 粉红 UI，当前版本 **0.6.5**（versionCode 13，Debug 测试包）
 - **插件开发指南**：`PLUGINS.md` — 自定义插件的完整规范，见 [插件开发](#插件开发)
 - **浏览器用户脚本**（早期版本，功能较少）：`userscript/` — 见 [下文的区别说明](#浏览器用户脚本和-app-是什么关系)
 - **成品安装包**：`apk/` 与 [Releases](https://github.com/xysy92ds/ElysiaFloat/releases)
@@ -322,22 +322,22 @@ App 会读取仓库中的静态版本索引（`release/latest.json`），把版�
 
 ## 功能一览
 
-| 分类 | 能力 |
-|---|---|
-| **窗口** | 悬浮主窗 / 悬浮小球 / 小胶囊 / 音乐迷你条 / 屏幕译文叠加层；任意拖动、贴边 |
-| **对话** | 流式/非流式聊天、多轮上下文（轮数可调）、完整 function calling、多服务商预设 |
-| **看屏幕** | 无障碍节点树读屏、截屏、前台页面识别、可选独立识图模型 |
-| **快捷指令** | 翻译屏幕、总结屏幕、要点、解释（读屏时自动收成胶囊，完成弹红点） |
-| **屏幕翻译** | 免费 / AI 双引擎，仅译文 / 双语，悬浮面板 / 贴屏叠加两种形态 |
-| **长期记忆** | 分类记忆库、关键词+向量检索、常驻摘要块、AI 主动读写、可视化增删改查、JSON/Markdown 导入导出 |
-| **音乐** | GD Studio + Meting 双源搜索、播放、歌词、收藏、原生迷你控制条（可折叠） |
-| **语音** | 朗读助手回复，系统 TTS / OpenAI 兼容接口 |
-| **插件** | 独立插件页、逐组/逐项工具开关、自定义插件导入/导出 JSON、HTTP 与 JS 双模式、隔离沙箱执行；规范见 [`PLUGINS.md`](PLUGINS.md) |
-| **更新** | 静态版本索引检测、首启/每 24h 自动检查、手动检查、下载并调起系统安装器 |
-| **上传** | 发图片（走识图模型）、发文件（读文本内容，≤200KB） |
-| **其它** | 剪贴板读写、打开链接、头像裁剪、主题色自定义、导出导入全部配置 |
+> 只列能力范围，不列每次改动。详细变化见 [`docs/history/0.6.5.md`](docs/history/0.6.5.md)。
 
----
+| 方向 | 能力 |
+|---|---|
+| **窗口形态** | 悬浮主窗 / 悬浮小球 / 状态胶囊 / 音乐迷你条 / 译文叠加层；任意拖动、贴边、等比缩放 |
+| **对话** | 多服务商预设、多轮上下文、完整 function calling、模型可用性检测、可调单次超时（生图/长推理友好） |
+| **看屏幕** | 无障碍节点树读屏（带控件类型与位置）、截屏、限时观察、独立识图模型 |
+| **手机 Agent** | 应用解析与白名单、点击/输入/滑动/按键/启动；执行有阶段、动作有验证、预算可控、随时可停 |
+| **工作任务** | 独立任务工作区（input/working/output/logs/snapshots）、文件索引、写入前快照与回滚 |
+| **文件能力** | 读：文本 / Word / Excel / 幻灯片 / 电子书 / 压缩包清单 / PDF；写：Markdown / 文本 / CSV / JSON / HTML；导出后可直接预览 |
+| **权限模型** | L1（只读）/ L2（工作区写入）/ L3 + 安全（手机操作、工作区外写入删除）、应用白名单、高风险逐次确认 |
+| **长期记忆** | 分类记忆库、关键词 + 向量检索、按消息量自动整理、手动整理、导入导出 |
+| **音乐** | 多来源搜索与分页、播放/歌词/收藏/历史/队列/缓存面板、下载进度、单曲删除、随主题换色 |
+| **插件** | 清单规范、权限声明、逐组逐项开关、HTTP 与 JS 沙箱双模式、本地与远程市场、SHA-256 校验 |
+| **语音与翻译** | 朗读（系统 TTS / OpenAI 兼容）、屏幕翻译（免费 / AI 双引擎，叠加或面板） |
+| **其它** | 剪贴板、打开链接、头像裁剪、主题色、配置导出导入、自动检查更新 |
 
 ## 怎么用
 
@@ -451,39 +451,60 @@ cd android
 
 ```
 ElysiaFloat/
-├── README.md                  ← 你正在看的这份
-├── PLUGINS.md                 ← 🧩 插件开发指南（清单规范 / host API / 示例）
+├── README.md                  ← 项目总览（你正在看的这份）
+├── PLUGINS.md                 ← 🧩 插件开发指南
+├── AGENT-START-HERE.md        ← 接手/迁移入口（给下一个开发者或 Agent）
+├── GIT-STATE.txt              ← 迁移快照里的仓库状态说明
 ├── android/                   ← 📱 安卓 App 源码（主项目）
 │   ├── build.sh               ← 构建入口（Gradle 环境封装）
-│   ├── BUILD_NOTES.md         ← 构建笔记 / Termux 环境下的坑
-│   ├── tools/                 ← apkzlib 垫片 + 冒烟测试
-│   │   ├── smoke.js           ← 无需安卓即可跑的 JS 逻辑冒烟测试
-│   │   └── remove_fix.c       ← 只给受限环境用的 apkzlib 垫片
+│   ├── BUILD_NOTES.md         ← 构建笔记 / 受限环境下的坑
+│   ├── tools/                 ← 无需安卓即可运行的校验工具
+│   │   ├── build-html.js      ← 把 assets/src 模块拼成 index.html
+│   │   ├── harness.js         ← 假 DOM / 假桥接的运行环境
+│   │   └── smoke.js           ← 冒烟测试（全部逻辑回归）
 │   └── app/src/main/
 │       ├── AndroidManifest.xml
 │       ├── assets/
-│       │   ├── index.html     ← ★ 整个 UI + 全部业务逻辑都在这一个文件里
-│       │   ├── avatar.jpg
-│       │   └── cover.jpg
-│       ├── java/com/elly/float/
-│       │   ├── MainActivity.kt             → 启动、引导开权限、拉起悬浮窗
-│       │   ├── FloatService.kt             → ★ 前台服务 + 全部悬浮窗（最大文件）
-│       │   ├── JsBridge.kt                 → Android.* 桥（干活）
-│       │   ├── PermissionBridge.kt         → Perm.* 桥（权限与系统状态）
-│       │   ├── AudioEngine.kt              → 原生音频播放引擎
-│       │   ├── ApkProvider.kt              → 安装包 content:// 提供者（零依赖）
-│       │   ├── EllyAccessibilityService.kt → 读屏（节点树 + 真实坐标）
-│       │   ├── ScreenCaptureActivity.kt    → 截屏授权
-│       │   ├── ScreenShotUtil.kt           → MediaProjection 截帧
+│       │   ├── index.html     ← 构建产物（由 assets/src 生成，勿手改）
+│       │   └── src/           ← ★ 前端源码：18 个模块 + 样式 + 模板
+│       │       ├── manifest.json      ← 模块顺序
+│       │       ├── template.html      ← 页面骨架
+│       │       ├── styles/main.css    ← 主题与布局
+│       │       └── scripts/           ← 兼容层、请求层、任务、插件、音乐、Agent…
+│       ├── java/com/elly/assistant/
+│       │   ├── MainActivity.kt             → 启动、引导开权限
+│       │   ├── FloatService.kt             → 前台服务 + 全部悬浮窗
+│       │   ├── JsBridge.kt                 → Android.* 桥（网络/媒体/缓存）
+│       │   ├── PermissionBridge.kt         → Perm.* 桥（权限/文件/Agent）
+│       │   ├── AgentPolicy.kt              → L1/L2/L3、安全开关、白名单门禁
+│       │   ├── EllyAccessibilityService.kt → 读屏与动作执行
+│       │   ├── TaskWorkspace.kt            → 任务工作区、快照、索引
+│       │   ├── FileExtractor.kt            → 多格式正文提取（0.6.5 新增）
+│       │   ├── FileSafety.kt               → 原子写 / 符号链接 / 安全删除（0.6.5 新增）
+│       │   ├── AudioEngine.kt              → 原生音频播放
+│       │   ├── TermuxWorker.kt / RootWorker.kt / ExternalAgentAdapter.kt
+│       │   ├── ScreenCaptureActivity.kt / ScreenShotUtil.kt
 │       │   └── PickImageActivity.kt        → 选图 / 选文件
-│       └── res/                            → 图标、主题、字符串、无障碍配置
-├── apk/                       ← 📦 已编译好的安装包
+│       └── res/                            → 图标、主题、无障碍配置
+├── docs/                      ← 📚 技术文档、用户教程、版本历史
+│   ├── user-guide/tutorial.md          ← 上手教程
+│   ├── security/permission-model.md    ← 权限与策略
+│   ├── development/plugin-system.md    ← 插件系统
+│   └── history/0.6.5.md                ← 本版宏观说明
+├── marketplace/               ← 🧩 插件市场索引、Schema、示例插件
+├── workspace/                 ← 计划、问题总表、决策、工作日志（开发过程）
+├── apk/                       ← 📦 已编译安装包（含各阶段测试包）
+├── release/                   ← 发布索引与历史发布说明
 └── userscript/                ← 🌐 浏览器用户脚本（早期轻量版）
-    ├── elysia-web-assistant-v4.2.user.js
-    └── elysia-web-assistant-v0.3.user.js
 ```
 
-历史版本安装包在 [Releases](https://github.com/xysy92ds/ElysiaFloat/releases) 里。
+### 文档索引
+
+- 上手教程：[`docs/user-guide/tutorial.md`](docs/user-guide/tutorial.md)
+- 本版说明：[`docs/history/0.6.5.md`](docs/history/0.6.5.md)
+- 权限模型：[`docs/security/permission-model.md`](docs/security/permission-model.md)
+- 插件系统：[`docs/development/plugin-system.md`](docs/development/plugin-system.md)
+- 插件开发：[`PLUGINS.md`](PLUGINS.md)
 
 ### 想改哪里？
 

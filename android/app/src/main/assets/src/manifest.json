@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "template": "template.html",
+  "styles": [
+    "styles/main.css"
+  ],
+  "scripts": [
+    "scripts/00-compat.js",
+    "scripts/00b-request.js",
+    "scripts/01-ui-dialog.js",
+    "scripts/02-config.js",
+    "scripts/03-state-tasks.js",
+    "scripts/04-plugins-core.js",
+    "scripts/05-memory.js",
+    "scripts/06-ui-render.js",
+    "scripts/07-media-tts.js",
+    "scripts/08-translate.js",
+    "scripts/09-ai-request.js",
+    "scripts/10-music.js",
+    "scripts/11-plugin-engine.js",
+    "scripts/12-send-quick.js",
+    "scripts/13-settings.js",
+    "scripts/14-update.js",
+    "scripts/15-views.js",
+    "scripts/16-permission-boot.js"
+  ],
+  "modules": [
+    {
+      "file": "00-compat.js",
+      "title": "兼容层、桥接与环境探测",
+      "chunks": [
+        0,
+        3
+      ],
+      "bytes": 10618
+    },
+    {
+      "file": "01-ui-dialog.js",
+      "title": "弹窗、头像、附件与窗口缩放",
+      "chunks": [
+        4,
+        7
+      ],
+      "bytes": 15402
+    },
+    {
+      "file": "02-config.js",
+      "title": "默认配置与人设/工具/上下文",
+      "chunks": [
+        8,
+        9
+      ],
+      "bytes": 19038
+    },
+    {
+      "file": "03-state-tasks.js",
+      "title": "状态与任务模型 v1",
+      "chunks": [
+        10,
+        12
+      ],
+      "bytes": 22742
+    },
+    {
+      "file": "04-plugins-core.js",
+      "title": "开放插件系统（清单与注册表）",
+      "chunks": [
+        13,
+        13
+      ],
+      "bytes": 17548
+    },
+    {
+      "file": "05-memory.js",
+      "title": "长期记忆库",
+      "chunks": [
+        14,
+        14
+      ],
+      "bytes": 26229
+    },
+    {
+      "file": "06-ui-render.js",
+      "title": "主题、快捷操作与对话渲染",
+      "chunks": [
+        15,
+        17
+      ],
+      "bytes": 6551
+    },
+    {
+      "file": "07-media-tts.js",
+      "title": "TTS、读屏与截屏",
+      "chunks": [
+        18,
+        20
+      ],
+      "bytes": 12449
+    },
+    {
+      "file": "08-translate.js",
+      "title": "翻译（微软与屏幕翻译）",
+      "chunks": [
+        21,
+        22
+      ],
+      "bytes": 12846
+    },
+    {
+      "file": "09-ai-request.js",
+      "title": "AI 请求与工具循环",
+      "chunks": [
+        23,
+        23
+      ],
+      "bytes": 1872
+    },
+    {
+      "file": "10-music.js",
+      "title": "音乐模块与播放器对账",
+      "chunks": [
+        24,
+        26
+      ],
+      "bytes": 59324
+    },
+    {
+      "file": "11-plugin-engine.js",
+      "title": "插件执行引擎",
+      "chunks": [
+        27,
+        27
+      ],
+      "bytes": 24723
+    },
+    {
+      "file": "12-send-quick.js",
+      "title": "发送与快捷操作",
+      "chunks": [
+        28,
+        29
+      ],
+      "bytes": 6729
+    },
+    {
+      "file": "13-settings.js",
+      "title": "设置页与插件安装",
+      "chunks": [
+        30,
+        31
+      ],
+      "bytes": 26914
+    },
+    {
+      "file": "14-update.js",
+      "title": "应用更新",
+      "chunks": [
+        32,
+        32
+      ],
+      "bytes": 40314
+    },
+    {
+      "file": "15-views.js",
+      "title": "视图切换、音乐 UI、顶栏与输入区",
+      "chunks": [
+        33,
+        37
+      ],
+      "bytes": 17650
+    },
+    {
+      "file": "16-permission-boot.js",
+      "title": "权限引导与启动",
+      "chunks": [
+        38,
+        40
+      ],
+      "bytes": 12074
+    }
+  ],
+  "sourceSha256": "eb6292fd7fef13c1f82ed05dc63cf7656a69de2513712e6ee75e8cb511a86fbe"
+}
