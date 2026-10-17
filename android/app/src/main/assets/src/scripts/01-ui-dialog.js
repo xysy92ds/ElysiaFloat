@@ -2,6 +2,27 @@
  *  自定义弹窗（替代原生 confirm，浮窗里才能正常显示）
  * ========================================================== */
 let _modalCb = null;
+
+/* 通用点击绑定：Android WebView 里单个 onclick 偶发被吞。
+ * 同时挂 pointerup / touchend / click，并按时间做去重，避免同一手势重复触发。 */
+function bindTap(el, fn) {
+  if (!el) return;
+  try { el.type = 'button'; } catch (e) {}
+  el.style.pointerEvents = 'auto';
+  el.style.touchAction = 'manipulation';
+  let last = 0;
+  const handler = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    const now = Date.now();
+    if (now - last < 350) return false;
+    last = now;
+    fn(e);
+    return false;
+  };
+  el.onclick = handler;
+  el.ontouchend = handler;
+  el.onpointerup = handler;
+}
 /* ==========================================================
  *  长按菜单（复制 / 全选 / 粘贴）
  *  覆盖层窗口里系统 ActionMode 常被立刻 dismiss，这里补一个系统样式的兜底：

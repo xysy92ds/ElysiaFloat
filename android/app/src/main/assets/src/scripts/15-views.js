@@ -329,8 +329,8 @@ function bindInput() {
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
-  $('#send').onclick = send;
-  $('#btn-plus').onclick = () => $('#plus-modal').classList.add('open');
+  bindTap($('#send'), send);
+  bindTap($('#btn-plus'), () => $('#plus-modal').classList.add('open'));
   $('#plus-image').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('image'); };
   $('#plus-file').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('file'); };
   $('#plus-cancel').onclick = () => $('#plus-modal').classList.remove('open');
