@@ -49,7 +49,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.CountDownLatch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -77,9 +76,6 @@ class FloatService : Service() {
     private var wm: WindowManager? = null
     private var webView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
-    private var fullscreenMode = false
-    /** 进入全屏前保存的悬浮窗矩形，退出全屏时恢复。 */
-    private var fullscreenPrevRect: IntArray? = null
 
     /**
      * 原生音频引擎（第二批）：音乐与语音合成都走它。
@@ -118,14 +114,23 @@ class FloatService : Service() {
 
     /**
      * 布局基准尺寸（物理像素）：页面永远是按这个尺寸排版然后再整体缩放的，
-     * 所以它必须是常量。否则一缩放就重新排版，「像电脑窗口那样等比缩放」就没了。
+     * 所以它必须是常量。用一个缓存钉死，而且用「短边/长边」计算，
+     * 保证同一台设备无论竖屏还是横屏算出来的 BASE 完全一样 ——
+     * 否则旋转屏幕后 bw/bh 变了，JS 的 ZOOM 就会算错，窗口底部留下点不到的死区。
      */
+    private var baseCache: IntArray? = null
+
     private fun baseSize(): IntArray {
+        baseCache?.let { return it }
         val dm = resources.displayMetrics
-        return intArrayOf(
-            min((dm.widthPixels * 0.92).toInt(), (400 * dm.density).toInt()),
-            min((dm.heightPixels * 0.78).toInt(), (660 * dm.density).toInt())
+        val shortSide = min(dm.widthPixels, dm.heightPixels)
+        val longSide = max(dm.widthPixels, dm.heightPixels)
+        val b = intArrayOf(
+            min((shortSide * 0.92).toInt(), (400 * dm.density).toInt()),
+            min((longSide * 0.78).toInt(), (660 * dm.density).toInt())
         )
+        baseCache = b
+        return b
     }
 
     /* 迷你播放器（独立系统悬浮窗，缩成小球后依然可见可拖动） */
@@ -447,79 +452,6 @@ class FloatService : Service() {
         pushRectToJs(false)
     }
 
-    /**
-     * 进入/退出全屏：G6 之后全屏是一个独立的 FullscreenActivity，
-     * 把同一个 WebView 迁移进去承载，聊天/任务/音乐状态全部保留。
-     */
-    fun setFullscreen(enabled: Boolean): JSONObject {
-        var result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode)
-        val done = CountDownLatch(1)
-        val apply = {
-            try {
-                val p = params
-                val wv = webView
-                if (p == null || wv == null) {
-                    result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode).put("error", "浮窗尚未就绪")
-                } else if (enabled && !fullscreenMode) {
-                    // 保存当前悬浮窗矩形，退出全屏时恢复
-                    fullscreenPrevRect = intArrayOf(p.x, p.y, p.width, p.height)
-                    // 从 WindowManager 摘掉 WebView，交给 FullscreenActivity 承载
-                    try { wm?.removeView(wv) } catch (_: Exception) { }
-                    fullscreenMode = true
-                    try {
-                        startActivity(Intent(this, FullscreenActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        result = JSONObject().put("ok", true).put("fullscreen", true)
-                    } catch (e: Exception) {
-                        // 启动失败：把 WebView 挂回去
-                        try { wm?.addView(wv, p) } catch (_: Exception) { }
-                        fullscreenMode = false
-                        result = JSONObject().put("ok", false).put("fullscreen", false)
-                            .put("error", e.message ?: "无法进入全屏")
-                    }
-                } else if (!enabled && fullscreenMode) {
-                    // 让 FullscreenActivity 自己 finish，它的 onDestroy 会把 WebView 还回来
-                    FullscreenActivity.current?.finish()
-                    result = JSONObject().put("ok", true).put("fullscreen", false)
-                } else {
-                    result = JSONObject().put("ok", true).put("fullscreen", fullscreenMode)
-                }
-            } catch (e: Exception) {
-                result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode).put("error", e.message ?: "全屏切换失败")
-            } finally { done.countDown() }
-        }
-        if (Looper.myLooper() == Looper.getMainLooper()) apply() else { main.post(apply); try { done.await(1200, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {} }
-        return result
-    }
-
-    /**
-     * 由 FullscreenActivity 调用：把 WebView 从悬浮窗里取出来给 Activity 承载。
-     * 调用前 WebView 已经从 WindowManager 移除，这里只是返回引用。
-     */
-    fun getWebViewForFullscreen(): WebView? = webView
-
-    /**
-     * 由 FullscreenActivity 销毁时调用：把 WebView 重新挂回悬浮窗。
-     */
-    fun returnWebViewFromFullscreen() {
-        val wv = webView ?: return
-        val p = params ?: return
-        runOnMain {
-            // 确保 WebView 没有被别的父容器持有
-            (wv.parent as? android.view.ViewGroup)?.removeView(wv)
-            val r = fullscreenPrevRect
-            if (r != null) { p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3] }
-            winRect = intArrayOf(p.x, p.y, p.width, p.height)
-            try { wm?.addView(wv, p) } catch (_: Exception) { }
-            fullscreenMode = false
-            fullscreenPrevRect = null
-            schedulePersistWinRect()
-            pushRectToJs()
-        }
-    }
-
-    fun isFullscreen(): Boolean = fullscreenMode
-
     fun resize(w: Int, h: Int) = runOnMain {
         val p = params ?: return@runOnMain
         applyRect(p.x, p.y, w, h)
@@ -538,16 +470,28 @@ class FloatService : Service() {
     }
 
     /**
-     * 把请求的矩形夹进「屏幕范围 + 最小尺寸」里。
+     * 把请求的矩形夹进「屏幕范围 + 最小尺寸 + 恒定宽高比」里。
      * 纯计算，不碰 View，所以 JS 线程也能直接调，返回值就是最终一定生效的结果。
+     *
+     * 宽高比必须等于 baseSize 的比例：内容是按 BASE 等比缩放的，窗口被夹成别的比例，
+     * 底部/右侧就会多出一条「看得见点不到」的死区，缩放角标也会跑偏 ——
+     * 横屏打开浮窗时卡在左上角、拉不动，根因就在这里。
      */
     private fun clampRect(x: Int, y: Int, w: Int, h: Int): IntArray {
         val dm = resources.displayMetrics
         val sw = dm.widthPixels
         val sh = dm.heightPixels
-        val minSize = minWindowSize()
-        val nw = w.coerceIn(minSize, max(minSize, sw))
-        val nh = h.coerceIn(minSize, max(minSize, sh))
+        val b = baseSize()
+        val ratio = b[1].toDouble() / b[0].toDouble()   // 高 / 宽
+        val minW = minWindowSize()
+        // 以宽度为准，再按恒定比例推高度
+        var nw = w.coerceAtLeast(minW)
+        if (nw > sw) nw = sw
+        var nh = (nw * ratio).toInt()
+        // 高度放不下就把两者一起收回来，始终不破坏比例
+        if (nh > sh) { nh = sh; nw = (sh / ratio).toInt() }
+        nw = nw.coerceIn(1, max(1, sw))
+        nh = nh.coerceIn(1, max(1, sh))
         val nx = x.coerceIn(0, (sw - nw).coerceAtLeast(0))
         val ny = y.coerceIn(0, (sh - nh).coerceAtLeast(0))
         return intArrayOf(nx, ny, nw, nh)

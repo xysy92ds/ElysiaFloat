@@ -835,21 +835,6 @@ class PermissionBridge(private val ctx: Context) {
         }.toString()
     } catch (e: Exception) { "{}" }
 
-    /** 屏幕尺寸兼容接口：全屏按钮直接读取真实显示尺寸。 */
-    @JavascriptInterface
-    fun getScreenMetrics(): String = try {
-        val dm = ctx.resources.displayMetrics
-        JSONObject().put("screenW", dm.widthPixels).put("screenH", dm.heightPixels).toString()
-    } catch (e: Exception) { "{}" }
-
-    @JavascriptInterface
-    fun setFullscreen(enabled: Boolean): String = try {
-        (ctx as? FloatService)?.setFullscreen(enabled)?.toString() ?: JSONObject().put("ok", false).put("error", "浮窗服务不可用").toString()
-    } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "全屏切换失败").toString() }
-
-    @JavascriptInterface
-    fun isFullscreen(): Boolean = (ctx as? FloatService)?.isFullscreen() == true
-
     /* ---------- 窗口移动 / 缩放 ---------- */
     @JavascriptInterface
     fun moveWindow(dx: Int, dy: Int) {

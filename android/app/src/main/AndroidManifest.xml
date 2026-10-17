@@ -102,15 +102,6 @@
             android:excludeFromRecents="true"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
 
-        <!-- 全屏模式：把悬浮窗 WebView 迁移进来承载，状态全部保留 -->
-        <activity
-            android:name=".FullscreenActivity"
-            android:exported="false"
-            android:theme="@style/Theme.EllyFloat"
-            android:excludeFromRecents="true"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"/>
-
         <!-- 只用于把更新包交给系统安装器的文件通道 -->
         <provider
             android:name=".ApkProvider"

@@ -11,10 +11,10 @@
 
 本版重点：
 
-- G6 真正的 `FullscreenActivity`（WebView 迁移，状态不丢）；
 - G8 Termux 长跑运行时（run_id / 输出流 / 取消 / java + bash）+ Root 进程管理 + Shizuku 真实状态；
 - 首个高权限官方插件：Minecraft 联机助手（服务器 + Mineflayer bot）；
-- 横屏适配修复；Kotlin wrapper 脚本转义修复；
+- 横屏适配修复（BASE 恒定 + 窗口按比例夹持）；Kotlin wrapper 脚本转义修复；
+- 修复主聊天页发送按钮点击无响应；公告改为按版本号记录，每个版本首次进入提示一次；
 - **签名可复现**：debug 与 release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`）。
 
 安装后校验：

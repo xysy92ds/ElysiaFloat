@@ -1265,43 +1265,29 @@ function step(name, fn) {
 
 
 
-  await step('主界面顶栏、更多菜单、全屏桥和设置返回结构', () => {
+  await step('主界面顶栏、更多菜单和设置返回结构', () => {
     const main = html.slice(html.indexOf('<div class="head-main">'), html.indexOf('<div class="head-actions"'));
     const secondary = html.slice(html.indexOf('<div class="head-actions"'), html.indexOf('</div>\n  </div>'));
     if (main.includes('id="btn-music"') || main.includes('id="btn-set"')) throw new Error('音乐/设置仍在顶栏第一行');
     if (!secondary.includes('id="btn-music"') || !secondary.includes('id="btn-set"')) throw new Error('音乐/设置没有移动到第二行');
     if (!html.includes('id="task-menu"') || !html.includes('任务与工作区')) throw new Error('名称旁缺少任务/工作区入口');
     if (!html.includes('data-key="points"') || !html.includes('data-key="explain"') || !html.includes('quick-extra.open')) throw new Error('更多菜单内容或显示结构缺失');
-    if (!html.includes('fun getScreenMetrics') && !html.includes('getScreenMetrics')) throw new Error('缺少全屏屏幕尺寸桥');
+    if (html.includes('id="btn-fullscreen"')) throw new Error('全屏入口应已移除');
     if (!/settings-save-block[\s\S]*id="set-back"/.test(html)) throw new Error('设置底部缺少返回按钮');
   });
 
-  await step('G6：全屏使用独立 Activity（WebView 迁移，状态不丢）', () => {
+  await step('全屏功能已彻底移除', () => {
     const fs = require('fs'), path = require('path');
     const dir = path.join(__dirname, '../app/src/main');
-    // 1) Activity 已注册，竖屏锁定，不进最近任务
     const manifest = fs.readFileSync(path.join(dir, 'AndroidManifest.xml'), 'utf8');
-    if (!/android:name="\.FullscreenActivity"/.test(manifest)) throw new Error('AndroidManifest 未注册 FullscreenActivity');
-    const actBlock = manifest.slice(manifest.indexOf('FullscreenActivity'), manifest.indexOf('FullscreenActivity') + 400);
-    if (!/screenOrientation="portrait"/.test(actBlock)) throw new Error('FullscreenActivity 未锁定竖屏');
-    if (!/excludeFromRecents="true"/.test(actBlock)) throw new Error('FullscreenActivity 不应出现在最近任务');
-
-    // 2) FloatService 提供 WebView 迁移方法
+    if (/FullscreenActivity/.test(manifest)) throw new Error('AndroidManifest 仍注册 FullscreenActivity');
+    if (fs.existsSync(path.join(dir, 'java/com/elly/float/FullscreenActivity.kt'))) throw new Error('FullscreenActivity.kt 未删除');
     const svc = fs.readFileSync(path.join(dir, 'java/com/elly/float/FloatService.kt'), 'utf8');
-    if (svc.indexOf('fun getWebViewForFullscreen()') < 0) throw new Error('FloatService 缺少 getWebViewForFullscreen');
-    if (svc.indexOf('fun returnWebViewFromFullscreen()') < 0) throw new Error('FloatService 缺少 returnWebViewFromFullscreen');
-    // 进入全屏是启动 Activity，不再是把 overlay 撑满
-    if (svc.indexOf('FullscreenActivity::class.java') < 0) throw new Error('setFullscreen 未启动 FullscreenActivity');
-
-    // 3) Activity 自身负责把 WebView 挂进来并在销毁时归还
-    const act = fs.readFileSync(path.join(dir, 'java/com/elly/float/FullscreenActivity.kt'), 'utf8');
-    if (act.indexOf('getWebViewForFullscreen()') < 0) throw new Error('FullscreenActivity 未从 Service 取 WebView');
-    if (act.indexOf('returnWebViewFromFullscreen()') < 0) throw new Error('FullscreenActivity 销毁时未归还 WebView');
-    if (act.indexOf('SYSTEM_UI_FLAG_IMMERSIVE_STICKY') < 0 && act.indexOf('WindowInsets.Type') < 0)
-      throw new Error('FullscreenActivity 没有沉浸式全屏处理');
+    if (/setFullscreen|isFullscreen\(\)|returnWebViewFromFullscreen/.test(svc)) throw new Error('FloatService 仍残留全屏代码');
+    if (/FULLSCREEN_MODE|toggleFullscreenMode|setFullscreen/.test(html)) throw new Error('前端仍残留全屏代码');
   });
 
-  await step('横屏适配：FloatService 处理 onConfigurationChanged，旋转后窗口重新夹持', () => {
+  await step('横屏适配：BASE 恒定 + 窗口按比例夹持，旋转不再卡角', () => {
     const fs = require('fs'), path = require('path');
     const dir = path.join(__dirname, '../app/src/main');
     const svc = fs.readFileSync(path.join(dir, 'java/com/elly/float/FloatService.kt'), 'utf8');
@@ -1310,6 +1296,13 @@ function step(name, fn) {
     // 旋转后必须重新 clampRect 到新屏幕尺寸
     const cfgBlock = svc.slice(svc.indexOf('onConfigurationChanged'), svc.indexOf('onConfigurationChanged') + 800);
     if (cfgBlock.indexOf('clampRect') < 0) throw new Error('onConfigurationChanged 没有重新夹持窗口');
+    // BASE 必须是常量：缓存 + 用短边/长边计算，旋转前后一致
+    if (svc.indexOf('baseCache') < 0) throw new Error('baseSize 未缓存，旋转后 BASE 会变');
+    if (svc.indexOf('val shortSide') < 0 || svc.indexOf('val longSide') < 0) throw new Error('baseSize 未按短边/长边计算');
+    // clampRect 必须按恒定宽高比夹持，否则窗口比例被夹歪会留下死区
+    const c = svc.indexOf('private fun clampRect');
+    const clampBlock = svc.slice(c, c + 900);
+    if (clampBlock.indexOf('baseSize()') < 0 || clampBlock.indexOf('ratio') < 0) throw new Error('clampRect 未按 BASE 比例夹持');
   });
 
   await step('G8：Termux 长跑能力（run_id + 输出 + 取消 + java/bash）', () => {

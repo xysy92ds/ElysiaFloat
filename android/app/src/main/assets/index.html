@@ -31,8 +31,6 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   cursor:pointer;font-family:inherit;flex:0 0 auto;white-space:nowrap}
 /* 关闭键脱离伸缩流：无论音乐键是否出现、窗口缩得多小，都固定在右上角可点 */
 #btn-close{padding:0 9px;height:26px}
-#btn-fullscreen{font-size:15px;padding:0 8px}
-#btn-fullscreen.unsupported{opacity:.62;font-size:10px;padding:0 6px}
 #head .head-actions > button{background:rgba(255,255,255,.2);height:25px;font-size:11px;padding:0 10px}
 #head button:active{background:rgba(255,255,255,.45)}
 #head button[hidden]{display:none}
@@ -706,7 +704,6 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
       <span id="mode-label">聊天</span>
       <button id="task-menu" title="任务与工作区" aria-label="打开任务与工作区">▦</button>
       <span class="sp"></span>
-      <button id="btn-fullscreen" title="全屏模式" aria-label="全屏模式">□</button>
       <button id="btn-min" title="收成悬浮小窗">－</button>
       <button id="btn-close">×</button>
     </div>
@@ -951,7 +948,6 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
       <h3>应用公告 · 0.7.0</h3>
       <div class="announcement-body">
         <p><b>本版更新（0.7.0）</b><br>
-        · 真全屏：新增独立全屏页面，聊天 / 任务 / 音乐状态不丢失；<br>
         · Termux 长跑运行时：任务可追踪、可读回、可取消，适合长时间跑服务器；<br>
         · 新增官方插件「Minecraft 联机助手」，市场可直接搜索安装；<br>
         · 修复横屏（玩游戏）时打开浮窗被卡住、无法缩放的问题；<br>
@@ -9619,39 +9615,6 @@ function bindTaskUI() {
   if (nw) nw.onclick = async () => { const t = taskAdd('workspace', '新工作任务', ''); const ready = await ensureTaskWorkspace(t); drawer.classList.remove('open'); toast(ready.ok ? '已创建工作任务和独立工作区：' + t.title : (ready.error || '工作区创建失败')); };
   renderTaskDrawer(); updateTaskMode();
 }
-let FULLSCREEN_MODE = false;
-let FULLSCREEN_PREV = null;
-function readScreenMetrics() {
-  let m = {};
-  try { if (HAS_PERM && Perm.getScreenMetrics) m = JSON.parse(Perm.getScreenMetrics() || '{}'); } catch (e) { m = {}; }
-  if ((!m.screenW || !m.screenH) && loadEnv()) {
-    m.screenW = loadEnv().screenW;
-    m.screenH = loadEnv().screenH;
-  }
-  return m;
-}
-function updateFullscreenButton() {
-  const btn = $('#btn-fullscreen'); if (!btn) return;
-  const m = readScreenMetrics();
-  const ok = !!(HAS_PERM && Perm.setFullscreen);
-  btn.disabled = !ok;
-  btn.classList.toggle('unsupported', !ok);
-  btn.textContent = FULLSCREEN_MODE ? '▣' : '□';
-  btn.title = ok ? (FULLSCREEN_MODE ? '退出全屏模式' : '全屏模式') : '当前环境不允许窗口全屏';
-  btn.setAttribute('aria-label', btn.title);
-}
-function toggleFullscreenMode() {
-  try {
-    if (!HAS_PERM || !Perm.setFullscreen) return toast('当前版本不支持真正全屏');
-    const next = !FULLSCREEN_MODE;
-    const raw = Perm.setFullscreen(next);
-    const r = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
-    if (!r || !r.ok) return toast((r && r.error) || '当前环境不允许窗口全屏');
-    FULLSCREEN_MODE = !!r.fullscreen;
-    updateFullscreenButton();
-    toast(FULLSCREEN_MODE ? '已进入全屏模式' : '已退出全屏模式');
-  } catch (e) { toast('全屏模式切换失败：' + errMsg(e)); }
-}
 function handleNativeBack() {
   const drawer = $('#task-drawer'); if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return true; }
   const market = $('#plug-market-page'); if (market && market.classList.contains('open')) { showView('plugins'); return true; }
@@ -9665,8 +9628,6 @@ function bindHeader() {
   const setBtn = $('#btn-set'); if (setBtn) setBtn.onclick = () => showView('settings');
   const memBtn = $('#btn-mem'); if (memBtn) memBtn.onclick = () => showView('memory');
   const musicBtn = $('#btn-music'); if (musicBtn) musicBtn.onclick = () => { renderMusicTab('search'); showView('music'); };
-  const fs = $('#btn-fullscreen'); if (fs) fs.onclick = toggleFullscreenMode;
-  updateFullscreenButton();
   $('#btn-close').onclick = () => {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };

@@ -2,7 +2,7 @@
   "tag_name": "v0.7.0",
   "name": "ElysiaFloat v0.7.0",
   "html_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.0",
-  "body": "0.7.0 把「浮窗最大化」升级为真正的独立全屏页面（G6 FullscreenActivity，WebView 迁移状态不丢）；把 Termux / Root / Shizuku 从协议骨架升级为可追踪、可读取、可取消的长期运行时（G8：run_id 追踪、输出流、信号文件取消、白名单含 java/bash/ffmpeg）；落地首个高权限官方插件——Minecraft 联机助手（Bedrock 服务器 + AI 控制的 Mineflayer bot，双向文件通道）；修复横屏时浮窗被卡在顶部一列的问题（onConfigurationChanged 重新夹持）；修复 Kotlin 三引号字符串内 shell 变量被误当插值导致编译失败的问题；并新增项目自有签名 keystore，debug/release 共用同一签名（CN=ElysiaFloat，SHA-256 7851cb49…），保证多环境构建签名一致。修复补丁：1) 主聊天页「发送」按钮点击无响应——根因是按钮落在窗口缩放角标(.rz-se)的 22px 热区内被抢走点击，现抬高底部操作条并改用多事件绑定(pointerup/touchend/click 去重)；2) 公告改为按版本号记录，每个版本首次进入都会提示一次，并更新为 0.7.0 内容；3) 内置插件市场索引加入官方插件 Minecraft 联机助手，离线即可搜索安装。注意：历史版本使用随机 debug 签名且私钥不可获得，从旧版升级需卸载重装一次。APK 为 Debug 测试包。SHA-256: 557e4c9abeeb04b85f097bb235306a15a0a1524d7a56d46839adbd80ff9d79ef。",
+  "body": "0.7.0 把 Termux / Root / Shizuku 从协议骨架升级为可追踪、可读取、可取消的长期运行时（G8：run_id 追踪、输出流、信号文件取消、白名单含 java/bash/ffmpeg）；落地首个高权限官方插件——Minecraft 联机助手（Bedrock 服务器 + AI 控制的 Mineflayer bot，双向文件通道）；修复横屏（玩游戏）时打开浮窗被卡在左上角、无法缩放的问题（BASE 恒定 + 窗口按比例夹持）；修复 Kotlin 三引号字符串内 shell 变量被误当插值导致编译失败的问题；并新增项目自有签名 keystore，debug/release 共用同一签名（CN=ElysiaFloat，SHA-256 7851cb49…），保证多环境构建签名一致。修复补丁：1) 主聊天页「发送」按钮点击无响应——根因是按钮落在窗口缩放角标(.rz-se)的 22px 热区内被抢走点击，现抬高底部操作条并改用多事件绑定(pointerup/touchend/click 去重)；2) 公告改为按版本号记录，每个版本首次进入都会提示一次，并更新为 0.7.0 内容；3) 内置插件市场索引加入官方插件 Minecraft 联机助手，离线即可搜索安装；4) 移除一直未落地的全屏(FullscreenActivity)功能。注意：历史版本使用随机 debug 签名且私钥不可获得，从旧版升级需卸载重装一次。APK 为 Debug 测试包。SHA-256: df9572da419317c2b1b0525dcf76e61571c61afd73bb3cb52d2e1e071c882634。",
   "assets": [
     {
       "name": "ElysiaFloat-v0.7.0-debug.apk",
