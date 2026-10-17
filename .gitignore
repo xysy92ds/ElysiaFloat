@@ -24,3 +24,8 @@ apk/phases/
 .env
 .env.*
 *.local.properties
+
+# 例外：项目自有签名 keystore 需随仓库分发（仅私有仓库），
+# 否则不同环境构建会用各自的 debug key，导致升级安装签名不一致。
+!android/keystore/elysia.jks
+!android/keystore.properties

@@ -1,12 +1,16 @@
 {
-  "tag_name": "v0.6.5",
-  "name": "ElysiaFloat v0.6.5",
-  "html_url": "https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.6.5",
-  "body": "0.6.5 把「能聊天、能看屏幕」的浮窗助手，升级为「能接任务、能动手、能交付文件」的手机 Agent：建立任务生命周期与执行阶段（读屏→规划→执行→验证→交付）；统一 L1/L2/L3 + 安全开关的权限模型；本地工作区支持多格式文件读写与导出预览；所有网络请求收敛到统一请求管理；提示词分层（工作协议与人设语气分离）；记忆与音乐成为完整子系统。APK 为 Debug 测试包。SHA-256: f74882cd37e94e571deef20df5fc03ca9e6f3834b918a78e1914decabf7e9e51。",
+  "tag_name": "v0.7.0",
+  "name": "ElysiaFloat v0.7.0",
+  "html_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.0",
+  "body": "0.7.0 把「浮窗最大化」升级为真正的独立全屏页面（G6 FullscreenActivity，WebView 迁移状态不丢）；把 Termux / Root / Shizuku 从协议骨架升级为可追踪、可读取、可取消的长期运行时（G8：run_id 追踪、输出流、信号文件取消、白名单含 java/bash/ffmpeg）；落地首个高权限官方插件——Minecraft 联机助手（Bedrock 服务器 + AI 控制的 Mineflayer bot，双向文件通道）；修复横屏时浮窗被卡在顶部一列的问题（onConfigurationChanged 重新夹持）；修复 Kotlin 三引号字符串内 shell 变量被误当插值导致编译失败的问题；并新增项目自有签名 keystore，debug/release 共用同一签名（CN=ElysiaFloat，SHA-256 7851cb49…），保证多环境构建签名一致。注意：历史版本使用随机 debug 签名且私钥不可获得，从旧版升级需卸载重装一次。APK 为 Debug 测试包。SHA-256: de6e56a0f8d169bf86fcd0e0b09a5a2440841145233d15aeee7b55a47ca22675。",
   "assets": [
     {
-      "name": "ElysiaFloat-v0.6.5-debug.apk",
-      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat/releases/download/v0.6.5/ElysiaFloat-v0.6.5-debug.apk"
+      "name": "ElysiaFloat-v0.7.0-debug.apk",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/download/v0.7.0/ElysiaFloat-v0.7.0-debug.apk"
+    },
+    {
+      "name": "ElysiaFloat-v0.7.0-source.zip",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/download/v0.7.0/ElysiaFloat-v0.7.0-source.zip"
     }
   ]
 }

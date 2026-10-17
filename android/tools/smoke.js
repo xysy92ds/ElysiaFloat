@@ -1348,6 +1348,21 @@ function step(name, fn) {
       throw new Error('ShizukuRuntime 仍然永远返回 false');
   });
 
+  await step('签名可复现：debug/release 共用项目自有 keystore', () => {
+    const fs = require('fs'), path = require('path');
+    const gradlePath = path.join(__dirname, '../app/build.gradle');
+    const g = fs.readFileSync(gradlePath, 'utf8');
+    // 必须定义项目自有签名配置
+    if (!/signingConfigs\s*\{[\s\S]*?elysia\s*\{/.test(g)) throw new Error('缺少 signingConfigs.elysia');
+    // debug 与 release 都必须用它，不能再复用 signingConfigs.debug
+    if (/signingConfig\s+signingConfigs\.debug/.test(g)) throw new Error('release 仍复用 signingConfigs.debug，会导致签名不一致');
+    const uses = (g.match(/signingConfig\s+signingConfigs\.elysia/g) || []).length;
+    if (uses < 2) throw new Error('debug 与 release 未同时使用 signingConfigs.elysia，实际 ' + uses + ' 处');
+    // keystore 与属性文件随仓库分发（私有仓库，保证多环境签名一致）
+    if (!fs.existsSync(path.join(__dirname, '../keystore/elysia.jks'))) throw new Error('缺少 keystore/elysia.jks');
+    if (!fs.existsSync(path.join(__dirname, '../keystore.properties'))) throw new Error('缺少 keystore.properties');
+  });
+
   await step('引导页：权限项按系统版本过滤（Android 11 应有 channel、Android 7 不应有）', () => {
     const names = T.activePermItems().map(i => i.id);
     if (ENVINFO.sdk >= 26 && !names.includes('channel'))
