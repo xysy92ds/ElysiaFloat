@@ -1,7 +1,7 @@
 # ElysiaFloat 工作区状态与导航
 
-更新时间：2026-10-16
-状态：已完成文档/代码核验，进入“计划冻结—问题清零—分阶段实施”阶段
+更新时间：2026-10-17
+状态：0.7.0 迭代中；全屏功能已移除、横屏窗口夹持已加固、发布产物已更新并推送
 
 > 本文件是工作区导航，不替代技术文档。项目当前真正的执行入口是：
 > - `plans/MASTER-EXECUTION-PLAN.md`：唯一任务链和阶段出口；
@@ -12,12 +12,13 @@
 ## 当前结论
 
 - 项目定位：悬浮窗 Android AI 助手 + 手机 Agent + 工作区 + 插件平台。
-- 基线：`0.6.2` / versionCode `12`，Debug 构建。
-- Git：`main` 相对 `origin/main` ahead 1；本地有大量未提交和未跟踪的持续开发改动。
+- 基线：`0.7.0` / versionCode `14`，Debug 构建。
+- Git：`main` 已与 `origin/main` 同步（最新提交 `496d5c7`）。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
-- 最新测试包：统一放在项目内 `/workspace/gh-ElysiaFloat/apk/phases/`，本轮为 `ElysiaFloat-g7-4-filesafety-debug.apk`。
-- 最新测试包 SHA-256：`c8e332dc25e55ee87d32385dcd55000f03ed12711a3db6288fcc1b99efe1fd94`。
+- 最新测试包：`apk/ElysiaFloat-v0.7.0-debug.apk`（同时归档于 `release/0.7.0/`）。
+- 最新测试包 SHA-256：`df9572da419317c2b1b0525dcf76e61571c61afd73bb3cb52d2e1e071c882634`。
 - 当前质量门：HTML 检查和 smoke 当前全通过；本轮最新改动尚未完成真机覆盖。
+- 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`）。
 
 ## 目录边界
 
