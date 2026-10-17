@@ -1,0 +1,35 @@
+{
+  "indexVersion": 1,
+  "manifestVersion": 1,
+  "generatedAt": "2026-10-17",
+  "source": "https://github.com/xysy92ds/ElysiaFloat",
+  "trustPolicy": "repository-source-not-security-guarantee",
+  "plugins": [
+    {
+      "id": "com.elly.market.text-tools",
+      "name": "文本处理示例",
+      "version": "1.0.0",
+      "author": "ElysiaFloat",
+      "description": "无外部权限的文本统计与规范化示例，适合验证插件开发流程。",
+      "manifest": "plugins/com.elly.market.text-tools/manifest.json",
+      "docs": "plugins/com.elly.market.text-tools/README.md",
+      "permissions": [],
+      "trust": "repository-source",
+      "reviewStatus": "self-published",
+      "sha256": "325326ebd5ad2778bc131931576c36e1dbd3443d94b32d46d0ca96385c76585e"
+    },
+    {
+      "id": "com.elly.market.minecraft",
+      "name": "Minecraft 联机助手",
+      "version": "0.2.0",
+      "author": "ElysiaFloat",
+      "description": "在 Termux 中运行 Minecraft 服务器和 AI 控制的 Mineflayer bot，实现你和 AI 同世界联机。bot 支持移动、挖掘、放置、攻击、寻路、合成、聊天等操作。需要 Termux + Java + Node.js。",
+      "manifest": "plugins/com.elly.market.minecraft/manifest.json",
+      "docs": "plugins/com.elly.market.minecraft/README.md",
+      "permissions": ["termux"],
+      "trust": "repository-source",
+      "reviewStatus": "self-published",
+      "sha256": "659fd5ef4fe694b434c87348c9e02645fd38ea561a6ac7f54905a84143dde878"
+    }
+  ]
+}

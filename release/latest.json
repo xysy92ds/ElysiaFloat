@@ -1,0 +1,12 @@
+{
+  "tag_name": "v0.6.5",
+  "name": "ElysiaFloat v0.6.5",
+  "html_url": "https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.6.5",
+  "body": "0.6.5 把「能聊天、能看屏幕」的浮窗助手，升级为「能接任务、能动手、能交付文件」的手机 Agent：建立任务生命周期与执行阶段（读屏→规划→执行→验证→交付）；统一 L1/L2/L3 + 安全开关的权限模型；本地工作区支持多格式文件读写与导出预览；所有网络请求收敛到统一请求管理；提示词分层（工作协议与人设语气分离）；记忆与音乐成为完整子系统。APK 为 Debug 测试包。SHA-256: f74882cd37e94e571deef20df5fc03ca9e6f3834b918a78e1914decabf7e9e51。",
+  "assets": [
+    {
+      "name": "ElysiaFloat-v0.6.5-debug.apk",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat/releases/download/v0.6.5/ElysiaFloat-v0.6.5-debug.apk"
+    }
+  ]
+}

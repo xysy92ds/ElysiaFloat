@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>爱莉希雅</title>
+<style>{{STYLES}}</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="head">
+    <div class="head-main">
+      <img id="avatar" src="" referrerpolicy="no-referrer" alt="">
+      <span id="name">爱莉希雅</span>
+      <span id="mode-label">聊天</span>
+      <button id="task-menu" title="任务与工作区" aria-label="打开任务与工作区">▦</button>
+      <span class="sp"></span>
+      <button id="btn-fullscreen" title="全屏模式" aria-label="全屏模式">□</button>
+      <button id="btn-min" title="收成悬浮小窗">－</button>
+      <button id="btn-close">×</button>
+    </div>
+    <div class="head-actions" id="head-actions">
+      <button id="btn-music">音乐</button>
+      <button id="btn-set">设置</button>
+      <span class="head-divider" aria-hidden="true"></span>
+      <div id="quick-actions"></div>
+    </div>
+  </div>
+  <div id="task-drawer" aria-label="任务舱">
+    <div class="task-drawer-head"><span>任务舱</span><span class="grow"></span><button id="task-close" class="task-close" aria-label="关闭任务舱">×</button></div>
+    <div id="task-list"></div>
+    <button id="task-new-work" class="btn-s task-new">＋ 新建工作任务</button>
+  </div>
+
+  <div id="actions"></div>
+  <div id="body"></div>
+  <div id="mini-player" aria-label="正在播放">
+    <div class="mini-disc">♪</div>
+    <div class="mini-info"><div class="mini-name">未播放</div><div class="mini-artist">—</div></div>
+    <button class="mini-btn mini-play" aria-label="暂停或播放">▶</button>
+    <button class="mini-btn mini-close" aria-label="隐藏歌曲浮窗">×</button>
+  </div>
+  <div id="attach-bar" hidden>
+    <img id="attach-thumb" alt="">
+    <span id="attach-info"></span>
+    <button id="attach-del" aria-label="移除附件">×</button>
+  </div>
+  <div id="foot">
+    <button id="btn-plus" aria-label="上传图片或文件">＋</button>
+    <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
+    <button id="send">发送</button>
+  </div>
+
+  <div id="settings"></div>
+
+  <div id="plugins">
+    <div class="mem-top">
+      <button class="mback" id="plug-back">← 返回设置</button>
+      <span class="grow"></span>
+      <button class="mback" id="plug-market">插件市场</button>
+      <button class="mback" id="plug-install">导入插件</button>
+      <button class="mback" id="plug-help">格式说明</button>
+      <button class="mback" id="plug-preview-btn">AI 说明</button>
+    </div>
+    <div id="plugins-scroll">
+      <div class="mini-note" style="margin:0 0 4px">以下是 AI 当前可以调用的全部工具。关闭某项开关后，AI 将无法使用该工具，也不会再读到它的说明。</div>
+      <div class="plug-risk" id="plugin-risk">⚠️ 第三方插件风险提示：插件可能由非 ElysiaFloat 作者提供，可能包含错误、隐私风险或恶意行为。市场展示和清单校验不等于安全审查或质量保证；安装、启用前请核对来源、代码和权限，勿输入 API Key、Cookie 等敏感信息。<button class="plug-risk-close" data-close-risk="plugin-risk" aria-label="关闭提示">×</button></div>
+      <pre id="plug-help-box" class="plug-preview" style="display:none"></pre>
+      <div id="plug-list"></div>
+      <pre id="plug-preview" class="plug-preview" style="display:none"></pre>
+    </div>
+  </div>
+
+  <div id="plug-market-page">
+    <div class="mem-top">
+      <button class="mback" id="plug-market-back">← 返回插件管理</button>
+      <span class="grow"></span><span class="plug-market-count" id="plug-market-count"></span>
+    </div>
+    <div id="plug-market-scroll">
+      <div class="mini-note">浏览和安装插件。市场只展示清单，安装前仍会校验来源、权限和 SHA-256。</div>
+      <div class="plug-risk" id="market-risk">⚠️ 第三方插件可能存在隐私、稳定性或恶意行为风险，请自行核对来源、代码和权限。<button class="plug-risk-close" data-close-risk="market-risk" aria-label="关闭提示">×</button></div>
+      <div class="plug-market-url-row"><button id="plug-market-source-toggle" class="btn-s">远程源设置</button><div id="plug-market-url-box" hidden><input id="plug-market-url" type="url" placeholder="远程市场地址"><button id="plug-market-sync" class="btn-s">同步</button></div></div>
+      <div id="plug-market-status" class="mini-note"></div>
+      <div class="msbar"><input id="plug-market-search" type="search" placeholder="搜索插件名称、描述或作者"><button id="plug-market-search-btn">搜索</button></div>
+      <div id="plug-market-list"></div>
+      <div class="plug-market-pager"><button id="plug-market-prev" class="btn-s">上一页</button><span class="grow"></span><span id="plug-market-page-no" class="plug-market-count"></span><span class="grow"></span><button id="plug-market-next" class="btn-s">下一页</button></div>
+    </div>
+  </div>
+
+  <div id="memory">
+    <div class="mem-top">
+      <button class="mback" id="mem-back">← 返回对话</button>
+      <span class="grow"></span>
+      <button class="mback" id="mem-sum">总结对话</button>
+      <button class="mback" id="mem-tools-btn">导入/导出</button>
+      <button class="mback" id="mem-new">＋ 新建</button>
+    </div>
+    <div class="msbar">
+      <input id="mem-search" type="text" placeholder="搜索记忆（标题 / 正文 / 标签）♪">
+      <button id="mem-search-btn">搜索</button>
+    </div>
+    <div class="mem-cats" id="mem-cats"></div>
+    <div id="mem-list"></div>
+    <div id="mem-tools">
+      <div class="acts" style="margin:0">
+        <button id="mem-export-json" class="btn-s">导出 JSON</button>
+        <button id="mem-export-md" class="btn-s">导出 Markdown</button>
+        <button id="mem-copy" class="btn-s">复制</button>
+      </div>
+      <textarea id="mem-code" placeholder="粘贴 JSON 或 Markdown 后点导入"></textarea>
+      <div class="acts" style="margin:0">
+        <button id="mem-import" class="btn-p">导入（合并）</button>
+        <button id="mem-import-replace" class="btn-s" style="color:#d6336c">导入（覆盖）</button>
+      </div>
+      <div class="mini-note">导出的 JSON 包含分类、标签、正文和时间，可粘贴回此处恢复。</div>
+    </div>
+  </div>
+
+  <div id="mem-edit" class="mem-edit"></div>
+
+  <div id="trans">
+    <div class="ttop">
+      <button class="mback" id="trans-back">← 返回对话</button>
+      <span class="grow"></span>
+      <button class="mback" id="trans-pin">贴到屏幕上</button>
+      <button class="mback" id="trans-copy">复制译文</button>
+      <button class="mback" id="trans-redo">重翻</button>
+    </div>
+    <div class="tmeta" id="trans-meta"></div>
+    <div id="trans-list"></div>
+  </div>
+
+  <div id="music">
+    <div class="mtop">
+      <button class="mback" id="music-back">← 返回对话</button>
+        <div class="mtabs">
+        <button class="mtab active" data-tab="search">搜索</button>
+        <button class="mtab" data-tab="fav">收藏 (<span id="fav-cnt">0</span>)</button>
+        <button class="mtab" data-tab="history">历史</button>
+        <button class="mtab" data-tab="queue">队列</button>
+        <button class="mtab" data-tab="cache">缓存</button>
+        <button id="music-clear-cache" class="mback" title="清理下载缓存">清理缓存</button>
+      </div>
+    </div>
+    <div class="msbar" id="ms-wrap">
+      <input id="ms-input" type="text" placeholder="搜索歌曲、歌手...♪">
+      <button id="ms-btn">搜索</button>
+    </div>
+    <div class="mini-note music-cache-info" id="music-cache-info">音乐缓存：读取中…</div>
+    <div id="music-list"><div class="mempty">输入关键词开始搜索♪</div></div>
+    <button id="music-more" class="btn-s music-more" hidden>加载更多结果</button>
+    <div id="music-context-menu" class="music-context-menu" hidden>
+      <div id="music-context-title" class="music-context-title"></div>
+      <button data-music-action="play">播放</button>
+      <button data-music-action="queue">加入队列</button>
+      <button data-music-action="favorite">收藏 / 取消收藏</button>
+      <button data-music-action="cache">缓存 / 删除缓存</button>
+      <button data-music-action="delete">删除此记录</button>
+      <button data-music-action="close" class="music-context-cancel">取消</button>
+    </div>
+    <div id="music-lyric">— ♪ —</div>
+    <div id="music-player">
+      <div class="mp-progress" id="mp-progress"><div class="mp-progress-bar" id="mp-progress-bar"></div></div>
+      <div class="mp-row">
+        <button class="mp-btn mp-mode" aria-label="播放方式">🔁</button>
+        <button class="mp-btn mp-prev">⏮</button>
+        <button class="mp-btn mp-play">▶</button>
+        <button class="mp-btn mp-next">⏭</button>
+        <div class="mp-title">未播放</div>
+        <div class="mp-time" id="mp-time">0:00 / 0:00</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="lyric-modal">
+    <div class="lyric-box">
+      <div class="lyric-head"><h3>♪ 歌词</h3><button class="lyric-close">×</button></div>
+      <div class="lyric-content"></div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="preview-modal" aria-label="文件预览">
+    <div class="pv-box">
+      <div class="pv-head"><span id="pv-title">预览</span><span class="grow"></span><button id="pv-close" type="button" aria-label="关闭">×</button></div>
+      <div id="pv-meta" class="pv-meta"></div>
+      <div id="pv-body" class="pv-body"></div>
+    </div>
+  </div>
+
+  <div class="rz rz-n" data-dir="n"></div>
+  <div class="rz rz-s" data-dir="s"></div>
+  <div class="rz rz-w" data-dir="w"></div>
+  <div class="rz rz-e" data-dir="e"></div>
+  <div class="rz rz-nw" data-dir="nw"></div>
+  <div class="rz rz-ne" data-dir="ne"></div>
+  <div class="rz rz-sw" data-dir="sw"></div>
+  <div class="rz rz-se" data-dir="se"></div>
+
+  <div id="modal" class="modal">
+    <div class="modal-card">
+      <h3 id="modal-title">请确认</h3>
+      <p id="modal-msg"></p>
+      <div class="acts">
+        <button id="modal-cancel" class="btn-s">取消</button>
+        <button id="modal-ok" class="btn-p">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="plus-modal" class="modal">
+    <div class="modal-card">
+      <h3>想让我看点什么呢？</h3>
+      <div class="acts" style="flex-direction:column">
+        <button id="plus-image" class="btn-p">🖼️ 上传图片</button>
+        <button id="plus-file" class="btn-s">📄 上传文件</button>
+        <button id="plus-cancel" class="btn-s">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="crop-modal" class="modal">
+    <div class="modal-card">
+      <h3>裁剪头像</h3>
+      <div class="crop-stage"><canvas id="crop-canvas" width="600" height="600"></canvas><div class="crop-ring"></div></div>
+      <div class="range-row"><span>缩放</span><input type="range" id="crop-zoom" min="100" max="400" value="100"><span id="crop-zoom-l">1.0x</span></div>
+      <div class="crop-tip">拖动图片调整位置，双指或滑块缩放</div>
+      <div class="acts">
+        <button id="crop-cancel" class="btn-s">取消</button>
+        <button id="crop-ok" class="btn-p">使用这张</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="plug-modal" class="modal">
+    <div class="modal-card">
+      <h3>导入插件</h3>
+      <p class="mini-note" style="margin:0">粘贴插件清单（JSON）。必须声明 manifestVersion、apiVersion、permissions 和工具能力。</p>
+      <div class="plug-risk" id="import-risk">⚠️ 第三方插件由用户自行提供，请先审查代码和权限。<button class="plug-risk-close" data-close-risk="import-risk" aria-label="关闭提示">×</button></div>
+      <div class="plug-import-choice">
+        <button id="plug-mode-text" class="btn-p">直接创建</button>
+        <button id="plug-mode-file" class="btn-s">从文件导入</button>
+        <button id="plug-mode-url" class="btn-s">从 URL 导入</button>
+      </div>
+      <div id="plug-source-text" class="plug-import-source open">
+      <textarea id="plug-code" placeholder='{"manifestVersion":1,"apiVersion":"0.1","id":"com.example.demo","name":"示例插件","permissions":[],"tools":[{"name":"hello","description":"处理输入","permissions":[],"kind":"js","code":"async function run(args){return args;}"}]}'></textarea>
+      </div>
+      <div id="plug-source-file" class="plug-import-source"><div class="mini-note">选择包含插件 JSON 清单的文件。</div><button id="plug-file-pick" class="btn-s">选择插件文件</button></div>
+      <div id="plug-source-url" class="plug-import-source"><div class="plug-import-url"><input id="plug-import-url" type="url" placeholder="https://example.com/plugin.json"><button id="plug-url-load" class="btn-s">读取</button></div></div>
+      <div id="plug-modal-msg" class="mini-note"></div>
+      <div class="acts">
+        <button id="plug-cancel" class="btn-s">取消</button>
+        <button id="plug-ok" class="btn-p">安装</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="announcement-modal" class="modal">
+    <div class="modal-card announcement-card">
+      <h3>应用公告 · 0.6.2</h3>
+      <div class="announcement-body">
+        <p>欢迎使用 ElysiaFloat。这是一个以开源方式发布的 Android 浮窗、Agent、翻译和工作区工具项目。</p>
+        <p><b>项目仓库</b><br><a href="https://github.com/xysy92ds/ElysiaFloat">https://github.com/xysy92ds/ElysiaFloat</a><br><b>作者</b>：xysy92ds<br><b>联系方式</b>：Q：3175461831　QQ 邮箱：3144919104@qq.com</p>
+        <p><b>免责声明</b><br>本应用及其中的 AI、Agent、翻译、文件和插件功能按“现状”提供，输出、识别、自动化操作和第三方服务结果可能不准确、失败或产生意外影响。请在使用前备份重要数据，并自行核对 AI 建议、文件路径和目标应用；不要将本应用用于违法、侵犯他人隐私、未经授权访问或高风险生产场景。因用户配置、权限授权、第三方服务、设备或目标应用变化造成的损失，由使用者自行判断并承担。</p>
+        <p><b>权限说明</b><br>悬浮窗权限用于显示和拖动应用窗口；无障碍权限用于按用户请求读取屏幕、获取控件信息和执行受策略限制的操作；通知和电池相关权限用于后台保活与状态提示；“允许管理所有文件”用于访问受控工作区及用户明确操作的 Android 公共存储路径。权限不会自动授予其它应用私有目录访问权，Agent、白名单、安全开关和 Android 原生策略仍会继续限制能力。工作区及公共存储的写入、复制、建目录和删除均需逐次确认。</p>
+        <p><b>插件提示</b><br>第三方插件可能存在安全、隐私和稳定性风险。安装或启用插件前请核对来源、代码和权限，不要提供密码、API Key、Cookie 等敏感信息；市场索引和权限声明不等于安全审查或安全保证。</p>
+      </div>
+      <div class="acts">
+        <button id="announcement-repo" class="btn-s">打开仓库</button>
+        <button id="announcement-close" class="btn-p">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="update-modal" class="modal">
+    <div class="modal-card">
+      <h3 id="upd-title">发现新版本</h3>
+      <p id="upd-notes"></p>
+      <div class="upd-bar"><div id="upd-progress"></div></div>
+      <div class="acts">
+        <button id="upd-later" class="btn-s">稍后</button>
+        <button id="upd-go" class="btn-p">下载并安装</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="guide">
+  <div class="guide-card">
+    <div class="guide-head">
+      <img id="guide-avatar" src="" alt="">
+      <div>
+        <div class="guide-title">你好呀，我是爱莉希雅 ♪</div>
+        <div class="guide-sub">让我先准备一下，马上就能陪你啦~</div>
+      </div>
+    </div>
+    <div class="guide-steps" id="guide-steps"></div>
+    <div class="guide-foot">
+      <button class="guide-skip" id="guide-skip">先跳过</button>
+      <button class="guide-next" id="guide-next" disabled>下一步</button>
+    </div>
+  </div>
+</div>
+
+<script>{{SCRIPTS}}</script>
+</body>
+</html>

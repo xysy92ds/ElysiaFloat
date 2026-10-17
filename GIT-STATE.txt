@@ -1,0 +1,26 @@
+本快照不包含 .git 目录（历史提交里有早期 APK，对迁移没有价值）。
+移植后重新 `git init` 即可继续。
+
+== 原仓库状态（导出时，已提交已推送） ==
+分支: main
+HEAD: 8f14e6c  (docs: 同步交接文档到 0.6.5 状态)
+tag: v0.6.5
+remote: origin  https://github.com/xysy92ds/ElysiaFloat.git
+工作区: 干净（所有源码、文档、工作区记录均已提交）
+
+== 最近 4 个提交 ==
+  8f14e6c  2026-10-17  docs: 同步交接文档到 0.6.5 状态（G5/G7 完成，下一阶段 G6）
+  1ac10d8  2026-10-17  release: ElysiaFloat v0.6.5 —— 手机 Agent 与本地工作台
+  c83b082  2026-10-08  docs: define multi-mode agent and workspace roadmap
+  f93a00a  2026-10-07  docs: explain agent capabilities and app whitelist
+
+== 版本 ==
+versionCode 13 / versionName 0.6.5（Debug 测试包）
+当前安装包: apk/ElysiaFloat-v0.6.5-debug.apk
+SHA-256: f74882cd37e94e571deef20df5fc03ca9e6f3834b918a78e1914decabf7e9e51
+GitHub Release: https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.6.5
+
+== 建议 ==
+  1. git init && git add -A && git commit -m 'import: ElysiaFloat v0.6.5'
+  2. 需要远程时再加 remote（不要复用旧 token，用新的最小权限 Fine-grained Token）
+  3. 推送前先跑 android/tools/smoke.js，并做一次凭据扫描

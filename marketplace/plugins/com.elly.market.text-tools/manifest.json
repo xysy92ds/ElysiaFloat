@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 1,
+  "apiVersion": "0.1",
+  "id": "com.elly.market.text-tools",
+  "name": "文本处理示例",
+  "icon": "Aa",
+  "version": "1.0.0",
+  "author": "ElysiaFloat",
+  "homepage": "https://github.com/xysy92ds/ElysiaFloat",
+  "docs": "plugins/com.elly.market.text-tools/README.md",
+  "desc": "无外部权限的文本统计与规范化示例，适合验证插件开发流程。",
+  "permissions": [],
+  "tools": [
+    {
+      "name": "text_inspect",
+      "description": "统计文本字符数、行数和非空行数。不会访问网络、文件或设备。",
+      "permissions": [],
+      "parameters": {
+        "type": "object",
+        "properties": { "text": { "type": "string", "description": "待统计文本" } },
+        "required": ["text"]
+      },
+      "kind": "js",
+      "code": "async function run(args){var t=String(args.text||\"\");var lines=t?t.split(/\\r?\\n/):[];return {characters:t.length,lines:lines.length,nonEmptyLines:lines.filter(function(x){return x.trim();}).length};}"
+    }
+  ]
+}
