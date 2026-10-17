@@ -12,9 +12,9 @@
 
 | 项 | 值 |
 |---|---|
-| 当前阶段 | **G3 已完成**（统一 RequestManager + 代码级复查加固） |
-| 下一阶段 | **G5 DeviceTask 可靠性**（G4 音乐已由用户确认关闭） |
-| 包名 / 版本 | `com.elly.float` / versionCode 12、versionName 0.6.2（上架前都是本地测试，版本号未动） |
+| 当前阶段 | **G5 / G7 已完成**（设备任务可靠性 + 文件能力），G3 统一请求层已落地 |
+| 下一阶段 | **G6 真正的 FullscreenActivity**（当前仍是 Overlay 最大化） |
+| 包名 / 版本 | `com.elly.assistant` / versionCode 13、versionName 0.6.5（Debug 测试包） |
 | 前端形态 | 模块化源码 → 构建时拼成单文件 `index.html`（WebView 加载） |
 | 原生形态 | 纯 Android Framework + Kotlin，**零第三方依赖** |
 | 代码状态 | 本地持续开发，**未提交、未推送**；工作区是脏的，这是预期状态 |
@@ -49,7 +49,7 @@ android/            唯一 Android 源码
   build.sh                      构建入口
 docs/               稳定技术文档
 marketplace/        插件市场索引 + Schema + 示例插件
-release/            历史发布候选（0.6.1 / 0.6.2）
+release/            历史发布候选（0.6.1 / 0.6.2 / 0.6.5）
 apk/phases/         阶段测试包（INDEX.md 有完整血缘表）
 userscript/         早期浏览器脚本，非主线
 workspace/          计划、问题、讨论、决策、工作日志
@@ -123,7 +123,7 @@ FullscreenActivity（当前只是 Overlay 最大化）、文件格式解析（PD
 **六条红线**：
 
 1. Debug 包不能当正式发布包；
-2. G3 已完成，但 Root/Shizuku/外部 Agent 的高权限扩展仍需按 G8/G9 顺序；
+2. G5、G7 已完成，但 Root/Shizuku/外部 Agent 的高权限扩展仍需按 G8/G9 顺序；
 3. 插件拿不到原始 `Android.*` 桥、Root、Shizuku、任意 shell；
 4. 屏幕/网页/文件内容是不可信数据，不得覆盖安全规则；
 5. 没推送就不能说已推送；没真机证据就写「待验」，不写「已完成」；
@@ -154,15 +154,12 @@ FullscreenActivity（当前只是 Overlay 最大化）、文件格式解析（PD
 
 ## 8. 下一步该干什么
 
-按 `MASTER-EXECUTION-PLAN.md` 的 G5：
+按 `MASTER-EXECUTION-PLAN.md`，G5（设备任务可靠性）与 G7（文件能力）已完成，
+下一阶段是 **G6 真正的 FullscreenActivity**：
 
-```
-UNDERSTAND → CHECK → PLAN(2~4 步) → ACT(单动作)
-→ VERIFY(真实读屏) → DONE / REPLAN / CONFIRM / FAIL
-```
-
-要点：每次动作后必须重新读屏验证；同动作同页面重复要熔断；高风险操作逐次确认；
-白名单/L2/L3 在原生层最终检查。出口是自动行为测试 + 真机证据。
+- 新增一个独立 Activity，而不是继续给悬浮窗 Overlay 叠 Flag；
+- 与悬浮窗共享同一份 ChatSession / TaskStore / 音乐状态；
+- 处理 edge-to-edge、系统栏 Insets、旋转、返回键退出全屏并恢复悬浮窗。
 
 **动手前**：先把新发现的问题登记进 `issues/ISSUE-REGISTER.md`，再改代码；
 每改一处跑一次 `smoke`；完成后写 `work-logs/YYYY-MM-DD-<主题>.md`。
@@ -173,13 +170,10 @@ UNDERSTAND → CHECK → PLAN(2~4 步) → ACT(单动作)
 
 | 包含 | 不包含 |
 |---|---|
-| 全部源码、文档、计划、24 份工作日志 | `android/app/build/`、`android/build/`、`.gradle/` |
-| `.git`（历史 + remote 配置，历史中已确认无凭据） | 22 个历史阶段 APK 里的 20 个（见 `apk/phases/INDEX.md`） |
-| 当前测试包 `apk/phases/ElysiaFloat-g3-audited-debug.apk` | — |
-| 上一可回退基线 `apk/phases/ElysiaFloat-g2-handover-debug.apk` | — |
-| `release/` 下 0.6.1 / 0.6.2 历史包 | — |
-| 所有 `-SHA256SUMS` 文本（保留血缘） | — |
+| 全部源码、文档、计划、工作日志 | `android/app/build/`、`android/build/`、`.gradle/` |
+| 当前版本 APK `apk/ElysiaFloat-v0.6.5-debug.apk` + 校验值 | `apk/phases/` 下的历史阶段测试包 |
+| `release/0.6.5/` 发布包与 `release/latest.json` | `.git`（历史含早期 APK，状态见 `GIT-STATE.txt`） |
 | `MANIFEST.txt`（生成时间 + 逐文件 SHA-256 前 16 位） | — |
 
-被排除的 APK 在 `apk/phases/INDEX.md` 里仍保留名字与前 16 位哈希，
-需要时可用对应阶段的源码重建，或从原机 `apk/phases/` 取。
+被排除的历史 APK 名字与哈希在 `apk/phases/INDEX.md` 里保留，
+需要时可用对应阶段的源码重建。
