@@ -1,7 +1,7 @@
 # ElysiaFloat 工作区状态与导航
 
-更新时间：2026-10-17
-状态：0.7.0 迭代中；全屏功能已移除、横屏窗口夹持已加固、发布产物已更新并推送
+更新时间：2026-10-20
+状态：0.7.1 纠错发布；全屏功能已移除、横屏窗口夹持已加固、主聊天发送键逻辑已统一并加固热区、已补齐发布链路（旧包未上传导致修复没到达用户）
 
 > 本文件是工作区导航，不替代技术文档。项目当前真正的执行入口是：
 > - `plans/MASTER-EXECUTION-PLAN.md`：唯一任务链和阶段出口；
@@ -12,13 +12,14 @@
 ## 当前结论
 
 - 项目定位：悬浮窗 Android AI 助手 + 手机 Agent + 工作区 + 插件平台。
-- 基线：`0.7.0` / versionCode `14`，Debug 构建。
-- Git：`main` 已与 `origin/main` 同步（最新提交 `496d5c7`）。
+- 基线：`0.7.1` / versionCode `16`，Debug 构建。
+- Git：`main` 已与 `origin/main` 同步（上一提交 `e99610e`）；本轮 0.7.1 改动已提交并推送。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
-- 最新测试包：`apk/ElysiaFloat-v0.7.0-debug.apk`（同时归档于 `release/0.7.0/`）。
-- 最新测试包 SHA-256：`df9572da419317c2b1b0525dcf76e61571c61afd73bb3cb52d2e1e071c882634`。
-- 当前质量门：HTML 检查和 smoke 当前全通过；本轮最新改动尚未完成真机覆盖。
+- 最新测试包：`apk/ElysiaFloat-v0.7.1-debug.apk`（同时归档于 `release/0.7.1/`）。
+- 最新测试包 SHA-256：`4b9b9cbbda98f923012439932972c1d0f3002d05b870d0a20827d261d802ee4c`。
+- 当前质量门：HTML 检查和 smoke 全通过；0.7.1 待真机覆盖确认。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`）。
+- 发布提醒：GitHub Release `v0.7.0` 上是 versionCode 14 的旧包（仍含发送按钮缺陷）；0.7.1 才是修复版。应用内更新检查指向公开仓库的 v0.6.5 索引，私有迭代期请直接到 Release 页下载。
 
 ## 目录边界
 

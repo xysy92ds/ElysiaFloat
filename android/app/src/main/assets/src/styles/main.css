@@ -121,9 +121,12 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   background:rgba(255,154,158,.22);color:var(--c1);font-size:15px;line-height:1}
 .msg-thumb{display:block;max-width:160px;max-height:160px;border-radius:10px;
   margin-top:6px;border:1px solid rgba(255,154,158,.3)}
-#send{width:60px;border-radius:18px;border:none;
+/* 发送键：底端对齐、给足最小高度，并抬到窗口缩放热区(.rz, z-index:60)之上。
+   即使某些机型安全区/布局让按钮落得更低，也不会被 .rz-se/.rz-s 抢走这一下点击。 */
+#send{width:60px;min-height:38px;align-self:flex-end;border-radius:18px;border:none;
   background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
-  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0}
+  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0;
+  position:relative;z-index:80}
 #send:disabled{opacity:.5}
 #settings{display:none;flex-direction:column;flex:1;overflow-y:auto;
   background:#fff5f7;padding:15px;-webkit-overflow-scrolling:touch}

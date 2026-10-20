@@ -48,7 +48,7 @@
   <div id="foot">
     <button id="btn-plus" aria-label="上传图片或文件">＋</button>
     <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
-    <button id="send">发送</button>
+    <button id="send" type="button">发送</button>
   </div>
 
   <div id="settings"></div>
@@ -257,9 +257,14 @@
 
   <div id="announcement-modal" class="modal">
     <div class="modal-card announcement-card">
-      <h3>应用公告 · 0.7.0</h3>
+      <h3>应用公告 · 0.7.1</h3>
       <div class="announcement-body">
-        <p><b>本版更新（0.7.0）</b><br>
+        <p><b>本版更新（0.7.1）</b><br>
+        · 修复主聊天页「发送」按钮点了没反应（发送链路里 const 变量被重复赋值，仅聊天路径触发）；<br>
+        · 发送失败不再静默：会在聊天里直接提示原因，按钮状态自动复位；<br>
+        · 输入法组词未提交时点发送，先提交再读取，避免「打了字却发不出去」；<br>
+        · 0.7.0 的功能（Termux 长跑、Minecraft 插件、横屏修复、统一签名）继续保留。</p>
+        <p><b>0.7.0 摘要</b><br>
         · Termux 长跑运行时：任务可追踪、可读回、可取消，适合长时间跑服务器；<br>
         · 新增官方插件「Minecraft 联机助手」，市场可直接搜索安装；<br>
         · 修复横屏（玩游戏）时打开浮窗被卡住、无法缩放的问题；<br>

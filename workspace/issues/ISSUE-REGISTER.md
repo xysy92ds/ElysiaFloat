@@ -39,6 +39,7 @@
 | I-037 | 用户主动停止会显示“错误：任务已取消” | 停止是正常操作，不应报错；聊天与快捷操作现按 CANCELLED 分支中性收尾，任务状态标 cancelled | 已修复（自动） | G2 |
 | I-033 | 内置音乐工具没有在插件配置/Agent 工具链中一致落实 | 已加入音乐插件面板复核、Schema/提示词一致性和单项开关测试；真机面板待验 | 已修复（自动） | G2 |
 | I-034 | 设置页保存按钮点不动 | 真因：`saveSettings()` 读取不存在的 `#set-gd-api`，抛 TypeError 中断（无 toast 无保存）；已补回输入框、27 处读取改为 null 安全 val()、异常可见、底部条 sticky bottom:44px 避开缩放热区；新增“保存控件存在性”通用回归并反向验证有效 | 已修复（自动） | G2 |
+| I-047 | 主聊天「发送」按钮点了没反应/只弹键盘；工作区同一按钮却能发 | 真因：`send()` 里 `routedTask` 声明成 `const` 又被 chat 分支 `taskEnsureChat()` 重新赋值，运行期抛 `Assignment to constant variable`（抛在清空输入/加气泡之前）；工作区/设备任务不走该分支故一直正常。已改为 `let` 并把聊天任务解析提前，三条路径统一落点；发送键同时加固 `type=button`、`align-self:flex-end`、`z-index:80`（高于缩放热区 `.rz` 的 60）。harness 运行期复现通过；真机待验。**后续排查发现：GitHub Release v0.7.0 上的 APK 仍是 versionCode 14 的旧构建（SHA 557e4c9…），源码里仍是 `const routedTask`，修复从未真正发布出去，所以用户反复安装到的都是坏包。已发布 v0.7.1（versionCode 16 / versionName 0.7.1，SHA 4b9b9cbb…），并新增 sendSafe 兜底与输入法组词提交读取** | 已修复（自动） | G5/G10 |
 
 ## P1：核心可靠性和安全
 

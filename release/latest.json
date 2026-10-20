@@ -1,16 +1,16 @@
 {
-  "tag_name": "v0.7.0",
-  "name": "ElysiaFloat v0.7.0",
-  "html_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.0",
-  "body": "0.7.0 把 Termux / Root / Shizuku 从协议骨架升级为可追踪、可读取、可取消的长期运行时（G8：run_id 追踪、输出流、信号文件取消、白名单含 java/bash/ffmpeg）；落地首个高权限官方插件——Minecraft 联机助手（Bedrock 服务器 + AI 控制的 Mineflayer bot，双向文件通道）；修复横屏（玩游戏）时打开浮窗被卡在左上角、无法缩放的问题（BASE 恒定 + 窗口按比例夹持）；修复 Kotlin 三引号字符串内 shell 变量被误当插值导致编译失败的问题；并新增项目自有签名 keystore，debug/release 共用同一签名（CN=ElysiaFloat，SHA-256 7851cb49…），保证多环境构建签名一致。修复补丁：1) 主聊天页「发送」按钮点击无响应——根因是按钮落在窗口缩放角标(.rz-se)的 22px 热区内被抢走点击，现抬高底部操作条并改用多事件绑定(pointerup/touchend/click 去重)；2) 公告改为按版本号记录，每个版本首次进入都会提示一次，并更新为 0.7.0 内容；3) 内置插件市场索引加入官方插件 Minecraft 联机助手，离线即可搜索安装；4) 移除一直未落地的全屏(FullscreenActivity)功能。注意：历史版本使用随机 debug 签名且私钥不可获得，从旧版升级需卸载重装一次。APK 为 Debug 测试包。SHA-256: df9572da419317c2b1b0525dcf76e61571c61afd73bb3cb52d2e1e071c882634。",
+  "tag_name": "v0.7.1",
+  "name": "ElysiaFloat v0.7.1",
+  "html_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.1",
+  "body": "0.7.1 是对 0.7.0 的一次纠错发布。0.7.0 发布页上的 APK（versionCode 14）里，send() 仍把 routedTask 声明为 const，又在聊天分支用 taskEnsureChat() 重新赋值，运行期抛 Assignment to constant variable；异常发生在清空输入和插入用户气泡之前，所以主聊天页点「发送」看起来完全没反应（工作区/设备任务不走那次赋值，因此一直正常）。本版把 routedTask 改为 let 并把聊天任务解析提前，三条路径统一落点；同时发送失败不再静默（会提示原因并复位按钮），输入法组词未提交时会先提交再读取。versionCode 16 / versionName 0.7.1，签名与此前 0.7.0 一致（CN=ElysiaFloat，SHA-256 7851cb49…），可直接覆盖安装。APK SHA-256: 4b9b9cbbda98f923012439932972c1d0f3002d05b870d0a20827d261d802ee4c。",
   "assets": [
     {
-      "name": "ElysiaFloat-v0.7.0-debug.apk",
-      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/download/v0.7.0/ElysiaFloat-v0.7.0-debug.apk"
+      "name": "ElysiaFloat-v0.7.1-debug.apk",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/download/v0.7.1/ElysiaFloat-v0.7.1-debug.apk"
     },
     {
-      "name": "ElysiaFloat-v0.7.0-source.zip",
-      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/download/v0.7.0/ElysiaFloat-v0.7.0-source.zip"
+      "name": "ElysiaFloat-v0.7.1-source.zip",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/download/v0.7.1/ElysiaFloat-v0.7.1-source.zip"
     }
   ]
 }

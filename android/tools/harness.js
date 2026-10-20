@@ -28,7 +28,7 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'saveSettings', 'renderSettings', '$',
   'reqRequest', 'REQ_CODE', 'REQ_RETRY_DELAY', 'reqAuditList', 'reqAuditClear', 'reqToken', 'reqIsRetriable', 'reqHost', 'reqSameHostOnly', 'musicStripVolatile', 'musicRemember', 'M', 'execTool', 'USER_PLUGINS', 'taskAdd', 'taskUpdate', 'taskResume', 'taskCancel', 'errMsg', 'TASKS', 'MEMCFG', 'checkUpdate',  'chatReq', 'memEmbed',  'mGetLyric', 'deviceState', 'deviceSetPhase', 'devicePhaseOf', 'deviceReset', 'deviceOrient', 'canParallelTool', 'isDeviceAction', 'DEVICE_PHASES', 'planToolBatch', 'screenDigest', 'screenFingerprint', 'screenCacheClear', 'deviceWaitChange', 'agentVerifyAction', 'deviceBudget', 'deviceBudgetLeft', 'deviceGrantMore', 'recordDeviceAction', 'closeModal', 'taskEnsureChat', 'chatTasks', 'taskBegin', 'detectModels', 'memAutoTick', 'memAutoState', 'memSummarize', 'taskFinish', 'routeTask', 'taskContinuable', 'cleanAssistantText', 'taskSetCurrent', 'addMsg', 'copyToClipboard', 'pasteIntoField', 'readClipboard', 'bindCtxMenu', 'modelTimeout', 'agentLevelAtLeast', 'previewKindOf', 'openPreview', 'addExportCard', 'prettyIfJson', 'cancelTaskRequests', 'currentTask', 'reqCancelledError',
   'showGuide', 'hideGuide', 'ensureGuideFooterVisible', 'activePermItems', 'PERM_ITEMS',
-  'renderGuideSteps', 'webviewLevel', 'loadEnv', 'sdkAtLeast', 'detectCaps'];
+  'renderGuideSteps', 'webviewLevel', 'loadEnv', 'sdkAtLeast', 'detectCaps', 'send'];
 const cuts = js.lastIndexOf('})();');
 if (cuts < 0) { console.error('没找到 IIFE 结尾'); process.exit(1); }
 js = js.slice(0, cuts) + '\ntry { window.__T = {' + EXPORTS.join(',') + '}; } catch (e) { console.error("EXPORT FAIL", e); }\n' + js.slice(cuts);

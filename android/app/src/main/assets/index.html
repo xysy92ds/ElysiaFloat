@@ -127,9 +127,12 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   background:rgba(255,154,158,.22);color:var(--c1);font-size:15px;line-height:1}
 .msg-thumb{display:block;max-width:160px;max-height:160px;border-radius:10px;
   margin-top:6px;border:1px solid rgba(255,154,158,.3)}
-#send{width:60px;border-radius:18px;border:none;
+/* 发送键：底端对齐、给足最小高度，并抬到窗口缩放热区(.rz, z-index:60)之上。
+   即使某些机型安全区/布局让按钮落得更低，也不会被 .rz-se/.rz-s 抢走这一下点击。 */
+#send{width:60px;min-height:38px;align-self:flex-end;border-radius:18px;border:none;
   background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
-  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0}
+  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0;
+  position:relative;z-index:80}
 #send:disabled{opacity:.5}
 #settings{display:none;flex-direction:column;flex:1;overflow-y:auto;
   background:#fff5f7;padding:15px;-webkit-overflow-scrolling:touch}
@@ -736,7 +739,7 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
   <div id="foot">
     <button id="btn-plus" aria-label="上传图片或文件">＋</button>
     <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
-    <button id="send">发送</button>
+    <button id="send" type="button">发送</button>
   </div>
 
   <div id="settings"></div>
@@ -945,9 +948,14 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
 
   <div id="announcement-modal" class="modal">
     <div class="modal-card announcement-card">
-      <h3>应用公告 · 0.7.0</h3>
+      <h3>应用公告 · 0.7.1</h3>
       <div class="announcement-body">
-        <p><b>本版更新（0.7.0）</b><br>
+        <p><b>本版更新（0.7.1）</b><br>
+        · 修复主聊天页「发送」按钮点了没反应（发送链路里 const 变量被重复赋值，仅聊天路径触发）；<br>
+        · 发送失败不再静默：会在聊天里直接提示原因，按钮状态自动复位；<br>
+        · 输入法组词未提交时点发送，先提交再读取，避免「打了字却发不出去」；<br>
+        · 0.7.0 的功能（Termux 长跑、Minecraft 插件、横屏修复、统一签名）继续保留。</p>
+        <p><b>0.7.0 摘要</b><br>
         · Termux 长跑运行时：任务可追踪、可读回、可取消，适合长时间跑服务器；<br>
         · 新增官方插件「Minecraft 联机助手」，市场可直接搜索安装；<br>
         · 修复横屏（玩游戏）时打开浮窗被卡住、无法缩放的问题；<br>
@@ -7836,8 +7844,14 @@ async function send() {
     return;
   }
   const inputEl = $('#input');
-  const t = inputEl.value.trim();
+  let t = inputEl.value.trim();
   const att = pendingAttachment;
+  // 部分输入法还在组词时读到的 value 是空的：先失焦让输入法提交，再读一次，
+  // 避免「明明打了字，点发送却什么都不发生」。
+  if (!t && !att && document.activeElement === inputEl) {
+    try { inputEl.blur(); } catch (e) {}
+    t = inputEl.value.trim();
+  }
   if (!t && !att) return;
   // 正在某个持久任务（工作/手机）里时，普通文字继续留在该任务；
   // 只有明确的快捷屏幕指令或其它任务类型关键词才切换。
@@ -7853,8 +7867,14 @@ async function send() {
     const shortcut = /翻译屏幕/.test(t) ? 'trans_screen' : (/总结屏幕/.test(t) ? 'sum_screen' : (/提取要点|要点/.test(t) ? 'points' : (/解释屏幕|解释/.test(t) ? 'explain' : '')));
     if (shortcut) { inputEl.value = ''; await handleQuickAction(shortcut); return; }
   }
-  const routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
+  // 统一落点：聊天、工作、设备任务都用同一段后续逻辑，只在这里一次性把「这轮消息进哪个任务」定死。
+  // 曾经把 routedTask 写成 const，又在下面 chat 分支用 taskEnsureChat() 覆盖它，
+  // 运行期必抛 "Assignment to constant variable"，且抛在清空输入和 addMsg 之前——
+  // 表现就是「主聊天点发送没反应」，而工作区/设备任务不走那次赋值所以一直正常。
+  // 现在把聊天任务的解析提前到这里，声明依然是 let，彻底消除这个分歧。
+  let routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
   if (!routedTask) return;
+  if (routeType === 'chat') routedTask = taskEnsureChat();
   if (routeType === 'workspace') {
     const ready = await ensureTaskWorkspace(routedTask);
     if (!ready.ok) { taskFinish(routedTask.id, 'failed', ready.error || '工作区不可用'); toast(ready.error || '工作区不可用'); return; }
@@ -7865,7 +7885,6 @@ async function send() {
     routedTask.artifacts = routedTask.artifacts || []; if (imported.relative) routedTask.artifacts.push(imported.relative); saveTasks();
   }
   if (routeType !== 'quick') taskBegin(routeType, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
-  if (routeType === 'chat') routedTask = taskEnsureChat();
   stopRequested = false;
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;
@@ -7933,6 +7952,20 @@ async function send() {
   stopRequested = false;
   ACTIVE_RUN_TASK_ID = '';
   sending = false; $('#send').disabled = false; $('#send').textContent = '发送';
+}
+
+/** 发送壳：send() 前半段（路由 / 切任务）如果抛错，以前是静默失败，
+ *  表现和「按钮点不动」一模一样。这里兜住异常、复位按钮并把原因说出来。 */
+function sendSafe() {
+  const fail = (e) => {
+    sending = false;
+    const b = $('#send'); if (b) { b.disabled = false; b.textContent = '发送'; }
+    toast('发送失败：' + errMsg(e));
+  };
+  try {
+    const p = send();
+    if (p && p.catch) p.catch(fail);
+  } catch (e) { fail(e); }
 }
 
 /* ==========================================================
@@ -9664,9 +9697,9 @@ function bindInput() {
     inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
   });
   inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSafe(); }
   });
-  bindTap($('#send'), send);
+  bindTap($('#send'), sendSafe);
   bindTap($('#btn-plus'), () => $('#plus-modal').classList.add('open'));
   $('#plus-image').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('image'); };
   $('#plus-file').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('file'); };

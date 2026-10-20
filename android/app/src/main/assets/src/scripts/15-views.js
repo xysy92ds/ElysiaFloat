@@ -292,9 +292,9 @@ function bindInput() {
     inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
   });
   inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSafe(); }
   });
-  bindTap($('#send'), send);
+  bindTap($('#send'), sendSafe);
   bindTap($('#btn-plus'), () => $('#plus-modal').classList.add('open'));
   $('#plus-image').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('image'); };
   $('#plus-file').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('file'); };

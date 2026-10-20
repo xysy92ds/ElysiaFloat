@@ -1393,6 +1393,36 @@ function step(name, fn) {
     if (T.sdkAtLeast(26) !== (ENVINFO.sdk >= 26)) throw new Error('sdkAtLeast 判定不对');
   });
 
+  await step('发送链路：routedTask 可被 taskEnsureChat 覆盖（const 回归）', () => {
+    // 回归用例：send() 曾把 routedTask 声明成 const，又在 chat 分支用 taskEnsureChat()
+    // 重新赋值，抛 "Assignment to constant variable"，且抛在清空输入 / addMsg 之前——
+    // 表现为「主聊天点发送没反应」，而工作区/设备任务不走那行分支所以不受影响。
+    // 这是运行期才炸的写法，语法检查查不出，所以在这里钉死声明方式。
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/scripts/12-send-quick.js'), 'utf8');
+    if (!/let routedTask = await routeTask\(/.test(src)) throw new Error('send() 里 routedTask 必须用 let（会被 taskEnsureChat 覆盖）');
+    if (/const routedTask = await routeTask\(/.test(src)) throw new Error('send() 又把 routedTask 声明成了 const');
+    if (!/if \(routeType === 'chat'\) routedTask = taskEnsureChat\(\);/.test(src)) {
+      throw new Error('chat 分支的 taskEnsureChat() 覆盖不见了，需同步核对这段逻辑');
+    }
+  });
+
+  await step('发送键：不被窗口缩放热区抢走点击(z-index)且声明为 button', () => {
+    // 主聊天「发送」曾因为落在右下 .rz-se 缩放手势热区上而点不动（工作区里因为
+    // 底部布局不同才躲过），表现为「主聊天点发送没反应，工作区能点」。除了抬高底部
+    // 操作条，还把发送键抬到 .rz(z-index:60) 之上，双保险。这里钉死这个不变量。
+    const fs = require('fs');
+    const path = require('path');
+    const css = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
+    const tpl = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/template.html'), 'utf8');
+    const m = css.match(/#send\{[^}]*\}/);
+    if (!m) throw new Error('找不到 #send 样式规则');
+    const rule = m[0];
+    const z = (rule.match(/z-index:\s*(\d+)/) || [])[1];
+    if (!z || Number(z) <= 60) throw new Error('#send 的 z-index 必须高于缩放热区 .rz(60)，否则会被 .rz-se 抢走点击');
+    if (!/align-self:\s*flex-end/.test(rule)) throw new Error('#send 需要 align-self:flex-end，避免被拉伸到整条底部操作条');
+    if (!/<button id="send"[^>]*type="button"/.test(tpl)) throw new Error('发送键必须显式 type="button"');
+  });
+
   console.log('');
   if (errors.length) {
     console.log('✗ 发现 ' + errors.length + ' 个问题：\n');
