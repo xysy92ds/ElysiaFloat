@@ -1,15 +1,16 @@
 # 交接说明（Handover）
 
-更新时间：2026-10-16
-当前阶段：G2 已完成（本地代码 + 自动验证 + 构建）；下一步进入 G3
-最新测试包：`apk/phases/ElysiaFloat-g2-handover-debug.apk`
-SHA-256：`4e795476320257b634002eb7d413dba19ddf885d29814141896d968515dbb835`
+更新时间：2026-10-20
+当前阶段：0.7.1 纠错发布完成（本地构建 + 自动验证 + 已推送 + 已上传 Release）；真机验证待做
+最新测试包：`apk/ElysiaFloat-v0.7.1-debug.apk`（versionCode 16 / versionName 0.7.1）
+SHA-256：`4b9b9cbbda98f923012439932972c1d0f3002d05b870d0a20827d261d802ee4c`
 
 ## 1. 一句话现状
 
 ElysiaFloat 是一个 Android 悬浮窗 AI 助手（聊天 + 手机 Agent + 文件工作区 + 插件平台）。
-0.6.2 之后一直在本地持续开发，**尚未提交、未推送**；`main` 相对 `origin/main` 仅 ahead 1（只多一个文档提交）。
-前端已拆分为 `android/app/src/main/assets/src/`，构建时由 `tools/build-html.js` 合并生成单文件 `index.html`。
+0.7.1 已提交并推送到私有仓库 `xysy92ds/ElysiaFloat-v0.7`，Release 资产与源码快照同步；
+`main` 与 `origin/main` 一致。前端已拆分为 `android/app/src/main/assets/src/`，
+构建时由 `tools/build-html.js` 合并生成单文件 `index.html`。
 
 ## 2. 代码与文档的权威入口
 
@@ -62,20 +63,30 @@ node tools/smoke.js                # 全部通过才算过
 ## 6. 未完成 / 待设备验证
 
 **设备验证（不能靠本地测试替代）**
+
+- 0.7.1：主聊天「发送」能正常发消息、清空输入、出现气泡；工作区/设备任务仍正常；
+- 0.7.1：横屏（玩游戏时）打开浮窗不卡左上角，能等比缩放；
+- 0.7.1：首次进入公告标题显示「应用公告 · 0.7.1」，且每个版本只弹一次；
+- 覆盖窗口里的长按选中、复制、粘贴（当前仍是未解决问题）；
 - 真机插件面板看到音乐组并生效；带 `music.control` / `device.read` 的第三方插件授权允许与拒绝；
 - 长任务暂停/恢复/停止、跨重启恢复；
 - 音乐真实源（GD Studio / Meting）、302/403/429/签名过期、离线与息屏播放、公共目录可见性；
 - 文件写入/快照/回滚在 Android 11+ 与厂商文件管理器的表现。
 
 **代码待做（按计划顺序）**
-- G3：统一 RequestManager（requestId、超时预算、取消、重试、3xx 策略、响应大小/MIME 校验、统一错误码、来源健康）；
+
+- 复制粘贴与输入法焦点：清理上一轮未生效的 550ms 长按菜单冗余代码，改为可靠的
+  selection + 系统剪贴板方案；
 - G4 尾：音乐真实源适配与真机收口；
-- G5：DeviceTask 完整 PLAN→ACT→VERIFY 调度与高风险确认；
-- G6：真正的 `FullscreenActivity`（当前只有 Overlay 最大化）；
-- G7：文件解析（PDF/Office/EPUB/ZIP 安全）、原子写入、符号链接边界、Kotlin 单测；
+- G5：DeviceTask 真机走通「打开应用 → 点按钮 → 输入 → 返回」；
+- G7：文件能力真机收尾；
 - G8：Termux token 校验 + run_id + 输出回传 + 取消；Root 审计与取消；Shizuku 真实接入；
-- G9：插件签名根、撤销、审核流水线；外部 Agent 下载/哈希/启动/停止/回传；
-- G10：Release 签名、CI、真机矩阵、`release/latest.json` 同步。
+- G9：插件签名根、撤销、审核流水线；外部 Agent 下载/哈希/启动/停止/回传；AstrBot 对齐；
+- G10：Release 签名分离、CI、真机矩阵、更新索引指向实际发布 APK。
+
+**已删除，不再排期**
+
+- G6 FullscreenActivity（用户 2026-10-17 决定彻底删除，代码/Manifest/桥接口/样式均已清理）。
 
 ## 7. 明确的红线
 
@@ -89,12 +100,14 @@ node tools/smoke.js                # 全部通过才算过
 ## 8. 接手第一天建议动作
 
 1. 跑一遍第 5 节的三条验证命令，确认基线全绿。
-2. 打开 `apk/phases/` 里最新的 `ElysiaFloat-g2-handover-debug.apk` 装机，按第 6 节设备清单抽查 3～5 项。
-3. 读 `workspace/issues/ISSUE-REGISTER.md`，把本轮新发现的问题补编号。
-4. 开始 G3：先建 `RequestManager`（先统一模型请求，再接插件/音乐/更新），每接一处跑一次 smoke。
+2. 打开 `apk/ElysiaFloat-v0.7.1-debug.apk` 装机（可直接覆盖 0.7.0），先看公告标题是否为 0.7.1。
+3. 按第 6 节设备清单走一遍发送、横屏、公告、插件市场。
+4. 读 `workspace/issues/ISSUE-REGISTER.md`，把本轮新发现的问题补编号；下一步做覆盖窗口的复制粘贴。
 
 ## 9. 已知遗留问题（非阻塞）
 
 - `node tools/build-html.js --verify-migration` 仍会失败：旧迁移基线已过期，`--check` 才是当前正确门；
-- `release/latest.json` 仍指向旧 0.6.2 包，与本地构建不一致（G10 处理）；
-- `via_ai_history` legacy 写入仍存在于记忆/插件/导入等路径（G2-002 后续清理项）。
+- `release/latest.json` 已更新到 v0.7.1，但应用内更新检查读的是公开仓库的 v0.6.5 索引，
+  私有仓库匿名不可读，内测期只能手动从 Release 下载（G10 处理）；
+- `via_ai_history` legacy 写入仍存在于记忆/插件/导入等路径（G2-002 后续清理项）；
+- GitHub Release `v0.7.0` 的资产仍是 versionCode 14 的旧包，已在发布说明顶部标注缺陷警告。

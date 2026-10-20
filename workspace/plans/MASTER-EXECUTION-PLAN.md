@@ -1,8 +1,8 @@
 # ElysiaFloat 主执行计划与完整任务链
 
-更新时间：2026-10-16
+更新时间：2026-10-20
 文档状态：当前唯一执行计划
-代码状态：本地持续开发；不新增提交、不推送，直到阶段出口满足
+代码状态：0.7.1 已提交并推送；内测期允许提交/推送，但每次必须同步版本号、Release 资产和校验值
 
 ## 0. 计划目标
 
@@ -44,11 +44,11 @@ G1 恢复自动验证全绿（音乐 + 工具轮数 + 回归测试）
 G2 任务/上下文/取消边界收敛
   ↓
 G3 统一 RequestManager 和错误模型
-  ├──────────────┬──────────────┬──────────────┐
-  ↓              ↓              ↓              ↓
-G4 音乐系统      G5 DeviceTask  G7 文件/工作区  G6 Fullscreen
-  ↓              ↓              ↓              ↓
-  └──────────────┴──────┬───────┴──────────────┘
+  ├──────────────┬──────────────┐
+  ↓              ↓              ↓
+G4 音乐系统      G5 DeviceTask  G7 文件/工作区
+  ↓              ↓              ↓
+  └──────────────┴───────┬──────┘
                          ↓
 G8 Termux / Root / Shizuku 真实运行时
                          ↓
@@ -59,8 +59,11 @@ G10 真机矩阵、Release、发布与长期维护
 
 G4～G7 可以在 G3 完成后并行，但每一条都必须单独通过自己的出口；G8 不得提前扩大高权限能力。
 
-**顺序调整（用户 2026-10-17）**：G7（文件格式与文件能力）与 G6（真正的 FullscreenActivity）提到前面，
-先做这两块，再做 G8 及之后的阶段。
+**顺序调整（用户 2026-10-17）**：G7（文件格式与文件能力）提前，先做这一块，再做 G8 及之后的阶段。
+
+**G6 已删除（用户 2026-10-17）**：全屏功能始终没有落地，用户要求彻底删除。
+`FullscreenActivity`、Manifest 注册、JS 桥接口、相关样式与冒烟断言已全部移除，不再排期。
+悬浮窗只保留 Overlay 自身的最大化/缩放能力。
 
 ## 3. G0：状态冻结与工作区整理
 
@@ -419,19 +422,21 @@ INVALID_ARGUMENT
 
 出口：文件行为测试 + Android 11+ 公共存储和至少一套厂商文件管理器真机验证。
 
-## 10. G6：真正 FullscreenActivity（与 G7 同批）
+## 10. G6：FullscreenActivity（已删除，不再排期）
 
-状态：未实现；当前只有 Overlay 最大化
+状态：已删除（用户 2026-10-17 决定）
 
-任务：
+原因：该能力从提出到 0.7.0 始终没有真正实现，只停留在 Overlay 叠 Flag 的候选方案，继续保留只会制造“文档里有、代码里没有”的假进度。
 
-- 新增 Activity，而不是继续给 Overlay 叠 Flag；
-- 与悬浮窗共享 ChatSession/TaskStore；
-- edge-to-edge、Insets、系统栏、旋转和屏幕尺寸适配；
-- 返回键退出全屏并恢复悬浮窗；
-- 处理全屏期间的任务、音乐和快捷操作。
+已清理：
 
-出口：系统栏、返回键、恢复悬浮窗在真机上通过；不影响普通聊天。
+- `FloatService.kt` 的 `fullscreenMode/fullscreenPrevRect/setFullscreen/getWebViewForFullscreen/returnWebViewFromFullscreen/isFullscreen`；
+- `PermissionBridge.kt` 的 JS 侧全屏桥接口；
+- `AndroidManifest.xml` 的 `FullscreenActivity` 注册；
+- 前端全屏入口、样式与 smoke 断言。
+
+替代方案：悬浮窗继续使用现有 Overlay 最大化与等比缩放；真需要更大显示面积时，后续按新的独立需求重新立项，不复活 G6。
+
 
 ## 11. G8：Termux / Root / Shizuku 运行时
 
@@ -483,19 +488,31 @@ INVALID_ARGUMENT
 
 ## 13. G10：Release 和长期维护
 
-状态：未开始
+状态：部分完成（0.7.1 起）
 
-任务：
+已完成：
 
-1. 正式签名方案和密钥不入仓库；
-2. versionCode 单调递增，versionName 语义化；
-3. Debug/Release 产物分离；
-4. APK、SHA-256、变更说明和权限说明同步；
-5. GitHub Actions：HTML 检查、smoke、行为测试、Kotlin 测试、Debug 构建；
-6. Android 版本 × 厂商 × 权限状态真机矩阵；
-7. 更新索引指向实际发布 APK；
-8. 发布前扫描 Token、API Key、Cookie、设备信息和用户数据；
-9. 所有阶段问题关闭或明确延期。
+1. 项目自有 keystore，debug/release 共用，签名不再随机构变化；
+2. versionCode 单调递增（0.7.0 = 14，0.7.1 = 16），versionName 语义化；
+3. 每次构建归档 APK、source.zip、SHA256SUMS，并同步 `release/latest.json`；
+4. 私有仓库 Release 资产与源码保持一致（v0.7.1）。
+
+未完成：
+
+1. Debug/Release 产物分离，Release 包尚未正式签名；
+2. GitHub Actions：HTML 检查、smoke、行为测试、Kotlin 测试、Debug 构建；
+3. Android 版本 × 厂商 × 权限状态真机矩阵；
+4. **更新索引指向实际发布 APK**——应用内检查更新读的是公开仓库
+   `xysy92ds/ElysiaFloat` 的 `release/latest.json`（仍是 v0.6.5），与私有仓库
+   `-v0.7` 不是同一源，内测期只能手动下载；
+5. 发布前扫描 Token、API Key、Cookie、设备信息和用户数据；
+6. 所有阶段问题关闭或明确延期。
+
+新增固定检查项（0.7.1 事故结论）：
+
+- 每次宣布“已修复”前，必须确认修复所在 commit 已推送，且 Release 资产 SHA-256
+  与本地构建一致；只改本地不发布，视为未修复。
+- Release 说明必须写明 versionCode；同名 versionName 的多份构建一律视为不同包。
 
 出口：Release 包可以安装、升级、回滚；文档、索引、校验值和源码相互一致。
 
@@ -504,21 +521,25 @@ INVALID_ARGUMENT
 近期不得扩展高权限能力，严格按以下顺序：
 
 ```text
-G0-001 / G0-003
-→ G1-001 音乐解析回归
-→ G1-002 工具轮数语义
-→ G1-003 行为测试
-→ G2-002 任务/上下文隔离
-→ G2-003 状态机与取消
-→ G3 RequestManager
+0.7.1 真机验证（发送 / 横屏 / 公告 / 插件市场）
+→ 复制粘贴与输入法焦点（覆盖窗口）
+→ G0-001 / G0-003 收口
+→ G1-003 行为测试补全
 → G4 音乐真机收尾
-→ G5 DeviceTask（已完成 G5-1~4）
-→ G7 文件格式与文件能力（前置）
-→ G6 FullscreenActivity（与 G7 同批）
-→ G8 Termux/Root/Shizuku
+→ G5 DeviceTask 真机收尾
+→ G7 文件能力真机收尾
+→ G8 Termux / Root / Shizuku
 → G9 插件市场和外部 Agent
 → G10 Release
 ```
+
+说明：
+
+- G6 已删除，不再出现在顺序里；
+- 0.7.1 真机验证属于 G10 出口的前置，不通过就不能继续宣称“已修复”；
+- 复制粘贴/长按选中是覆盖窗口的焦点与剪贴板权限问题，先于新功能处理，
+  同时删除上一轮未生效的长按菜单冗余代码。
+
 
 ## 15. 阶段完成定义
 
