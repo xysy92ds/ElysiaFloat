@@ -31,8 +31,6 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   cursor:pointer;font-family:inherit;flex:0 0 auto;white-space:nowrap}
 /* 关闭键脱离伸缩流：无论音乐键是否出现、窗口缩得多小，都固定在右上角可点 */
 #btn-close{padding:0 9px;height:26px}
-#btn-fullscreen{font-size:15px;padding:0 8px}
-#btn-fullscreen.unsupported{opacity:.62;font-size:10px;padding:0 6px}
 #head .head-actions > button{background:rgba(255,255,255,.2);height:25px;font-size:11px;padding:0 10px}
 #head button:active{background:rgba(255,255,255,.45)}
 #head button[hidden]{display:none}
@@ -106,7 +104,8 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
 .tts-btn:active{background:rgba(255,154,158,.25)}
 #foot{display:flex;gap:8px;padding:10px 12px;background:#fff5f7;
   border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;
-  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  /* 抬高按钮，避开右下/左下 22px 的窗口缩放热区(.rz)，否则「发送」会被 .rz-se 抢走点击 */
+  padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))}
 #input{flex:1;border:1.5px solid rgba(255,154,158,.25);border-radius:18px;
   padding:10px 16px;font-size:14px;outline:none;resize:none;
   background:var(--card);color:var(--text);max-height:100px;
@@ -128,9 +127,12 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   background:rgba(255,154,158,.22);color:var(--c1);font-size:15px;line-height:1}
 .msg-thumb{display:block;max-width:160px;max-height:160px;border-radius:10px;
   margin-top:6px;border:1px solid rgba(255,154,158,.3)}
-#send{width:60px;border-radius:18px;border:none;
+/* 发送键：底端对齐、给足最小高度，并抬到窗口缩放热区(.rz, z-index:60)之上。
+   即使某些机型安全区/布局让按钮落得更低，也不会被 .rz-se/.rz-s 抢走这一下点击。 */
+#send{width:60px;min-height:38px;align-self:flex-end;border-radius:18px;border:none;
   background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
-  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0}
+  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0;
+  position:relative;z-index:80}
 #send:disabled{opacity:.5}
 #settings{display:none;flex-direction:column;flex:1;overflow-y:auto;
   background:#fff5f7;padding:15px;-webkit-overflow-scrolling:touch}
@@ -705,7 +707,6 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
       <span id="mode-label">聊天</span>
       <button id="task-menu" title="任务与工作区" aria-label="打开任务与工作区">▦</button>
       <span class="sp"></span>
-      <button id="btn-fullscreen" title="全屏模式" aria-label="全屏模式">□</button>
       <button id="btn-min" title="收成悬浮小窗">－</button>
       <button id="btn-close">×</button>
     </div>
@@ -738,7 +739,7 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
   <div id="foot">
     <button id="btn-plus" aria-label="上传图片或文件">＋</button>
     <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
-    <button id="send">发送</button>
+    <button id="send" type="button">发送</button>
   </div>
 
   <div id="settings"></div>
@@ -947,12 +948,26 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
 
   <div id="announcement-modal" class="modal">
     <div class="modal-card announcement-card">
-      <h3>应用公告 · 0.6.2</h3>
+      <h3>应用公告 · 0.7.2</h3>
       <div class="announcement-body">
-        <p>欢迎使用 ElysiaFloat。这是一个以开源方式发布的 Android 浮窗、Agent、翻译和工作区工具项目。</p>
+        <p><b>本版更新（0.7.2）</b><br>
+        · 在工作区任务里让 AI 操作手机，不再被切到新任务、也不用重新进入工作区；<br>
+        · 安全确认精简：进入工作区/手机任务授权一次，30 分钟内不再重复询问，任务结束或重启后失效；<br>
+        · 密码、支付、卸载、发送消息、外部文件删除仍然每次确认；<br>
+        · 修复覆盖窗口里长按菜单点不动、聊天框粘贴不进去的问题；<br>
+        · 0.7.1 的发送按钮修复、横屏修复、统一签名继续保留。</p>
+        <p><b>0.7.1 摘要</b><br>
+        · 修复主聊天页「发送」按钮点了没反应（发送链路里 const 变量被重复赋值，仅聊天路径触发）；<br>
+        · 发送失败不再静默：会在聊天里直接提示原因，按钮状态自动复位；<br>
+        · 输入法组词未提交时点发送，先提交再读取，避免「打了字却发不出去」。</p>
+        <p><b>0.7.0 摘要</b><br>
+        · 修复横屏（玩游戏）时打开浮窗被卡住、无法缩放的问题；<br>
+        · 浮窗按屏幕短边/长边保持宽高比，并始终限制在屏幕内；<br>
+        · 统一项目签名，之后版本之间可直接覆盖安装。</p>
+        <p>欢迎使用 ElysiaFloat。这是一个公开源码的 Android 浮窗、Agent、翻译和工作区工具项目。</p>
         <p><b>项目仓库</b><br><a href="https://github.com/xysy92ds/ElysiaFloat">https://github.com/xysy92ds/ElysiaFloat</a><br><b>作者</b>：xysy92ds<br><b>联系方式</b>：Q：3175461831　QQ 邮箱：3144919104@qq.com</p>
         <p><b>免责声明</b><br>本应用及其中的 AI、Agent、翻译、文件和插件功能按“现状”提供，输出、识别、自动化操作和第三方服务结果可能不准确、失败或产生意外影响。请在使用前备份重要数据，并自行核对 AI 建议、文件路径和目标应用；不要将本应用用于违法、侵犯他人隐私、未经授权访问或高风险生产场景。因用户配置、权限授权、第三方服务、设备或目标应用变化造成的损失，由使用者自行判断并承担。</p>
-        <p><b>权限说明</b><br>悬浮窗权限用于显示和拖动应用窗口；无障碍权限用于按用户请求读取屏幕、获取控件信息和执行受策略限制的操作；通知和电池相关权限用于后台保活与状态提示；“允许管理所有文件”用于访问受控工作区及用户明确操作的 Android 公共存储路径。权限不会自动授予其它应用私有目录访问权，Agent、白名单、安全开关和 Android 原生策略仍会继续限制能力。工作区及公共存储的写入、复制、建目录和删除均需逐次确认。</p>
+        <p><b>权限说明</b><br>悬浮窗权限用于显示和拖动应用窗口；无障碍权限用于按用户请求读取屏幕、获取控件信息和执行受策略限制的操作；通知和电池相关权限用于后台保活与状态提示；“允许管理所有文件”用于访问受控工作区及用户明确操作的 Android 公共存储路径。权限不会自动授予其它应用私有目录访问权，Agent、白名单、安全开关和 Android 原生策略仍会继续限制能力。工作区内的写入在任务授权有效期内免逐次确认，公共存储的写入、复制、建目录在授权有效期内合并确认一次，删除仍每次确认。</p>
         <p><b>插件提示</b><br>第三方插件可能存在安全、隐私和稳定性风险。安装或启用插件前请核对来源、代码和权限，不要提供密码、API Key、Cookie 等敏感信息；市场索引和权限声明不等于安全审查或安全保证。</p>
       </div>
       <div class="acts">
@@ -1640,6 +1655,27 @@ function reqErrText(e) {
  *  自定义弹窗（替代原生 confirm，浮窗里才能正常显示）
  * ========================================================== */
 let _modalCb = null;
+
+/* 通用点击绑定：Android WebView 里单个 onclick 偶发被吞。
+ * 同时挂 pointerup / touchend / click，并按时间做去重，避免同一手势重复触发。 */
+function bindTap(el, fn) {
+  if (!el) return;
+  try { el.type = 'button'; } catch (e) {}
+  el.style.pointerEvents = 'auto';
+  el.style.touchAction = 'manipulation';
+  let last = 0;
+  const handler = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    const now = Date.now();
+    if (now - last < 350) return false;
+    last = now;
+    fn(e);
+    return false;
+  };
+  el.onclick = handler;
+  el.ontouchend = handler;
+  el.onpointerup = handler;
+}
 /* ==========================================================
  *  长按菜单（复制 / 全选 / 粘贴）
  *  覆盖层窗口里系统 ActionMode 常被立刻 dismiss，这里补一个系统样式的兜底：
@@ -1675,7 +1711,9 @@ function showCtxMenu(x, y, items) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = it.label;
-    b.onclick = (e) => { e.stopPropagation(); hideCtxMenu(); try { it.run(); } catch (err) { toast('操作失败'); } };
+    // 用 bindTap：touchend 就触发，早于下面 touchend 里的“0ms 后隐藏菜单”。
+    // 原来用 onclick 时，菜单会在 click 派发前被隐藏，点「粘贴」永远没反应。
+    bindTap(b, () => { hideCtxMenu(); try { it.run(); } catch (err) { toast('操作失败'); } });
     m.appendChild(b);
   });
   const w = window.innerWidth || 360, h = window.innerHeight || 640;
@@ -1736,6 +1774,8 @@ function bindCtxMenu() {
   document.addEventListener('touchmove', cancel, { passive: true });
   document.addEventListener('touchend', (e) => {
     cancel();
+    // 点在菜单自己身上时不要隐藏：隐藏会发生在菜单项的 touchend 之后、click 之前。
+    if (e.target && e.target.closest && e.target.closest('#ctx-menu')) return;
     setTimeout(() => { if (!ctxSelectionText()) hideCtxMenu(); }, 0);
   }, { passive: true });
   document.addEventListener('touchcancel', () => { cancel(); hideCtxMenu(); }, { passive: true });
@@ -2235,7 +2275,7 @@ const PLUGINS = [
     tools: ['workspace_status', 'workspace_create', 'workspace_list', 'workspace_read', 'workspace_write', 'workspace_mkdir', 'external_file_list', 'external_file_read', 'external_file_write', 'external_file_copy', 'external_file_mkdir', 'external_file_delete'] },
   { id: 'runtime', name: '高级运行时', icon: '运行',
     desc: '在工作任务中调用受控 Termux 或 Root 能力。不会接受任意 shell 文本。',
-    tools: ['run_termux_job', 'root_operation'] },
+    tools: ['run_termux_job', 'termux_job_status', 'termux_job_output', 'termux_job_cancel', 'termux_jobs_list', 'root_operation'] },
   { id: 'system', name: '系统操作', icon: '系统',
     desc: '用系统浏览器打开网址、把文字写进剪贴板。',
     tools: ['open_url', 'set_clipboard'] },
@@ -2277,8 +2317,12 @@ const TOOL_DOC = {
   external_file_copy: '复制手机公共存储中的文件；每次写入目标前都会向用户确认。',
   external_file_mkdir: '在手机公共存储中创建目录；执行前会向用户确认。',
   external_file_delete: '删除手机公共存储中的文件或目录；执行前会进行高风险确认。',
-  run_termux_job: '在当前工作任务目录中运行结构化 Termux 工具；不能执行任意 shell。',
-  root_operation: '执行受控 Root 诊断操作；只允许固定白名单操作。',
+  run_termux_job: '在当前工作任务目录中运行结构化 Termux 工具（支持长跑进程）；只能用白名单执行器，不能执行任意 shell。',
+  termux_job_status: '查询 Termux 任务的状态和最近输出。',
+  termux_job_output: '流式读取 Termux 任务的输出日志。',
+  termux_job_cancel: '取消正在运行的 Termux 任务。',
+  termux_jobs_list: '列出当前任务下所有 Termux 任务。',
+  root_operation: '执行受控 Root 操作；只允许固定白名单操作。',
   open_url: '用系统浏览器打开网址。',
   set_clipboard: '把文字写进系统剪贴板。',
   search_and_play_music: '找歌并播放。',
@@ -2613,6 +2657,53 @@ function taskLoadContext(t) {
   sSet(taskHistoryKey(t.id), history);
 }
 function saveTasks() { sSet(TASK_KEY, TASKS.slice(0, 50)); sSet(TASK_CURRENT_KEY, CURRENT_TASK_ID); }
+
+/* ==========================================================
+ *  G2-005 能力授权
+ *  同一任务内 30 分钟复用；只放内存，进程重启即失效。
+ *  简化的是“问人次数”：L3、无障碍、白名单、路径校验仍由原生门禁执行，
+ *  密码框、发送消息、支付、卸载、外部删除依旧逐次确认。
+ * ========================================================== */
+const CONSENT_TTL_MS = 30 * 60 * 1000;
+const CONSENTS = Object.create(null);
+function consentKey(taskId, cap) { return String(taskId || '') + ':' + String(cap || ''); }
+function consentGranted(taskId, cap) {
+  if (!taskId || !cap) return false;
+  const k = consentKey(taskId, cap), exp = CONSENTS[k] || 0;
+  if (exp > Date.now()) return true;
+  if (k in CONSENTS) delete CONSENTS[k];
+  return false;
+}
+function consentGrant(taskId, cap) {
+  if (!taskId || !cap) return false;
+  CONSENTS[consentKey(taskId, cap)] = Date.now() + CONSENT_TTL_MS;
+  try { taskEvent(taskId, 'consent_granted', { capability: String(cap), ttlSec: CONSENT_TTL_MS / 1000 }); } catch (e) {}
+  return true;
+}
+function consentRevokeTask(taskId) {
+  const prefix = consentKey(taskId, '');
+  Object.keys(CONSENTS).forEach(k => { if (k.indexOf(prefix) === 0) delete CONSENTS[k]; });
+  try { taskEvent(taskId, 'consent_revoked', {}); } catch (e) {}
+}
+/** 设备类动作：已授权直接过；未授权只问一次，拒绝返回 false */
+async function ensureDeviceConsent(task) {
+  if (!task) return false;
+  if (consentGranted(task.id, 'device')) return true;
+  const ok = await uiConfirm('这一步需要操作手机：读取屏幕、点击或输入。\n\n本次任务 30 分钟内不再重复询问；密码框、发送消息、支付和卸载仍会逐次确认。', '允许操作手机', '手机控制授权');
+  if (!ok) return false;
+  consentGrant(task.id, 'device');
+  return true;
+}
+/** 公共存储写入/复制/建目录：同一任务授权一次；删除仍逐次确认 */
+async function ensureExternalWriteConsent(task, detail, okText, title) {
+  if (!task) return false;
+  if (consentGranted(task.id, 'external_write')) return true;
+  const ok = await uiConfirm(detail + '\n\n本次任务 30 分钟内不再逐次询问；删除仍需单次确认。', okText, title);
+  if (!ok) return false;
+  consentGrant(task.id, 'external_write');
+  return true;
+}
+
 const QUICK_OPS = new Map();
 function quickOperationBegin(title, goal, timeoutMs) {
   const t = taskNormalize({ id: 'quick-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6), type: 'quick', title: title || '快捷操作', goal: goal || '', state: 'active', context: { messages: [], taskScoped: true }, deadline: Date.now() + (timeoutMs || 30000), progress: '处理中' });
@@ -2750,6 +2841,7 @@ async function deleteTask(id) {
   if (!(await uiConfirm(t.type === 'chat' ? '删除这个聊天记录？\n\n里面的消息会一起删除。' : '删除任务记录“' + t.title + '”？\n\n任务上下文会删除；工作区文件默认保留。', t.type === 'chat' ? '删除聊天' : '删除任务', '任务删除'))) return;
   const removeFiles = t.type === 'workspace' && await uiConfirm('是否同时删除该任务工作区文件？此操作不可恢复。', '删除文件', '工作区删除');
   if (removeFiles && HAS_PERM && Perm.deleteTaskWorkspace) { try { Perm.deleteTaskWorkspace(t.id); } catch (e) {} }
+  consentRevokeTask(t.id);
   clearTaskHistory(t.id);
   // 原地删除，避免把 TASKS 换成新数组导致外部引用陈旧
   for (let i = TASKS.length - 1; i >= 0; i--) if (TASKS[i].id === id) TASKS.splice(i, 1);
@@ -2759,17 +2851,20 @@ async function deleteTask(id) {
 function taskModeText(t) { return t.type === 'chat' ? '聊天' : TASK_TYPES[t.type] || '任务'; }
 function taskStateText(t) { return TASK_STATES[t.state] || '运行中'; }
 function updateTaskMode() { const t = currentTask(); const mode = $('#mode-label'); if (mode) mode.textContent = taskModeText(t); const name = $('#name'); if (name) name.textContent = CONFIG.assistantName || '爱莉希雅'; }
-function taskToolsAllowed(type, name) {
+function taskToolsAllowed(type, name, taskId) {
   const device = ['read_screen','screenshot','watch_screen','find_app','tap_screen','click_text','swipe_screen','input_text','press_key','launch_app','get_current_page'];
   const files = ['workspace_status','workspace_create','workspace_list','workspace_read','workspace_write','workspace_mkdir','external_file_list','external_file_read','external_file_write','external_file_copy','external_file_mkdir','external_file_delete'];
-  const runtime = ['run_termux_job','root_operation'];
+  const runtime = ['run_termux_job','termux_job_status','termux_job_output','termux_job_cancel','termux_jobs_list','root_operation'];
   const quick = ['quick'];
   if (quick.indexOf(type) >= 0) return true;
   if (name === 'read_screen_once') return true;
   if (device.indexOf(name) >= 0) {
     // 兼容现有聊天层的只读能力探测：真正的点击、输入和启动仍只能在 device/quick 任务中执行。
     if (type === 'chat') return ['find_app', 'watch_screen'].indexOf(name) >= 0;
-    return type === 'device' || type === 'quick';
+    if (type === 'device' || type === 'quick') return true;
+    // G2-005：工作任务里获准操作手机后，设备工具留在同一任务内执行，不再切任务。
+    if (type === 'workspace') return consentGranted(taskId, 'device');
+    return false;
   }
   if (files.indexOf(name) >= 0) return type === 'workspace';
   return true;
@@ -2794,11 +2889,18 @@ async function routeTask(type, goal) {
   if (type === 'chat') { taskSetCurrent(TASKS.find(t => t.type === 'chat').id); return currentTask(); }
   if (type === 'quick') return quickOperationBegin(String(goal || '快捷操作').slice(0, 30), goal || '', 30000);
   if (type === 'device') {
-    if (!(await uiConfirm('这需要进入手机控制模式。Agent 将读取屏幕，并可能操作白名单应用；高风险动作仍会再次确认。', '进入手机控制', '任务模式确认'))) return null;
-    return taskAdd('device', String(goal || '手机控制任务').slice(0, 30), goal || '');
+    // G2-005：已经在工作/手机任务里就直接复用，不再新建任务把原工作区留在后台。
+    if (old && (old.type === 'device' || old.type === 'workspace') && taskContinuable(old)) {
+      if (!(await ensureDeviceConsent(old))) return null;
+      return old;
+    }
+    if (!(await uiConfirm('这需要进入手机控制模式。Agent 将读取屏幕，并可能操作白名单应用；高风险动作仍会再次确认。\n\n进入后本次任务 30 分钟内不再重复询问。', '进入手机控制', '任务模式确认'))) return null;
+    const deviceTask = taskAdd('device', String(goal || '手机控制任务').slice(0, 30), goal || '');
+    consentGrant(deviceTask.id, 'device');
+    return deviceTask;
   }
   if (type === 'workspace') {
-    if (!(await uiConfirm('这需要创建或切换到独立工作任务。文件修改前仍会逐次确认。', '进入工作任务', '任务模式确认'))) return null;
+    if (!(await uiConfirm('这需要创建或切换到独立工作任务。工作区内写入免逐次确认，外部文件修改会先征求同意。', '进入工作任务', '任务模式确认'))) return null;
     const task = taskAdd('workspace', String(goal || '工作任务').slice(0, 30), goal || '');
     const ready = await ensureTaskWorkspace(task);
     if (!ready.ok) { taskFinish(task.id, 'failed', ready.error || '工作区创建失败'); toast(ready.error || '工作区创建失败'); return null; }
@@ -3382,13 +3484,325 @@ const PLUG_HELP = [
 /* 本地插件市场索引：发布前可由构建流程同步为远程静态索引；本版本不执行上传。 */
 const PLUGIN_MARKET_INDEX = [
   {
-    manifestVersion: 1, apiVersion: '0.1', id: 'com.elly.market.text-tools',
-    name: '文本处理示例', icon: 'Aa', version: '1.0.0', author: 'ElysiaFloat',
-    desc: '无外部权限的文本统计与规范化示例，适合验证插件开发流程。',
-    docs: 'marketplace/plugins/com.elly.market.text-tools/README.md', permissions: [],
-    tools: [{ name: 'text_inspect', description: '统计文本字符数、行数和非空行数。', permissions: [], kind: 'js',
-      parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
-      code: 'async function run(args){var t=String(args.text||"");var lines=t? t.split(/\r?\n/):[];return {characters:t.length,lines:lines.length,nonEmptyLines:lines.filter(function(x){return x.trim();}).length};}' }]
+    "manifestVersion": 1,
+    "apiVersion": "0.1",
+    "id": "com.elly.market.text-tools",
+    "name": "文本处理示例",
+    "icon": "Aa",
+    "version": "1.0.0",
+    "author": "ElysiaFloat",
+    "homepage": "https://github.com/xysy92ds/ElysiaFloat",
+    "docs": "plugins/com.elly.market.text-tools/README.md",
+    "desc": "无外部权限的文本统计与规范化示例，适合验证插件开发流程。",
+    "permissions": [],
+    "tools": [
+      {
+        "name": "text_inspect",
+        "description": "统计文本字符数、行数和非空行数。不会访问网络、文件或设备。",
+        "permissions": [],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "待统计文本"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        },
+        "kind": "js",
+        "code": "async function run(args){var t=String(args.text||\"\");var lines=t?t.split(/\\r?\\n/):[];return {characters:t.length,lines:lines.length,nonEmptyLines:lines.filter(function(x){return x.trim();}).length};}"
+      }
+    ]
+  },
+  {
+    "manifestVersion": 1,
+    "apiVersion": "0.1",
+    "id": "com.elly.market.minecraft",
+    "name": "Minecraft 联机助手",
+    "icon": "⛏",
+    "version": "0.2.0",
+    "author": "ElysiaFloat",
+    "homepage": "https://github.com/xysy92ds/ElysiaFloat",
+    "docs": "plugins/com.elly.market.minecraft/README.md",
+    "desc": "在 Termux 中运行 Minecraft 服务器和 AI 控制的 Mineflayer bot，实现你和 AI 同世界联机。bot 支持移动、挖掘、放置、攻击、寻路、合成、聊天等操作。需要 Termux + Java + Node.js。",
+    "permissions": [
+      "termux"
+    ],
+    "tools": [
+      {
+        "name": "minecraft_setup",
+        "description": "在 Termux 中安装 Java 17、Node.js，并创建 mc-bot 目录和 package.json。这是一次性的环境搭建。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; return await t.call('run_termux_job', {executor:'bash', args:['-c','pkg update -y && pkg install -y openjdk-17 nodejs && mkdir -p ~/mc-bot && cd ~/mc-bot && echo \\'{\"name\":\"mc-bot\",\"version\":\"1.0.0\"}\\' > package.json']}); }"
+      },
+      {
+        "name": "minecraft_install_deps",
+        "description": "安装 Mineflayer bot 的依赖：mineflayer、mineflayer-pathfinder、minecraft-data、vec3。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; return await t.call('run_termux_job', {executor:'bash', args:['-c','cd ~/mc-bot && npm install mineflayer mineflayer-pathfinder minecraft-data vec3']}); }"
+      },
+      {
+        "name": "minecraft_deploy_bot",
+        "description": "部署正式的 bot.js 脚本到 Termux。bot 会连接 MC 服务器，通过 JSON 指令文件接收控制，通过状态文件回报信息。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "botName": {
+              "type": "string",
+              "description": "bot 游戏名，默认 Elly"
+            },
+            "serverHost": {
+              "type": "string",
+              "description": "服务器地址，默认 127.0.0.1"
+            },
+            "serverPort": {
+              "type": "integer",
+              "description": "服务器端口，默认 19132"
+            }
+          },
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; const name = args.botName || \"Elly\"; const host = args.serverHost || \"127.0.0.1\"; const port = args.serverPort || 19132; const b64 = \"Ly8gRWx5c2lhRmxvYXQgTWluZWNyYWZ0IEJvdAovLyDpgJrov4cgSlNPTiDmjIfku6Tmlofku7bmjqXmlLYgQUkg5o6n5Yi277yM6YCa6L+H54q25oCB5paH5Lu25Zue5oql546v5aKD5L+h5oGvCi8vIOS+nei1lu+8mm1pbmVmbGF5ZXIsIG1pbmVmbGF5ZXItcGF0aGZpbmRlciwgbWluZWNyYWZ0LWRhdGEsIHZlYzMKCmNvbnN0IG1pbmVmbGF5ZXIgPSByZXF1aXJlKCdtaW5lZmxheWVyJyk7CmNvbnN0IHsgcGF0aGZpbmRlciwgTW92ZW1lbnRzLCBnb2FscyB9ID0gcmVxdWlyZSgnbWluZWZsYXllci1wYXRoZmluZGVyJyk7CmNvbnN0IHZlYzMgPSByZXF1aXJlKCd2ZWMzJyk7CmNvbnN0IGZzID0gcmVxdWlyZSgnZnMnKTsKCmNvbnN0IENPTkZJRyA9IHsKICBob3N0OiBwcm9jZXNzLmVudi5NQ19IT1NUIHx8ICcxMjcuMC4wLjEnLAogIHBvcnQ6IHBhcnNlSW50KHByb2Nlc3MuZW52Lk1DX1BPUlQgfHwgJzE5MTMyJywgMTApLAogIHVzZXJuYW1lOiBwcm9jZXNzLmVudi5NQ19VU0VSTkFNRSB8fCAnRWxseScsCiAgY21kRmlsZTogcHJvY2Vzcy5lbnYuTUNfQ01EX0ZJTEUgfHwgJy9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy9ob21lL21jLWJvdC9jbWQuanNvbicsCiAgc3RhdHVzRmlsZTogcHJvY2Vzcy5lbnYuTUNfU1RBVFVTX0ZJTEUgfHwgJy9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy9ob21lL21jLWJvdC9zdGF0dXMuanNvbicsCiAgY2hhdExvZ0ZpbGU6IHByb2Nlc3MuZW52Lk1DX0NIQVRfRklMRSB8fCAnL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL2hvbWUvbWMtYm90L2NoYXQubG9nJwp9OwoKbGV0IGJvdCA9IG51bGw7CmxldCBjdXJyZW50QWN0aW9uID0gbnVsbDsKbGV0IGxhc3RTdGF0dXNVcGRhdGUgPSAwOwoKZnVuY3Rpb24gbG9nKG1zZykgewogIGNvbnN0IHRzID0gbmV3IERhdGUoKS50b0lTT1N0cmluZygpOwogIGNvbnNvbGUubG9nKGBbJHt0c31dICR7bXNnfWApOwp9CgpmdW5jdGlvbiBzYWZlUmVhZEpzb24oZmlsZSkgewogIHRyeSB7CiAgICBpZiAoIWZzLmV4aXN0c1N5bmMoZmlsZSkpIHJldHVybiBudWxsOwogICAgY29uc3QgdGV4dCA9IGZzLnJlYWRGaWxlU3luYyhmaWxlLCAndXRmOCcpLnRyaW0oKTsKICAgIGlmICghdGV4dCkgcmV0dXJuIG51bGw7CiAgICByZXR1cm4gSlNPTi5wYXJzZSh0ZXh0KTsKICB9IGNhdGNoIChlKSB7CiAgICByZXR1cm4gbnVsbDsKICB9Cn0KCmZ1bmN0aW9uIHdyaXRlU3RhdHVzKGV4dHJhKSB7CiAgaWYgKCFib3QpIHJldHVybjsKICBjb25zdCBub3cgPSBEYXRlLm5vdygpOwogIGlmIChub3cgLSBsYXN0U3RhdHVzVXBkYXRlIDwgNTAwKSByZXR1cm47IC8vIOacgOWkmiAyIOasoS/np5IKICBsYXN0U3RhdHVzVXBkYXRlID0gbm93OwogIHRyeSB7CiAgICBjb25zdCBlbnRpdHkgPSBib3QuZW50aXR5OwogICAgY29uc3Qgc3RhdHVzID0gewogICAgICB0czogbm93LAogICAgICBjb25uZWN0ZWQ6IHRydWUsCiAgICAgIHVzZXJuYW1lOiBib3QudXNlcm5hbWUsCiAgICAgIGhlYWx0aDogTWF0aC5yb3VuZChib3QuaGVhbHRoICogMTApIC8gMTAsCiAgICAgIGh1bmdlcjogTWF0aC5yb3VuZChib3QuZm9vZCAqIDEwKSAvIDEwLAogICAgICBwb3NpdGlvbjogZW50aXR5ID8gewogICAgICAgIHg6IE1hdGgucm91bmQoZW50aXR5LnBvc2l0aW9uLnggKiAxMDApIC8gMTAwLAogICAgICAgIHk6IE1hdGgucm91bmQoZW50aXR5LnBvc2l0aW9uLnkgKiAxMDApIC8gMTAwLAogICAgICAgIHo6IE1hdGgucm91bmQoZW50aXR5LnBvc2l0aW9uLnogKiAxMDApIC8gMTAwLAogICAgICAgIHlhdzogTWF0aC5yb3VuZChlbnRpdHkueWF3ICogMTAwKSAvIDEwMAogICAgICB9IDogbnVsbCwKICAgICAgb25Hcm91bmQ6IGVudGl0eSA/IGVudGl0eS5vbkdyb3VuZCA6IGZhbHNlLAogICAgICBpbnZlbnRvcnk6IGJvdC5pbnZlbnRvcnkuaXRlbXMoKS5tYXAoaSA9PiAoewogICAgICAgIG5hbWU6IGkubmFtZSwgY291bnQ6IGkuY291bnQsIHNsb3Q6IGkuc2xvdAogICAgICB9KSksCiAgICAgIGVxdWlwbWVudDogYm90LmVxdWlwbWVudCA/IE9iamVjdC5lbnRyaWVzKGJvdC5lcXVpcG1lbnQpLmZpbHRlcigoWywgdl0pID0+IHYpLm1hcCgoW2ssIHZdKSA9PiAoeyBzbG90OiBrLCBuYW1lOiB2Lm5hbWUgfSkpIDogW10sCiAgICAgIG5lYXJieVBsYXllcnM6IE9iamVjdC5lbnRyaWVzKGJvdC5wbGF5ZXJzKS5tYXAoKFtuYW1lLCBwXSkgPT4gKHsKICAgICAgICBuYW1lLAogICAgICAgIHBvczogcC5lbnRpdHkgPyB7IHg6IE1hdGgucm91bmQocC5lbnRpdHkucG9zaXRpb24ueCksIHk6IE1hdGgucm91bmQocC5lbnRpdHkucG9zaXRpb24ueSksIHo6IE1hdGgucm91bmQocC5lbnRpdHkucG9zaXRpb24ueikgfSA6IG51bGwKICAgICAgfSkpLmZpbHRlcihwID0+IHAucG9zKSwKICAgICAgY3VycmVudEFjdGlvbjogY3VycmVudEFjdGlvbiA/IHsgdHlwZTogY3VycmVudEFjdGlvbi50eXBlLCBhdDogY3VycmVudEFjdGlvbi5hdCB9IDogbnVsbAogICAgfTsKICAgIGlmIChleHRyYSkgT2JqZWN0LmFzc2lnbihzdGF0dXMsIGV4dHJhKTsKICAgIGZzLndyaXRlRmlsZVN5bmMoQ09ORklHLnN0YXR1c0ZpbGUsIEpTT04uc3RyaW5naWZ5KHN0YXR1cywgbnVsbCwgMikpOwogIH0gY2F0Y2ggKGUpIHsKICAgIGxvZygnc3RhdHVzIHdyaXRlIGVycm9yOiAnICsgZS5tZXNzYWdlKTsKICB9Cn0KCmZ1bmN0aW9uIGFwcGVuZENoYXQodXNlcm5hbWUsIG1lc3NhZ2UpIHsKICB0cnkgewogICAgY29uc3QgbGluZSA9IEpTT04uc3RyaW5naWZ5KHsgdHM6IERhdGUubm93KCksIHVzZXI6IHVzZXJuYW1lLCBtc2c6IG1lc3NhZ2UgfSkgKyAnXG4nOwogICAgZnMuYXBwZW5kRmlsZVN5bmMoQ09ORklHLmNoYXRMb2dGaWxlLCBsaW5lKTsKICB9IGNhdGNoIChlKSB7fQp9Cgphc3luYyBmdW5jdGlvbiBleGVjdXRlQWN0aW9uKGFjdGlvbikgewogIGlmICghYm90KSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnbm90IGNvbm5lY3RlZCcgfTsKICBjdXJyZW50QWN0aW9uID0geyB0eXBlOiBhY3Rpb24uYWN0aW9uIHx8IGFjdGlvbi50eXBlLCBhdDogRGF0ZS5ub3coKSB9OwogIGNvbnN0IHR5cGUgPSBhY3Rpb24uYWN0aW9uIHx8IGFjdGlvbi50eXBlOwogIHRyeSB7CiAgICBzd2l0Y2ggKHR5cGUpIHsKICAgICAgY2FzZSAnc2F5JzogewogICAgICAgIGJvdC5jaGF0KFN0cmluZyhhY3Rpb24udGV4dCB8fCAnJykpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdzYXknIH07CiAgICAgIH0KICAgICAgY2FzZSAnbW92ZSc6IHsKICAgICAgICBjb25zdCBkaXIgPSBTdHJpbmcoYWN0aW9uLmRpcmVjdGlvbiB8fCBhY3Rpb24uZGlyIHx8ICdmb3J3YXJkJyk7CiAgICAgICAgY29uc3QgdGlja3MgPSBNYXRoLm1heCgxLCBNYXRoLm1pbigyMDAsIHBhcnNlSW50KGFjdGlvbi50aWNrcyB8fCBhY3Rpb24uZHVyYXRpb24gfHwgMTAsIDEwKSkpOwogICAgICAgIGNvbnN0IHZhbGlkID0gWydmb3J3YXJkJywgJ2JhY2snLCAnbGVmdCcsICdyaWdodCcsICdqdW1wJywgJ3NwcmludCcsICdzbmVhayddOwogICAgICAgIGlmICghdmFsaWQuaW5jbHVkZXMoZGlyKSkgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ2ludmFsaWQgZGlyZWN0aW9uOiAnICsgZGlyIH07CiAgICAgICAgYm90LnNldENvbnRyb2xTdGF0ZShkaXIsIHRydWUpOwogICAgICAgIGF3YWl0IGJvdC53YWl0Rm9yVGlja3ModGlja3MpOwogICAgICAgIGJvdC5zZXRDb250cm9sU3RhdGUoZGlyLCBmYWxzZSk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ21vdmUnLCBkaXJlY3Rpb246IGRpciwgdGlja3MgfTsKICAgICAgfQogICAgICBjYXNlICdsb29rJzogewogICAgICAgIGNvbnN0IHlhdyA9IHBhcnNlRmxvYXQoYWN0aW9uLnlhdyk7CiAgICAgICAgY29uc3QgcGl0Y2ggPSBhY3Rpb24ucGl0Y2ggIT0gbnVsbCA/IHBhcnNlRmxvYXQoYWN0aW9uLnBpdGNoKSA6IDA7CiAgICAgICAgaWYgKGlzTmFOKHlhdykpIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdpbnZhbGlkIHlhdycgfTsKICAgICAgICBhd2FpdCBib3QubG9vayh5YXcsIHBpdGNoKTsKICAgICAgICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnbG9vaycsIHlhdywgcGl0Y2ggfTsKICAgICAgfQogICAgICBjYXNlICdsb29rQXQnOiB7CiAgICAgICAgY29uc3QgeCA9IHBhcnNlRmxvYXQoYWN0aW9uLngpLCB5ID0gcGFyc2VGbG9hdChhY3Rpb24ueSksIHogPSBwYXJzZUZsb2F0KGFjdGlvbi56KTsKICAgICAgICBpZiAoW3gsIHksIHpdLnNvbWUoaXNOYU4pKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnaW52YWxpZCBjb29yZGluYXRlcycgfTsKICAgICAgICBhd2FpdCBib3QubG9va0F0KHZlYzMoeCwgeSwgeikpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdsb29rQXQnIH07CiAgICAgIH0KICAgICAgY2FzZSAnZGlnJzogewogICAgICAgIGNvbnN0IGJsb2NrID0gYm90LmJsb2NrQXRDdXJzb3IoNSk7CiAgICAgICAgaWYgKCFibG9jaykgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ25vIGJsb2NrIGluIHNpZ2h0JyB9OwogICAgICAgIGF3YWl0IGJvdC5kaWcoYmxvY2spOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdkaWcnLCBibG9jazogYmxvY2submFtZSB9OwogICAgICB9CiAgICAgIGNhc2UgJ2RpZ0F0JzogewogICAgICAgIGNvbnN0IHggPSBwYXJzZUludChhY3Rpb24ueCksIHkgPSBwYXJzZUludChhY3Rpb24ueSksIHogPSBwYXJzZUludChhY3Rpb24ueik7CiAgICAgICAgaWYgKFt4LCB5LCB6XS5zb21lKGlzTmFOKSkgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ2ludmFsaWQgY29vcmRpbmF0ZXMnIH07CiAgICAgICAgY29uc3QgYmxvY2sgPSBib3QuYmxvY2tBdCh2ZWMzKHgsIHksIHopKTsKICAgICAgICBpZiAoIWJsb2NrKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnbm8gYmxvY2sgYXQgcG9zaXRpb24nIH07CiAgICAgICAgYXdhaXQgYm90LmRpZyhibG9jayk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ2RpZ0F0JywgYmxvY2s6IGJsb2NrLm5hbWUsIHBvczogeyB4LCB5LCB6IH0gfTsKICAgICAgfQogICAgICBjYXNlICdwbGFjZSc6IHsKICAgICAgICBjb25zdCBibG9jayA9IGJvdC5ibG9ja0F0Q3Vyc29yKDUpOwogICAgICAgIGlmICghYmxvY2spIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdubyBibG9jayBpbiBzaWdodCB0byBwbGFjZSBhZ2FpbnN0JyB9OwogICAgICAgIGNvbnN0IGZhY2luZyA9IGFjdGlvbi5mYWNpbmcgfHwgJ3RvcCc7CiAgICAgICAgY29uc3QgZmFjZU1hcCA9IHsgdG9wOiAxLCBib3R0b206IDAsIG5vcnRoOiAyLCBzb3V0aDogMywgZWFzdDogNSwgd2VzdDogNCB9OwogICAgICAgIGF3YWl0IGJvdC5wbGFjZUJsb2NrKGJsb2NrLCBuZXcgdmVjMygwLCAwLCAwKSk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ3BsYWNlJyB9OwogICAgICB9CiAgICAgIGNhc2UgJ2F0dGFjayc6IHsKICAgICAgICBjb25zdCB0YXJnZXQgPSBib3QubmVhcmVzdEVudGl0eShlID0+IGUudHlwZSA9PT0gJ21vYicgfHwgZS50eXBlID09PSAncGxheWVyJyk7CiAgICAgICAgaWYgKCF0YXJnZXQpIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdubyBlbnRpdHkgdG8gYXR0YWNrJyB9OwogICAgICAgIGF3YWl0IGJvdC5hdHRhY2sodGFyZ2V0KTsKICAgICAgICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnYXR0YWNrJywgdGFyZ2V0OiB0YXJnZXQubmFtZSB8fCB0YXJnZXQudHlwZSB9OwogICAgICB9CiAgICAgIGNhc2UgJ2F0dGFja05lYXJlc3QnOiB7CiAgICAgICAgY29uc3QgZmlsdGVyID0gYWN0aW9uLmZpbHRlciB8fCAnbW9iJzsKICAgICAgICBjb25zdCB0YXJnZXQgPSBib3QubmVhcmVzdEVudGl0eShlID0+IGUudHlwZSA9PT0gZmlsdGVyIHx8IChmaWx0ZXIgPT09ICdwbGF5ZXInICYmIGUudHlwZSA9PT0gJ3BsYXllcicpKTsKICAgICAgICBpZiAoIXRhcmdldCkgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ25vICcgKyBmaWx0ZXIgKyAnIG5lYXJieScgfTsKICAgICAgICBhd2FpdCBib3QuYXR0YWNrKHRhcmdldCk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ2F0dGFja05lYXJlc3QnLCB0YXJnZXQ6IHRhcmdldC5uYW1lIHx8IHRhcmdldC50eXBlIH07CiAgICAgIH0KICAgICAgY2FzZSAnYWN0aXZhdGUnOiB7CiAgICAgICAgYm90LmFjdGl2YXRlSXRlbSgpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdhY3RpdmF0ZScgfTsKICAgICAgfQogICAgICBjYXNlICdkZWFjdGl2YXRlJzogewogICAgICAgIGJvdC5kZWFjdGl2YXRlSXRlbSgpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdkZWFjdGl2YXRlJyB9OwogICAgICB9CiAgICAgIGNhc2UgJ2VxdWlwJzogewogICAgICAgIGNvbnN0IGl0ZW1OYW1lID0gU3RyaW5nKGFjdGlvbi5pdGVtIHx8ICcnKTsKICAgICAgICBjb25zdCBpdGVtID0gYm90LmludmVudG9yeS5pdGVtcygpLmZpbmQoaSA9PiBpLm5hbWUuaW5jbHVkZXMoaXRlbU5hbWUpKTsKICAgICAgICBpZiAoIWl0ZW0pIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdpdGVtIG5vdCBmb3VuZDogJyArIGl0ZW1OYW1lIH07CiAgICAgICAgYXdhaXQgYm90LmVxdWlwKGl0ZW0sIGFjdGlvbi5oYW5kIHx8ICdoYW5kJyk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ2VxdWlwJywgaXRlbTogaXRlbS5uYW1lIH07CiAgICAgIH0KICAgICAgY2FzZSAndG9zcyc6IHsKICAgICAgICBjb25zdCBpdGVtTmFtZSA9IFN0cmluZyhhY3Rpb24uaXRlbSB8fCAnJyk7CiAgICAgICAgY29uc3QgaXRlbSA9IGJvdC5pbnZlbnRvcnkuaXRlbXMoKS5maW5kKGkgPT4gaS5uYW1lLmluY2x1ZGVzKGl0ZW1OYW1lKSk7CiAgICAgICAgaWYgKCFpdGVtKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnaXRlbSBub3QgZm91bmQ6ICcgKyBpdGVtTmFtZSB9OwogICAgICAgIGF3YWl0IGJvdC50b3NzKGl0ZW0udHlwZSwgbnVsbCwgYWN0aW9uLmNvdW50IHx8IGl0ZW0uY291bnQpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICd0b3NzJywgaXRlbTogaXRlbS5uYW1lIH07CiAgICAgIH0KICAgICAgY2FzZSAncGF0aGZpbmQnOiB7CiAgICAgICAgY29uc3QgeCA9IHBhcnNlRmxvYXQoYWN0aW9uLngpLCB5ID0gcGFyc2VGbG9hdChhY3Rpb24ueSksIHogPSBwYXJzZUZsb2F0KGFjdGlvbi56KTsKICAgICAgICBpZiAoW3gsIHksIHpdLnNvbWUoaXNOYU4pKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnaW52YWxpZCBjb29yZGluYXRlcycgfTsKICAgICAgICBjb25zdCBtY0RhdGEgPSByZXF1aXJlKCdtaW5lY3JhZnQtZGF0YScpKGJvdC52ZXJzaW9uKTsKICAgICAgICBjb25zdCBtb3ZlbWVudHMgPSBuZXcgTW92ZW1lbnRzKGJvdCwgbWNEYXRhKTsKICAgICAgICBib3QucGF0aGZpbmRlci5zZXRNb3ZlbWVudHMobW92ZW1lbnRzKTsKICAgICAgICBjb25zdCBnb2FsID0gbmV3IGdvYWxzLkdvYWxCbG9jayhNYXRoLmZsb29yKHgpLCBNYXRoLmZsb29yKHkpLCBNYXRoLmZsb29yKHopKTsKICAgICAgICBhd2FpdCBib3QucGF0aGZpbmRlci5nb3RvKGdvYWwpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdwYXRoZmluZCcsIHRhcmdldDogeyB4LCB5LCB6IH0gfTsKICAgICAgfQogICAgICBjYXNlICdwYXRoZmluZFRvUGxheWVyJzogewogICAgICAgIGNvbnN0IHRhcmdldE5hbWUgPSBTdHJpbmcoYWN0aW9uLnBsYXllciB8fCAnJyk7CiAgICAgICAgY29uc3QgcGxheWVyID0gYm90LnBsYXllcnNbdGFyZ2V0TmFtZV07CiAgICAgICAgaWYgKCFwbGF5ZXIgfHwgIXBsYXllci5lbnRpdHkpIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdwbGF5ZXIgbm90IGZvdW5kOiAnICsgdGFyZ2V0TmFtZSB9OwogICAgICAgIGNvbnN0IG1jRGF0YSA9IHJlcXVpcmUoJ21pbmVjcmFmdC1kYXRhJykoYm90LnZlcnNpb24pOwogICAgICAgIGNvbnN0IG1vdmVtZW50cyA9IG5ldyBNb3ZlbWVudHMoYm90LCBtY0RhdGEpOwogICAgICAgIGJvdC5wYXRoZmluZGVyLnNldE1vdmVtZW50cyhtb3ZlbWVudHMpOwogICAgICAgIGNvbnN0IGdvYWwgPSBuZXcgZ29hbHMuR29hbEZvbGxvdyhwbGF5ZXIuZW50aXR5LCAyKTsKICAgICAgICBhd2FpdCBib3QucGF0aGZpbmRlci5nb3RvKGdvYWwpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdwYXRoZmluZFRvUGxheWVyJywgcGxheWVyOiB0YXJnZXROYW1lIH07CiAgICAgIH0KICAgICAgY2FzZSAnc3RvcCc6IHsKICAgICAgICBpZiAoYm90LnBhdGhmaW5kZXIpIGJvdC5wYXRoZmluZGVyLnNldEdvYWwobnVsbCk7CiAgICAgICAgWydmb3J3YXJkJywgJ2JhY2snLCAnbGVmdCcsICdyaWdodCcsICdqdW1wJywgJ3NwcmludCcsICdzbmVhayddLmZvckVhY2goYyA9PiBib3Quc2V0Q29udHJvbFN0YXRlKGMsIGZhbHNlKSk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ3N0b3AnIH07CiAgICAgIH0KICAgICAgY2FzZSAnanVtcCc6IHsKICAgICAgICBib3Quc2V0Q29udHJvbFN0YXRlKCdqdW1wJywgdHJ1ZSk7CiAgICAgICAgYXdhaXQgYm90LndhaXRGb3JUaWNrcygxMCk7CiAgICAgICAgYm90LnNldENvbnRyb2xTdGF0ZSgnanVtcCcsIGZhbHNlKTsKICAgICAgICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnanVtcCcgfTsKICAgICAgfQogICAgICBjYXNlICdzdGF0dXMnOiB7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ3N0YXR1cycgfTsKICAgICAgfQogICAgICBkZWZhdWx0OgogICAgICAgIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICd1bmtub3duIGFjdGlvbjogJyArIHR5cGUgfTsKICAgIH0KICB9IGNhdGNoIChlKSB7CiAgICByZXR1cm4geyBvazogZmFsc2UsIGFjdGlvbjogdHlwZSwgZXJyb3I6IGUubWVzc2FnZSB9OwogIH0gZmluYWxseSB7CiAgICBjdXJyZW50QWN0aW9uID0gbnVsbDsKICB9Cn0KCmZ1bmN0aW9uIGNvbm5lY3QoKSB7CiAgbG9nKGBDb25uZWN0aW5nIHRvICR7Q09ORklHLmhvc3R9OiR7Q09ORklHLnBvcnR9IGFzICR7Q09ORklHLnVzZXJuYW1lfS4uLmApOwogIGJvdCA9IG1pbmVmbGF5ZXIuY3JlYXRlQm90KHsKICAgIGhvc3Q6IENPTkZJRy5ob3N0LAogICAgcG9ydDogQ09ORklHLnBvcnQsCiAgICB1c2VybmFtZTogQ09ORklHLnVzZXJuYW1lLAogICAgaGlkZUVycm9yczogZmFsc2UKICB9KTsKCiAgYm90LmxvYWRQbHVnaW4ocGF0aGZpbmRlcik7CgogIGJvdC5vbignc3Bhd24nLCAoKSA9PiB7CiAgICBsb2coJ1NwYXduZWQgaW4gd29ybGQnKTsKICAgIHdyaXRlU3RhdHVzKHsgZXZlbnQ6ICdzcGF3bicgfSk7CiAgfSk7CgogIGJvdC5vbignY2hhdCcsICh1c2VybmFtZSwgbWVzc2FnZSkgPT4gewogICAgYXBwZW5kQ2hhdCh1c2VybmFtZSwgbWVzc2FnZSk7CiAgICBsb2coYFtDSEFUXSAke3VzZXJuYW1lfTogJHttZXNzYWdlfWApOwogIH0pOwoKICBib3Qub24oJ3BsYXllckpvaW5lZCcsIChwbGF5ZXIpID0+IHsKICAgIGxvZyhgUGxheWVyIGpvaW5lZDogJHtwbGF5ZXIudXNlcm5hbWV9YCk7CiAgfSk7CgogIGJvdC5vbigncGxheWVyTGVmdCcsIChwbGF5ZXIpID0+IHsKICAgIGxvZyhgUGxheWVyIGxlZnQ6ICR7cGxheWVyLnVzZXJuYW1lfWApOwogIH0pOwoKICBib3Qub24oJ2hlYWx0aCcsICgpID0+IHsKICAgIHdyaXRlU3RhdHVzKCk7CiAgfSk7CgogIGJvdC5vbignZGVhdGgnLCAoKSA9PiB7CiAgICBsb2coJ0RpZWQnKTsKICAgIHdyaXRlU3RhdHVzKHsgZXZlbnQ6ICdkZWF0aCcgfSk7CiAgfSk7CgogIGJvdC5vbigna2lja2VkJywgKHJlYXNvbikgPT4gewogICAgbG9nKCdLaWNrZWQ6ICcgKyByZWFzb24pOwogICAgd3JpdGVTdGF0dXMoeyBldmVudDogJ2tpY2tlZCcsIHJlYXNvbjogU3RyaW5nKHJlYXNvbikgfSk7CiAgfSk7CgogIGJvdC5vbignZXJyb3InLCAoZXJyKSA9PiB7CiAgICBsb2coJ0Vycm9yOiAnICsgZXJyLm1lc3NhZ2UpOwogIH0pOwoKICBib3Qub24oJ2VuZCcsICgpID0+IHsKICAgIGxvZygnRGlzY29ubmVjdGVkJyk7CiAgICBib3QgPSBudWxsOwogICAgd3JpdGVTdGF0dXMoeyBjb25uZWN0ZWQ6IGZhbHNlLCBldmVudDogJ2VuZCcgfSk7CiAgICBzZXRUaW1lb3V0KGNvbm5lY3QsIDUwMDApOwogIH0pOwp9CgovLyDkuLvlvqrnjq/vvJror7vlj5bmjIfku6Tmlofku7blubbmiafooYwKYXN5bmMgZnVuY3Rpb24gbWFpbkxvb3AoKSB7CiAgaWYgKCFib3QpIHsKICAgIHNldFRpbWVvdXQobWFpbkxvb3AsIDUwMCk7CiAgICByZXR1cm47CiAgfQogIHRyeSB7CiAgICBjb25zdCBjbWQgPSBzYWZlUmVhZEpzb24oQ09ORklHLmNtZEZpbGUpOwogICAgaWYgKGNtZCAmJiBjbWQuYWN0aW9uKSB7CiAgICAgIGxvZygnRXhlY3V0aW5nOiAnICsgY21kLmFjdGlvbik7CiAgICAgIGNvbnN0IHJlc3VsdCA9IGF3YWl0IGV4ZWN1dGVBY3Rpb24oY21kKTsKICAgICAgbG9nKCdSZXN1bHQ6ICcgKyBKU09OLnN0cmluZ2lmeShyZXN1bHQpKTsKICAgICAgLy8g5YaZ5YWl57uT5p6c5bm25Yig6Zmk5oyH5Luk5paH5Lu2CiAgICAgIGNvbnN0IHJlc3VsdEZpbGUgPSBDT05GSUcuY21kRmlsZS5yZXBsYWNlKC9cLmpzb24kLywgJy5yZXN1bHQuanNvbicpOwogICAgICBmcy53cml0ZUZpbGVTeW5jKHJlc3VsdEZpbGUsIEpTT04uc3RyaW5naWZ5KHsgdHM6IERhdGUubm93KCksIHJlc3VsdCB9KSk7CiAgICAgIHRyeSB7IGZzLnVubGlua1N5bmMoQ09ORklHLmNtZEZpbGUpOyB9IGNhdGNoIChlKSB7fQogICAgICB3cml0ZVN0YXR1cyh7IGxhc3RSZXN1bHQ6IHJlc3VsdCB9KTsKICAgIH0gZWxzZSB7CiAgICAgIHdyaXRlU3RhdHVzKCk7CiAgICB9CiAgfSBjYXRjaCAoZSkgewogICAgbG9nKCdMb29wIGVycm9yOiAnICsgZS5tZXNzYWdlKTsKICB9CiAgc2V0VGltZW91dChtYWluTG9vcCwgMjAwKTsKfQoKY29ubmVjdCgpOwpzZXRUaW1lb3V0KG1haW5Mb29wLCAxMDAwKTsK\"; const cmd = \"cd ~/mc-bot && echo \" + b64 + \" | base64 -d > bot.js && cat > bot.env << ENVEOF\\n\" + \"export MC_HOST=\" + host + \"\\n\" + \"export MC_PORT=\" + port + \"\\n\" + \"export MC_USERNAME=\" + name + \"\\n\" + \"export MC_CMD_FILE=$HOME/mc-bot/cmd.json\\n\" + \"export MC_STATUS_FILE=$HOME/mc-bot/status.json\\n\" + \"export MC_CHAT_FILE=$HOME/mc-bot/chat.log\\n\" + \"ENVEOF\"; return await t.call(\"run_termux_job\", {executor:\"bash\", args:[\"-c\", cmd]}); }"
+      },
+      {
+        "name": "minecraft_download_server",
+        "description": "下载 Minecraft Bedrock Dedicated Server 到 Termux。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string",
+              "description": "版本号，如 1.21.0；留空用最新"
+            }
+          },
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; const ver = args.version || '1.21.0.03'; return await t.call('run_termux_job', {executor:'bash', args:['-c', 'cd ~ && mkdir -p mc-server && cd mc-server && curl -L -o bds.zip https://minecraft.azureedge.net/bin-linux/bedrock-server-'+ver+'.zip && unzip -o bds.zip && chmod +x bedrock_server']}); }"
+      },
+      {
+        "name": "minecraft_start_server",
+        "description": "启动 Minecraft Bedrock 服务器。返回 runId。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "description": "端口，默认 19132"
+            }
+          },
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; const port = args.port || 19132; return await t.call('run_termux_job', {executor:'bash', args:['-c', 'cd ~/mc-server && export LD_LIBRARY_PATH=. && ./bedrock_server --port '+port]}); }"
+      },
+      {
+        "name": "minecraft_server_status",
+        "description": "查询服务器状态和最近日志。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "runId"
+          ]
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ return await ctx.hostTools.call('termux_job_status', {runId: args.runId}); }"
+      },
+      {
+        "name": "minecraft_stop_server",
+        "description": "停止 Minecraft 服务器。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "runId"
+          ]
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ return await ctx.hostTools.call('termux_job_cancel', {runId: args.runId}); }"
+      },
+      {
+        "name": "minecraft_start_bot",
+        "description": "启动 Mineflayer bot 连接到服务器。返回 runId。bot 启动后会创建状态文件，等待指令。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; return await t.call('run_termux_job', {executor:'bash', args:['-c', 'cd ~/mc-bot && source bot.env && node bot.js']}); }"
+      },
+      {
+        "name": "minecraft_bot_command",
+        "description": "向 bot 发送一条结构化指令。支持的 action：say(发消息)、move(移动)、look(转头)、dig(挖眼前方块)、digAt(挖指定坐标)、place(放置)、attack(攻击最近)、activate(使用物品)、equip(装备)、pathfind(寻路到坐标)、pathfindToPlayer(跟随玩家)、stop(停止)、jump(跳跃)。指令会被执行并返回结果。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "description": "动作类型"
+            },
+            "text": {
+              "type": "string",
+              "description": "say 的消息内容"
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "forward",
+                "back",
+                "left",
+                "right",
+                "jump",
+                "sprint",
+                "sneak"
+              ],
+              "description": "move 的方向"
+            },
+            "ticks": {
+              "type": "integer",
+              "description": "move 持续的 tick 数"
+            },
+            "yaw": {
+              "type": "number",
+              "description": "look 的水平角度"
+            },
+            "pitch": {
+              "type": "number",
+              "description": "look 的垂直角度"
+            },
+            "x": {
+              "type": "number",
+              "description": "坐标 x"
+            },
+            "y": {
+              "type": "number",
+              "description": "坐标 y"
+            },
+            "z": {
+              "type": "number",
+              "description": "坐标 z"
+            },
+            "item": {
+              "type": "string",
+              "description": "equip/toss 的物品名"
+            },
+            "player": {
+              "type": "string",
+              "description": "pathfindToPlayer 的玩家名"
+            }
+          },
+          "required": [
+            "action"
+          ]
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; const cmd = JSON.stringify(args); const r1 = await t.call('run_termux_job', {executor:'bash', args:['-c', 'cat > ~/mc-bot/cmd.json << \\'CMDEOF\\'\\n'+cmd+'\\nCMDEOF\\nrm -f ~/mc-bot/cmd.result.json']}); if (!r1.ok) return r1; for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 500)); const st = await t.call('termux_job_status', {runId: r1.runId}); const out = st.output || ''; if (out.indexOf('Result:') >= 0) { const m = out.match(/Result: (\\{[\\s\\S]*?\\})/); if (m) return { ok: true, result: JSON.parse(m[1]) }; } } const st2 = await t.call('termux_job_status', {runId: r1.runId}); return { ok: false, error: 'timeout', output: st2.output }; }"
+      },
+      {
+        "name": "minecraft_bot_status",
+        "description": "读取 bot 的当前状态：位置、血量、饥饿、背包、附近玩家、当前动作。从状态文件读取。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; const r = await t.call('run_termux_job', {executor:'bash', args:['-c', 'cat ~/mc-bot/status.json 2>/dev/null || echo \\'{\"connected\":false}\\'']}); if (r.ok) { try { const out = r.output || r.stdout || ''; const m = out.match(/\\{[\\s\\S]*\\}/); if (m) return { ok: true, status: JSON.parse(m[0]) }; } catch(e){} return { ok: false, error: 'parse failed', raw: r.output || r.stdout }; } return r; }"
+      },
+      {
+        "name": "minecraft_bot_chat",
+        "description": "读取 bot 记录的最近聊天消息。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "lines": {
+              "type": "integer",
+              "description": "读取最后 N 行，默认 20"
+            }
+          },
+          "required": []
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ const t = ctx.hostTools; const n = args.lines || 20; const r = await t.call('run_termux_job', {executor:'bash', args:['-c', 'tail -n '+n+' ~/mc-bot/chat.log 2>/dev/null || echo \\'no chat\\'']}); return r; }"
+      },
+      {
+        "name": "minecraft_bot_stop",
+        "description": "停止 Mineflayer bot。",
+        "permissions": [
+          "termux"
+        ],
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "runId"
+          ]
+        },
+        "kind": "js",
+        "code": "async function run(args, ctx){ return await ctx.hostTools.call('termux_job_cancel', {runId: args.runId}); }"
+      }
+    ]
   }
 ];
 
@@ -4419,7 +4833,7 @@ function copyToClipboard(text) {
 function pasteIntoField(el) {
   if (!el) return false;
   const text = readClipboard();
-  if (!text) { toast('剪贴板里没有可粘贴的文字'); return false; }
+  if (!text) { toast('读不到剪贴板：先点一下输入框，或用键盘上的“粘贴”键'); return false; }
   try {
     if (typeof el.selectionStart === 'number') {
       const s0 = el.selectionStart, e0 = el.selectionEnd;
@@ -6297,15 +6711,29 @@ function buildTools(runTask) {
   }
   if (exposedTask.type === 'workspace' && workspaceReady() && agentActionsOn() && HAS_PERM && Perm.getTermuxWorkerState) {
     let termux = false; try { termux = JSON.parse(Perm.getTermuxWorkerState() || '{}').installed === true; } catch (e) {}
-    if (termux) tools.push({ type: 'function', function: {
-      name: 'run_termux_job', description: '在当前工作任务目录中运行一个结构化 Termux 工具。只允许 python/node/git/rg/ffmpeg，不接受 shell 字符串；执行前必须确认命令、参数和目录。',
-      parameters: { type: 'object', properties: { executor: { type: 'string', enum: ['python','node','git','rg','ffmpeg'] }, args: { type: 'array', items: { type: 'string' } }, cwd: { type: 'string', description: '当前任务工作区内的相对目录' }, timeoutMs: { type: 'integer' } }, required: ['executor','args'] } } });
+    if (termux) {
+      tools.push({ type: 'function', function: {
+        name: 'run_termux_job', description: '在当前工作任务目录中运行一个结构化 Termux 工具（支持长跑进程如服务器、bot）。只允许 python/node/git/rg/ffmpeg/java/bash，不接受 shell 字符串；执行前必须确认命令、参数和目录。返回 runId 用于后续查询状态和输出。',
+        parameters: { type: 'object', properties: { executor: { type: 'string', enum: ['python','node','git','rg','ffmpeg','java','bash'] }, args: { type: 'array', items: { type: 'string' } }, cwd: { type: 'string', description: '当前任务工作区内的相对目录' } }, required: ['executor','args'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_job_status', description: '查询 Termux 任务状态和最近输出。状态可能是 running / done / failed。',
+        parameters: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_job_output', description: '读取 Termux 任务的输出日志，可指定偏移量实现流式读取。',
+        parameters: { type: 'object', properties: { runId: { type: 'string' }, offset: { type: 'integer', description: '上次返回的 nextOffset，从 0 开始' } }, required: ['runId'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_job_cancel', description: '取消一个正在运行的 Termux 任务（先 TERM 后 KILL）。',
+        parameters: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_jobs_list', description: '列出当前任务下所有 Termux 任务及其状态。',
+        parameters: { type: 'object', properties: {}, required: [] } } });
+    }
   }
   if (exposedTask.type === 'workspace' && agentActionsOn() && HAS_PERM && Perm.getAgentRuntimeState) {
     let root = false; try { root = JSON.parse(Perm.getAgentRuntimeState() || '{}').rootAvailable === true; } catch (e) {}
     if (root) tools.push({ type: 'function', function: {
-      name: 'root_operation', description: '执行受控 Root 诊断操作，只允许 id、getprop、task_files；执行前必须确认。',
-      parameters: { type: 'object', properties: { operation: { type: 'string', enum: ['id','getprop','task_files'] } }, required: ['operation'] } } });
+      name: 'root_operation', description: '执行受控 Root 操作，只允许 id、getprop、task_files、list_processes、kill_process；执行前必须确认。',
+      parameters: { type: 'object', properties: { operation: { type: 'string', enum: ['id','getprop','task_files','list_processes','kill_process'] }, pid: { type: 'integer', description: 'kill_process 时需要的进程 PID' } }, required: ['operation'] } } });
   }
 
   const musicToolsOn = plugOn('music') && !!CONFIG.musicEnabled;
@@ -6401,14 +6829,14 @@ function buildTools(runTask) {
 async function execTool(name, args, runTask) {
   const task = runTask || currentTask();
   if (!toolLive(name)) return { success: false, error: '该工具当前未获授权或已关闭。' };
-  if (!taskToolsAllowed(task.type, name)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
+  if (!taskToolsAllowed(task.type, name, task.id)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
   args = args && typeof args === 'object' ? Object.assign({}, args) : {};
   const scoped = ['workspace_list','workspace_read','workspace_write','workspace_mkdir'];
   if (scoped.indexOf(name) >= 0 && task.type === 'workspace') args.path = taskWorkspacePath(task, args.path || '');
   const cp = plugFind(name);
   if (cp) {
     const pt = cp.plugin.pluginType || 'chat';
-    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick') || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
+    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick' && !(task.type === 'workspace' && consentGranted(task.id, 'device'))) || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
     if (cp.plugin.enabled === false) return { success: false, error: '该插件已停用。' };
     if (!toolOn(name)) return { success: false, error: '该工具已关闭。' };
     return await plugExec(cp.plugin, cp.tool, args || {}, task);
@@ -6440,7 +6868,9 @@ async function execTool(name, args, runTask) {
     } catch (e) { return { success: false, error: '应用查询失败：' + errMsg(e) }; }
   }
   if (name === 'screenshot') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    // G2-005：任务内已获准操作手机后，截图不再每次重复询问
+    const shotOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !shotOk) {
       const ok = await uiConfirm('Agent 想查看当前手机画面。截图可能包含聊天、验证码或其它隐私内容，是否继续？', '允许截图', '查看手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮截图' };
     }
@@ -6453,7 +6883,8 @@ async function execTool(name, args, runTask) {
     return { success: true, note: '已截取当前屏幕画面，画面会在下一条消息里给你看。' };
   }
   if (name === 'watch_screen') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    const watchOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !watchOk) {
       const ok = await uiConfirm('Agent 想在限定时间内观察当前手机画面。最多 10 秒、每秒 2 帧，是否继续？', '允许观察', '观察手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮观察' };
     }
@@ -6465,15 +6896,35 @@ async function execTool(name, args, runTask) {
   if (name === 'run_termux_job') {
     const runTaskObj = task;
     if (runTaskObj.type !== 'workspace') return { success: false, errorCode: 'TASK_TYPE_DENIED', error: 'Termux 只能在工作任务中运行' };
-    const job = { jobId: runTaskObj.id + '-' + Date.now().toString(36), taskId: runTaskObj.id, executor: String(args.executor || ''), args: Array.isArray(args.args) ? args.args.map(String) : [], cwd: String(args.cwd || 'working'), timeoutMs: Math.max(1000, Math.min(600000, parseInt(args.timeoutMs, 10) || 60000)) };
+    const job = { jobId: runTaskObj.id + '-' + Date.now().toString(36), taskId: runTaskObj.id, executor: String(args.executor || ''), args: Array.isArray(args.args) ? args.args.map(String) : [], cwd: String(args.cwd || 'working') };
     if (!(await uiConfirm('即将通过 Termux 执行：' + job.executor + '\n参数：' + JSON.stringify(job.args) + '\n目录：' + job.cwd + '\n是否继续？', '确认执行', 'Termux 任务确认'))) return { success: false, kind: 'cancelled', error: '用户取消了 Termux 任务' };
     try { return JSON.parse(Perm.dispatchTermuxJob ? (Perm.dispatchTermuxJob(JSON.stringify(job)) || '{}') : '{}'); }
     catch (e) { return { success: false, errorCode: 'TERMUX_DISPATCH_FAILED', error: errMsg(e) }; }
   }
+  if (name === 'termux_job_status') {
+    try { return JSON.parse(Perm.getTermuxJobStatus ? (Perm.getTermuxJobStatus(String(args.runId || '')) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_STATUS_FAILED', error: errMsg(e) }; }
+  }
+  if (name === 'termux_job_output') {
+    try { return JSON.parse(Perm.readTermuxJobOutput ? (Perm.readTermuxJobOutput(String(args.runId || ''), parseInt(args.offset, 10) || 0) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_OUTPUT_FAILED', error: errMsg(e) }; }
+  }
+  if (name === 'termux_job_cancel') {
+    if (!(await uiConfirm('确定要取消 Termux 任务 ' + String(args.runId || '') + ' 吗？', '确认取消', 'Termux 取消确认'))) return { success: false, kind: 'cancelled', error: '用户取消了操作' };
+    try { return JSON.parse(Perm.cancelTermuxJob ? (Perm.cancelTermuxJob(String(args.runId || '')) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_CANCEL_FAILED', error: errMsg(e) }; }
+  }
+  if (name === 'termux_jobs_list') {
+    try { return JSON.parse(Perm.listTermuxJobs ? (Perm.listTermuxJobs(task.id) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_LIST_FAILED', error: errMsg(e) }; }
+  }
   if (name === 'root_operation') {
     const runTaskObj = task;
-    if (!(await uiConfirm('即将执行受控 Root 诊断操作：' + String(args.operation || '') + '\n是否继续？', '确认 Root 操作', 'Root 确认'))) return { success: false, kind: 'cancelled', error: '用户取消了 Root 操作' };
-    try { return JSON.parse(Perm.runRootOperation ? (Perm.runRootOperation(String(args.operation || ''), runTaskObj.id) || '{}') : '{}'); }
+    if (!(await uiConfirm('即将执行受控 Root 操作：' + String(args.operation || '') + (args.pid ? ' pid=' + args.pid : '') + '\n是否继续？', '确认 Root 操作', 'Root 确认'))) return { success: false, kind: 'cancelled', error: '用户取消了 Root 操作' };
+    try {
+      const extra = args.pid ? JSON.stringify({ pid: parseInt(args.pid, 10) }) : '{}';
+      return JSON.parse(Perm.runRootOperation ? (Perm.runRootOperation(String(args.operation || ''), runTaskObj.id, extra) || '{}') : '{}');
+    }
     catch (e) { return { success: false, errorCode: 'ROOT_FAILED', error: errMsg(e) }; }
   }
   if (name === 'workspace_status') {
@@ -6645,7 +7096,7 @@ async function execTool(name, args, runTask) {
     const path = String(args.path || '').trim();
     const content = String(args.content == null ? '' : args.content);
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符\n是否允许？', '允许本次写入', '外部文件修改确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符', '允许写入', '外部文件授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次外部文件写入' };
     }
     try { return JSON.parse(Perm.agentExternalWrite ? (Perm.agentExternalWrite(path, content, overwrite) || '{}') : '{}'); }
@@ -6655,7 +7106,7 @@ async function execTool(name, args, runTask) {
     const source = String(args.source || '').trim();
     const destination = String(args.destination || '').trim();
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。') + '\n是否允许本次复制？', '允许本次复制', '文件复制确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。'), '允许复制', '文件复制授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次复制' };
     }
     try { return JSON.parse(Perm.agentExternalCopy ? (Perm.agentExternalCopy(source, destination, overwrite) || '{}') : '{}'); }
@@ -6663,7 +7114,7 @@ async function execTool(name, args, runTask) {
   }
   if (name === 'external_file_mkdir') {
     const path = String(args.path || '').trim();
-    if (!(await uiConfirm('AI 请求在公共存储创建目录：\n\n' + path + '\n\n是否允许？', '允许创建目录', '外部目录确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求在公共存储创建目录：\n\n' + path, '允许创建', '外部目录授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许创建外部目录' };
     }
     try { return JSON.parse(Perm.agentExternalMkdir ? (Perm.agentExternalMkdir(path) || '{}') : '{}'); }
@@ -7462,8 +7913,14 @@ async function send() {
     return;
   }
   const inputEl = $('#input');
-  const t = inputEl.value.trim();
+  let t = inputEl.value.trim();
   const att = pendingAttachment;
+  // 部分输入法还在组词时读到的 value 是空的：先失焦让输入法提交，再读一次，
+  // 避免「明明打了字，点发送却什么都不发生」。
+  if (!t && !att && document.activeElement === inputEl) {
+    try { inputEl.blur(); } catch (e) {}
+    t = inputEl.value.trim();
+  }
   if (!t && !att) return;
   // 正在某个持久任务（工作/手机）里时，普通文字继续留在该任务；
   // 只有明确的快捷屏幕指令或其它任务类型关键词才切换。
@@ -7479,19 +7936,27 @@ async function send() {
     const shortcut = /翻译屏幕/.test(t) ? 'trans_screen' : (/总结屏幕/.test(t) ? 'sum_screen' : (/提取要点|要点/.test(t) ? 'points' : (/解释屏幕|解释/.test(t) ? 'explain' : '')));
     if (shortcut) { inputEl.value = ''; await handleQuickAction(shortcut); return; }
   }
-  const routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
+  // 统一落点：聊天、工作、设备任务都用同一段后续逻辑，只在这里一次性把「这轮消息进哪个任务」定死。
+  // 曾经把 routedTask 写成 const，又在下面 chat 分支用 taskEnsureChat() 覆盖它，
+  // 运行期必抛 "Assignment to constant variable"，且抛在清空输入和 addMsg 之前——
+  // 表现就是「主聊天点发送没反应」，而工作区/设备任务不走那次赋值所以一直正常。
+  // 现在把聊天任务的解析提前到这里，声明依然是 let，彻底消除这个分歧。
+  let routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
   if (!routedTask) return;
-  if (routeType === 'workspace') {
+  if (routeType === 'chat') routedTask = taskEnsureChat();
+  // G2-005：用路由后的实际任务类型，而不是消息意图。
+  // 在已有工作任务里操作手机时，routedTask 仍是那个 workspace，不能再用 'device' 去 taskBegin，
+  // 否则 taskBegin 会按类型再建一个新任务，工作区就被留在后台。
+  if (routedTask.type === 'workspace') {
     const ready = await ensureTaskWorkspace(routedTask);
     if (!ready.ok) { taskFinish(routedTask.id, 'failed', ready.error || '工作区不可用'); toast(ready.error || '工作区不可用'); return; }
   }
-  if (att && routeType === 'workspace') {
+  if (att && routedTask.type === 'workspace') {
     const imported = await importAttachmentToTask(routedTask, att);
     if (!imported.ok) { taskFinish(routedTask.id, 'failed', imported.error || '文件导入失败'); toast(imported.error || '文件导入失败'); return; }
     routedTask.artifacts = routedTask.artifacts || []; if (imported.relative) routedTask.artifacts.push(imported.relative); saveTasks();
   }
-  if (routeType !== 'quick') taskBegin(routeType, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
-  if (routeType === 'chat') routedTask = taskEnsureChat();
+  if (routeType !== 'quick') taskBegin(routedTask.type, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
   stopRequested = false;
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;
@@ -7559,6 +8024,20 @@ async function send() {
   stopRequested = false;
   ACTIVE_RUN_TASK_ID = '';
   sending = false; $('#send').disabled = false; $('#send').textContent = '发送';
+}
+
+/** 发送壳：send() 前半段（路由 / 切任务）如果抛错，以前是静默失败，
+ *  表现和「按钮点不动」一模一样。这里兜住异常、复位按钮并把原因说出来。 */
+function sendSafe() {
+  const fail = (e) => {
+    sending = false;
+    const b = $('#send'); if (b) { b.disabled = false; b.textContent = '发送'; }
+    toast('发送失败：' + errMsg(e));
+  };
+  try {
+    const p = send();
+    if (p && p.catch) p.catch(fail);
+  } catch (e) { fail(e); }
 }
 
 /* ==========================================================
@@ -9241,39 +9720,6 @@ function bindTaskUI() {
   if (nw) nw.onclick = async () => { const t = taskAdd('workspace', '新工作任务', ''); const ready = await ensureTaskWorkspace(t); drawer.classList.remove('open'); toast(ready.ok ? '已创建工作任务和独立工作区：' + t.title : (ready.error || '工作区创建失败')); };
   renderTaskDrawer(); updateTaskMode();
 }
-let FULLSCREEN_MODE = false;
-let FULLSCREEN_PREV = null;
-function readScreenMetrics() {
-  let m = {};
-  try { if (HAS_PERM && Perm.getScreenMetrics) m = JSON.parse(Perm.getScreenMetrics() || '{}'); } catch (e) { m = {}; }
-  if ((!m.screenW || !m.screenH) && loadEnv()) {
-    m.screenW = loadEnv().screenW;
-    m.screenH = loadEnv().screenH;
-  }
-  return m;
-}
-function updateFullscreenButton() {
-  const btn = $('#btn-fullscreen'); if (!btn) return;
-  const m = readScreenMetrics();
-  const ok = !!(HAS_PERM && Perm.setFullscreen);
-  btn.disabled = !ok;
-  btn.classList.toggle('unsupported', !ok);
-  btn.textContent = FULLSCREEN_MODE ? '▣' : '□';
-  btn.title = ok ? (FULLSCREEN_MODE ? '退出全屏模式' : '全屏模式') : '当前环境不允许窗口全屏';
-  btn.setAttribute('aria-label', btn.title);
-}
-function toggleFullscreenMode() {
-  try {
-    if (!HAS_PERM || !Perm.setFullscreen) return toast('当前版本不支持真正全屏');
-    const next = !FULLSCREEN_MODE;
-    const raw = Perm.setFullscreen(next);
-    const r = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
-    if (!r || !r.ok) return toast((r && r.error) || '当前环境不允许窗口全屏');
-    FULLSCREEN_MODE = !!r.fullscreen;
-    updateFullscreenButton();
-    toast(FULLSCREEN_MODE ? '已进入全屏模式' : '已退出全屏模式');
-  } catch (e) { toast('全屏模式切换失败：' + errMsg(e)); }
-}
 function handleNativeBack() {
   const drawer = $('#task-drawer'); if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return true; }
   const market = $('#plug-market-page'); if (market && market.classList.contains('open')) { showView('plugins'); return true; }
@@ -9287,8 +9733,6 @@ function bindHeader() {
   const setBtn = $('#btn-set'); if (setBtn) setBtn.onclick = () => showView('settings');
   const memBtn = $('#btn-mem'); if (memBtn) memBtn.onclick = () => showView('memory');
   const musicBtn = $('#btn-music'); if (musicBtn) musicBtn.onclick = () => { renderMusicTab('search'); showView('music'); };
-  const fs = $('#btn-fullscreen'); if (fs) fs.onclick = toggleFullscreenMode;
-  updateFullscreenButton();
   $('#btn-close').onclick = () => {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };
@@ -9325,10 +9769,10 @@ function bindInput() {
     inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
   });
   inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSafe(); }
   });
-  $('#send').onclick = send;
-  $('#btn-plus').onclick = () => $('#plus-modal').classList.add('open');
+  bindTap($('#send'), sendSafe);
+  bindTap($('#btn-plus'), () => $('#plus-modal').classList.add('open'));
   $('#plus-image').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('image'); };
   $('#plus-file').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('file'); };
   $('#plus-cancel').onclick = () => $('#plus-modal').classList.remove('open');
@@ -9522,10 +9966,16 @@ function hideGuide() {
 }
 
 /* 首次启动公告：只记录“我知道了”，不把公告阅读当成永久权限授权。 */
-const ANNOUNCEMENT_KEY = 'via_ai_announcement_0_6_2';
+/* 公告按「版本号」记录：每个版本首次进入都提示一次，跨版本自动重新出现。 */
+const ANNOUNCEMENT_FALLBACK_VER = '0.7.0';
 const ANNOUNCEMENT_REPO = 'https://github.com/xysy92ds/ElysiaFloat';
+function announcementKey() {
+  const raw = String((loadEnv() || {}).appVer || ANNOUNCEMENT_FALLBACK_VER).trim()
+    .replace(/[^0-9A-Za-z._-]/g, '');
+  return 'via_ai_announcement_v' + (raw || ANNOUNCEMENT_FALLBACK_VER);
+}
 function showAnnouncement(force) {
-  if (!force && sGet(ANNOUNCEMENT_KEY, false)) return;
+  if (!force && sGet(announcementKey(), false)) return;
   const modal = $('#announcement-modal');
   if (modal) {
     const app = $('#app');
@@ -9538,7 +9988,7 @@ function hideAnnouncement() {
   if (modal) modal.classList.remove('open');
   const app = $('#app');
   if (app) app.classList.remove('announcement-visible');
-  sSet(ANNOUNCEMENT_KEY, true);
+  sSet(announcementKey(), true);
 }
 function bindAnnouncement() {
   const close = $('#announcement-close');

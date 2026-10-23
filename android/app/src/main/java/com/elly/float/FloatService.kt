@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
@@ -48,7 +49,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.CountDownLatch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -76,10 +76,6 @@ class FloatService : Service() {
     private var wm: WindowManager? = null
     private var webView: WebView? = null
     private var params: WindowManager.LayoutParams? = null
-    private var fullscreenMode = false
-    private var fullscreenPrevRect: IntArray? = null
-    private var fullscreenPrevFlags = 0
-    private var fullscreenPrevUi = 0
 
     /**
      * 原生音频引擎（第二批）：音乐与语音合成都走它。
@@ -118,14 +114,23 @@ class FloatService : Service() {
 
     /**
      * 布局基准尺寸（物理像素）：页面永远是按这个尺寸排版然后再整体缩放的，
-     * 所以它必须是常量。否则一缩放就重新排版，「像电脑窗口那样等比缩放」就没了。
+     * 所以它必须是常量。用一个缓存钉死，而且用「短边/长边」计算，
+     * 保证同一台设备无论竖屏还是横屏算出来的 BASE 完全一样 ——
+     * 否则旋转屏幕后 bw/bh 变了，JS 的 ZOOM 就会算错，窗口底部留下点不到的死区。
      */
+    private var baseCache: IntArray? = null
+
     private fun baseSize(): IntArray {
+        baseCache?.let { return it }
         val dm = resources.displayMetrics
-        return intArrayOf(
-            min((dm.widthPixels * 0.92).toInt(), (400 * dm.density).toInt()),
-            min((dm.heightPixels * 0.78).toInt(), (660 * dm.density).toInt())
+        val shortSide = min(dm.widthPixels, dm.heightPixels)
+        val longSide = max(dm.widthPixels, dm.heightPixels)
+        val b = intArrayOf(
+            min((shortSide * 0.92).toInt(), (400 * dm.density).toInt()),
+            min((longSide * 0.78).toInt(), (660 * dm.density).toInt())
         )
+        baseCache = b
+        return b
     }
 
     /* 迷你播放器（独立系统悬浮窗，缩成小球后依然可见可拖动） */
@@ -188,6 +193,31 @@ class FloatService : Service() {
     private val main = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /**
+     * 屏幕旋转时重新夹持窗口位置和尺寸。
+     * 横屏玩游戏时打开浮窗，如果不处理，竖屏下保存的坐标会导致窗口卡出屏幕外或无法缩放。
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        runOnMain {
+            val wv = webView ?: return@runOnMain
+            val p = params ?: return@runOnMain
+            // 用当前矩形重新夹持到新屏幕尺寸
+            val r = clampRect(p.x, p.y, p.width, p.height)
+            p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3]
+            winRect = r
+            try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
+            pushRectToJs(false)
+            // 迷你条也重新夹持
+            miniParams?.let { mp ->
+                val mdm = resources.displayMetrics
+                mp.x = mp.x.coerceIn(0, (mdm.widthPixels - mp.width).coerceAtLeast(0))
+                mp.y = mp.y.coerceIn(0, (mdm.heightPixels - mp.height).coerceAtLeast(0))
+                try { miniBar?.let { wm?.updateViewLayout(it, mp) } } catch (_: Exception) { }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -422,49 +452,6 @@ class FloatService : Service() {
         pushRectToJs(false)
     }
 
-    /** 真正扩展悬浮窗到整块显示区域，并请求隐藏系统栏；不是只改 WebView CSS。 */
-    fun setFullscreen(enabled: Boolean): JSONObject {
-        var result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode)
-        val done = CountDownLatch(1)
-        val apply = {
-            try {
-                val p = params
-                val wv = webView
-                if (p == null || wv == null) {
-                    result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode).put("error", "浮窗尚未就绪")
-                } else {
-                    val dm = resources.displayMetrics
-                    if (enabled && !fullscreenMode) {
-                        fullscreenPrevRect = intArrayOf(p.x, p.y, p.width, p.height)
-                        fullscreenPrevFlags = p.flags
-                        fullscreenPrevUi = wv.systemUiVisibility
-                        p.x = 0; p.y = 0; p.width = dm.widthPixels; p.height = dm.heightPixels
-                        p.flags = fullscreenPrevFlags or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_FULLSCREEN
-                        wv.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        fullscreenMode = true
-                    } else if (!enabled && fullscreenMode) {
-                        val r = fullscreenPrevRect
-                        if (r != null) { p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3] }
-                        p.flags = fullscreenPrevFlags
-                        wv.systemUiVisibility = fullscreenPrevUi
-                        fullscreenMode = false
-                    }
-                    winRect = intArrayOf(p.x, p.y, p.width, p.height)
-                    wm?.updateViewLayout(wv, p)
-                    schedulePersistWinRect()
-                    pushRectToJs()
-                    result = JSONObject().put("ok", true).put("fullscreen", fullscreenMode).put("w", p.width).put("h", p.height)
-                }
-            } catch (e: Exception) {
-                result = JSONObject().put("ok", false).put("fullscreen", fullscreenMode).put("error", e.message ?: "窗口切换失败")
-            } finally { done.countDown() }
-        }
-        if (Looper.myLooper() == Looper.getMainLooper()) apply() else { main.post(apply); try { done.await(1200, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {} }
-        return result
-    }
-
-    fun isFullscreen(): Boolean = fullscreenMode
-
     fun resize(w: Int, h: Int) = runOnMain {
         val p = params ?: return@runOnMain
         applyRect(p.x, p.y, w, h)
@@ -483,16 +470,28 @@ class FloatService : Service() {
     }
 
     /**
-     * 把请求的矩形夹进「屏幕范围 + 最小尺寸」里。
+     * 把请求的矩形夹进「屏幕范围 + 最小尺寸 + 恒定宽高比」里。
      * 纯计算，不碰 View，所以 JS 线程也能直接调，返回值就是最终一定生效的结果。
+     *
+     * 宽高比必须等于 baseSize 的比例：内容是按 BASE 等比缩放的，窗口被夹成别的比例，
+     * 底部/右侧就会多出一条「看得见点不到」的死区，缩放角标也会跑偏 ——
+     * 横屏打开浮窗时卡在左上角、拉不动，根因就在这里。
      */
     private fun clampRect(x: Int, y: Int, w: Int, h: Int): IntArray {
         val dm = resources.displayMetrics
         val sw = dm.widthPixels
         val sh = dm.heightPixels
-        val minSize = minWindowSize()
-        val nw = w.coerceIn(minSize, max(minSize, sw))
-        val nh = h.coerceIn(minSize, max(minSize, sh))
+        val b = baseSize()
+        val ratio = b[1].toDouble() / b[0].toDouble()   // 高 / 宽
+        val minW = minWindowSize()
+        // 以宽度为准，再按恒定比例推高度
+        var nw = w.coerceAtLeast(minW)
+        if (nw > sw) nw = sw
+        var nh = (nw * ratio).toInt()
+        // 高度放不下就把两者一起收回来，始终不破坏比例
+        if (nh > sh) { nh = sh; nw = (sh / ratio).toInt() }
+        nw = nw.coerceIn(1, max(1, sw))
+        nh = nh.coerceIn(1, max(1, sh))
         val nx = x.coerceIn(0, (sw - nw).coerceAtLeast(0))
         val ny = y.coerceIn(0, (sh - nh).coerceAtLeast(0))
         return intArrayOf(nx, ny, nw, nh)

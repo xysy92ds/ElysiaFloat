@@ -626,7 +626,11 @@ class JsBridge(private val ctx: Context, private val webView: WebView) {
                             429 -> "RATE_LIMITED"
                             else -> "HTTP_ERROR"
                         }
-                        err = if (text.isBlank()) "HTTP $rc" else "HTTP $rc"
+                        err = if (text.isBlank()) "HTTP $rc"
+                        else {
+                            val body = text.trim().take(500)
+                            if (body.isEmpty()) "HTTP $rc" else "HTTP $rc：$body"
+                        }
                     }
                     try { conn.disconnect() } catch (_: Exception) { }
                     activeRequests.remove(id)

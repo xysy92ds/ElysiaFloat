@@ -11,14 +11,14 @@ import java.util.concurrent.TimeUnit
  * 当前提供状态/诊断级操作，文件和系统修改操作不在白名单内。
  */
 object RootWorker {
-    private val operations = setOf("id", "getprop", "task_files")
+    private val operations = setOf("id", "getprop", "task_files", "list_processes", "kill_process")
 
     fun isRootBinaryAvailable(): Boolean = try {
         val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", "command -v su"))
         p.waitFor() == 0
     } catch (_: Exception) { false }
 
-    fun run(ctx: Context, operation: String, taskId: String): JSONObject {
+    fun run(ctx: Context, operation: String, taskId: String, extra: JSONObject = JSONObject()): JSONObject {
         if (operation !in operations) return error("ROOT_OPERATION_DENIED", "Root 操作不在白名单中")
         if (!isRootBinaryAvailable()) return error("ROOT_UNAVAILABLE", "未检测到 su")
         val command = when (operation) {
@@ -27,6 +27,12 @@ object RootWorker {
             "task_files" -> {
                 val dir = TaskWorkspace.taskDir(taskId) ?: return error("INVALID_TASK", "任务工作区无效")
                 "find " + shellQuote(dir.absolutePath) + " -maxdepth 2 -type f -print"
+            }
+            "list_processes" -> "ps -A -o PID,NAME"
+            "kill_process" -> {
+                val pid = extra.optInt("pid", 0)
+                if (pid <= 0) return error("INVALID_PID", "kill_process 需要有效 pid 参数")
+                "kill -TERM " + pid
             }
             else -> return error("ROOT_OPERATION_DENIED", "Root 操作不在白名单中")
         }

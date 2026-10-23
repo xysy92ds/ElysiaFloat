@@ -25,8 +25,6 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   cursor:pointer;font-family:inherit;flex:0 0 auto;white-space:nowrap}
 /* 关闭键脱离伸缩流：无论音乐键是否出现、窗口缩得多小，都固定在右上角可点 */
 #btn-close{padding:0 9px;height:26px}
-#btn-fullscreen{font-size:15px;padding:0 8px}
-#btn-fullscreen.unsupported{opacity:.62;font-size:10px;padding:0 6px}
 #head .head-actions > button{background:rgba(255,255,255,.2);height:25px;font-size:11px;padding:0 10px}
 #head button:active{background:rgba(255,255,255,.45)}
 #head button[hidden]{display:none}
@@ -100,7 +98,8 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
 .tts-btn:active{background:rgba(255,154,158,.25)}
 #foot{display:flex;gap:8px;padding:10px 12px;background:#fff5f7;
   border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;
-  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+  /* 抬高按钮，避开右下/左下 22px 的窗口缩放热区(.rz)，否则「发送」会被 .rz-se 抢走点击 */
+  padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))}
 #input{flex:1;border:1.5px solid rgba(255,154,158,.25);border-radius:18px;
   padding:10px 16px;font-size:14px;outline:none;resize:none;
   background:var(--card);color:var(--text);max-height:100px;
@@ -122,9 +121,12 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   background:rgba(255,154,158,.22);color:var(--c1);font-size:15px;line-height:1}
 .msg-thumb{display:block;max-width:160px;max-height:160px;border-radius:10px;
   margin-top:6px;border:1px solid rgba(255,154,158,.3)}
-#send{width:60px;border-radius:18px;border:none;
+/* 发送键：底端对齐、给足最小高度，并抬到窗口缩放热区(.rz, z-index:60)之上。
+   即使某些机型安全区/布局让按钮落得更低，也不会被 .rz-se/.rz-s 抢走这一下点击。 */
+#send{width:60px;min-height:38px;align-self:flex-end;border-radius:18px;border:none;
   background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
-  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0}
+  font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0;
+  position:relative;z-index:80}
 #send:disabled{opacity:.5}
 #settings{display:none;flex-direction:column;flex:1;overflow-y:auto;
   background:#fff5f7;padding:15px;-webkit-overflow-scrolling:touch}

@@ -1,12 +1,23 @@
 {
-  "tag_name": "v0.6.5",
-  "name": "ElysiaFloat v0.6.5",
-  "html_url": "https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.6.5",
-  "body": "0.6.5 把「能聊天、能看屏幕」的浮窗助手，升级为「能接任务、能动手、能交付文件」的手机 Agent：建立任务生命周期与执行阶段（读屏→规划→执行→验证→交付）；统一 L1/L2/L3 + 安全开关的权限模型；本地工作区支持多格式文件读写与导出预览；所有网络请求收敛到统一请求管理；提示词分层（工作协议与人设语气分离）；记忆与音乐成为完整子系统。APK 为 Debug 测试包。SHA-256: f74882cd37e94e571deef20df5fc03ca9e6f3834b918a78e1914decabf7e9e51。",
+  "tag_name": "v0.7.2",
+  "name": "ElysiaFloat v0.7.2 Beta",
+  "prerelease": true,
+  "html_url": "https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2",
+  "published_at": "2026-10-24T00:00:00Z",
+  "body": "ElysiaFloat 0.7.2 Beta\n\n改进\n- 在工作区任务中让 Agent 操作手机时，复用当前任务，不再新建任务或要求重新进入工作区。\n- 安全确认精简：进入工作区或手机任务授权一次，30 分钟内有效；任务结束、删除或应用重启后自动失效。\n- 工作区内写入在授权有效期内免逐次确认；公共存储的写入、复制、建目录在授权期内合并确认一次。\n\n修复\n- 修复悬浮窗内长按文本后菜单项点不动的问题。\n- 修复聊天输入框无法粘贴系统剪贴板内容的问题。\n- 剪贴板读取失败时给出明确提示。\n\n保持不变\n- 密码、支付、卸载、发送消息、删除文件仍然每次确认。\n- 0.7.x 之间签名一致，可直接覆盖安装。\n\n版本：versionCode 17 / versionName 0.7.2\nAPK SHA-256: 6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03",
   "assets": [
     {
-      "name": "ElysiaFloat-v0.6.5-debug.apk",
-      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat/releases/download/v0.6.5/ElysiaFloat-v0.6.5-debug.apk"
+      "name": "ElysiaFloat-v0.7.2-debug.apk",
+      "size": 2653759,
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat/releases/download/v0.7.2/ElysiaFloat-v0.7.2-debug.apk"
+    },
+    {
+      "name": "ElysiaFloat-v0.7.2-source.zip",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat/releases/download/v0.7.2/ElysiaFloat-v0.7.2-source.zip"
+    },
+    {
+      "name": "SHA256SUMS",
+      "browser_download_url": "https://github.com/xysy92ds/ElysiaFloat/releases/download/v0.7.2/SHA256SUMS"
     }
   ]
 }

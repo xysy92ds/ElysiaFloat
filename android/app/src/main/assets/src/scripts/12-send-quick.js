@@ -19,8 +19,14 @@ async function send() {
     return;
   }
   const inputEl = $('#input');
-  const t = inputEl.value.trim();
+  let t = inputEl.value.trim();
   const att = pendingAttachment;
+  // 部分输入法还在组词时读到的 value 是空的：先失焦让输入法提交，再读一次，
+  // 避免「明明打了字，点发送却什么都不发生」。
+  if (!t && !att && document.activeElement === inputEl) {
+    try { inputEl.blur(); } catch (e) {}
+    t = inputEl.value.trim();
+  }
   if (!t && !att) return;
   // 正在某个持久任务（工作/手机）里时，普通文字继续留在该任务；
   // 只有明确的快捷屏幕指令或其它任务类型关键词才切换。
@@ -36,19 +42,27 @@ async function send() {
     const shortcut = /翻译屏幕/.test(t) ? 'trans_screen' : (/总结屏幕/.test(t) ? 'sum_screen' : (/提取要点|要点/.test(t) ? 'points' : (/解释屏幕|解释/.test(t) ? 'explain' : '')));
     if (shortcut) { inputEl.value = ''; await handleQuickAction(shortcut); return; }
   }
-  const routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
+  // 统一落点：聊天、工作、设备任务都用同一段后续逻辑，只在这里一次性把「这轮消息进哪个任务」定死。
+  // 曾经把 routedTask 写成 const，又在下面 chat 分支用 taskEnsureChat() 覆盖它，
+  // 运行期必抛 "Assignment to constant variable"，且抛在清空输入和 addMsg 之前——
+  // 表现就是「主聊天点发送没反应」，而工作区/设备任务不走那次赋值所以一直正常。
+  // 现在把聊天任务的解析提前到这里，声明依然是 let，彻底消除这个分歧。
+  let routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
   if (!routedTask) return;
-  if (routeType === 'workspace') {
+  if (routeType === 'chat') routedTask = taskEnsureChat();
+  // G2-005：用路由后的实际任务类型，而不是消息意图。
+  // 在已有工作任务里操作手机时，routedTask 仍是那个 workspace，不能再用 'device' 去 taskBegin，
+  // 否则 taskBegin 会按类型再建一个新任务，工作区就被留在后台。
+  if (routedTask.type === 'workspace') {
     const ready = await ensureTaskWorkspace(routedTask);
     if (!ready.ok) { taskFinish(routedTask.id, 'failed', ready.error || '工作区不可用'); toast(ready.error || '工作区不可用'); return; }
   }
-  if (att && routeType === 'workspace') {
+  if (att && routedTask.type === 'workspace') {
     const imported = await importAttachmentToTask(routedTask, att);
     if (!imported.ok) { taskFinish(routedTask.id, 'failed', imported.error || '文件导入失败'); toast(imported.error || '文件导入失败'); return; }
     routedTask.artifacts = routedTask.artifacts || []; if (imported.relative) routedTask.artifacts.push(imported.relative); saveTasks();
   }
-  if (routeType !== 'quick') taskBegin(routeType, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
-  if (routeType === 'chat') routedTask = taskEnsureChat();
+  if (routeType !== 'quick') taskBegin(routedTask.type, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
   stopRequested = false;
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;
@@ -116,6 +130,20 @@ async function send() {
   stopRequested = false;
   ACTIVE_RUN_TASK_ID = '';
   sending = false; $('#send').disabled = false; $('#send').textContent = '发送';
+}
+
+/** 发送壳：send() 前半段（路由 / 切任务）如果抛错，以前是静默失败，
+ *  表现和「按钮点不动」一模一样。这里兜住异常、复位按钮并把原因说出来。 */
+function sendSafe() {
+  const fail = (e) => {
+    sending = false;
+    const b = $('#send'); if (b) { b.disabled = false; b.textContent = '发送'; }
+    toast('发送失败：' + errMsg(e));
+  };
+  try {
+    const p = send();
+    if (p && p.catch) p.catch(fail);
+  } catch (e) { fail(e); }
 }
 
 /* ==========================================================

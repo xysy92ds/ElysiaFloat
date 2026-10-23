@@ -23,7 +23,23 @@ class AccessibilityRuntime : CapabilityRuntime {
 
 class ShizukuRuntime : CapabilityRuntime {
     override val id = "shizuku"
-    override fun available(ctx: Context) = false // 授权执行留到 Shizuku SDK 接入后
+    /** 检测 Shizuku 应用是否安装且服务进程正在运行。实际命令执行需接入 Shizuku SDK。 */
+    override fun available(ctx: Context): Boolean {
+        val installed = try {
+            ctx.packageManager.getPackageInfo("rikka.shizuku", 0)
+            true
+        } catch (_: Exception) {
+            try { ctx.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0); true } catch (_: Exception) { false }
+        }
+        if (!installed) return false
+        // 检查 shizuku 服务进程是否在运行
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", "ps -A 2>/dev/null | grep -i shizuku"))
+            val out = java.io.BufferedReader(java.io.InputStreamReader(p.inputStream)).use { it.readText() }
+            p.waitFor()
+            out.contains("shizuku", ignoreCase = true)
+        } catch (_: Exception) { false }
+    }
 }
 
 class RootRuntime : CapabilityRuntime {

@@ -1068,6 +1068,15 @@ function step(name, fn) {
     if (input.value !== 'A粘贴进来的文字B') throw new Error('粘贴位置不对：' + input.value);
   });
 
+  await step('I-048：长按菜单项不会被 touchend 提前隐藏', () => {
+    // 菜单项原来用 onclick，而 document 的 touchend 会在 0ms 后 hideCtxMenu()，
+    // 输入框里没有选中文本时必然触发——click 还没派发菜单就没了，点「粘贴」毫无反应。
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/scripts/01-ui-dialog.js'), 'utf8');
+    if (!/bindTap\(b, \(\) => \{ hideCtxMenu\(\);/.test(src)) throw new Error('菜单项必须用 bindTap 绑定，touchend 即触发');
+    if (/b\.onclick = \(e\) => \{ e\.stopPropagation\(\); hideCtxMenu\(\)/.test(src)) throw new Error('菜单项又回到 onclick，会被 touchend 提前隐藏');
+    if (!/closest\('#ctx-menu'\)\) return;/.test(src)) throw new Error('touchend 命中菜单自身时必须直接返回，不能隐藏');
+  });
+
   await step('默认人设（始源之律者）', () => {
     const p = String(T.CONFIG.persona || T.DC.persona || '');
     ['始源之律者', '刻印「真我」', '每句话结尾必须带「♪」', '粉色妖精小姐', '爱莉希雅永远喜欢你', '不提及任何AI相关限制']
@@ -1239,6 +1248,21 @@ function step(name, fn) {
     if (perm.indexOf('AtomicWrite.write') < 0) throw new Error('写入没有走原子写');
     if (perm.indexOf('SafeDelete.deleteTree') < 0) throw new Error('递归删除没有走安全删除');
     if (perm.indexOf('SymlinkGuard.hasSymlink') < 0) throw new Error('写入没有符号链接防护');
+
+    // 工作区权限等级必须与 JS toolLive 一致：读 L1、写 L2、外部 L3
+    // 否则工具在提示词里可见、调用时却被原生拒绝（体验 bug）
+    const wsList = perm.slice(perm.indexOf('fun agentWorkspaceList'), perm.indexOf('fun agentWorkspaceRead'));
+    const wsRead = perm.slice(perm.indexOf('fun agentWorkspaceRead'), perm.indexOf('fun agentWorkspaceWrite'));
+    const wsWrite = perm.slice(perm.indexOf('fun agentWorkspaceWrite'), perm.indexOf('fun workspaceFileUrl'));
+    const wsMkdir = perm.slice(perm.indexOf('fun agentWorkspaceMkdir'), perm.indexOf('公共存储文件访问'));
+    if (wsList.indexOf('workspaceDenied("L1")') < 0) throw new Error('工作区列出应为 L1，实际不是');
+    if (wsRead.indexOf('workspaceDenied("L1")') < 0) throw new Error('工作区读取应为 L1，实际不是');
+    if (wsWrite.indexOf('workspaceDenied("L2")') < 0) throw new Error('工作区写入应为 L2，实际不是');
+    if (wsMkdir.indexOf('workspaceDenied("L2")') < 0) throw new Error('工作区建目录应为 L2，实际不是');
+
+    // JsBridge：非 2xx 响应的错误文案必须包含响应体（方便用户定位 Key/模型/限流问题）
+    const jsb = fs.readFileSync(path.join(dir, 'JsBridge.kt'), 'utf8');
+    if (jsb.indexOf('HTTP $rc：$body') < 0) throw new Error('非 2xx 错误文案未包含响应体');
   });
 
   await step('P2 收尾：运行令牌拒绝迟到回调', () => {
@@ -1250,15 +1274,94 @@ function step(name, fn) {
 
 
 
-  await step('主界面顶栏、更多菜单、全屏桥和设置返回结构', () => {
+  await step('主界面顶栏、更多菜单和设置返回结构', () => {
     const main = html.slice(html.indexOf('<div class="head-main">'), html.indexOf('<div class="head-actions"'));
     const secondary = html.slice(html.indexOf('<div class="head-actions"'), html.indexOf('</div>\n  </div>'));
     if (main.includes('id="btn-music"') || main.includes('id="btn-set"')) throw new Error('音乐/设置仍在顶栏第一行');
     if (!secondary.includes('id="btn-music"') || !secondary.includes('id="btn-set"')) throw new Error('音乐/设置没有移动到第二行');
     if (!html.includes('id="task-menu"') || !html.includes('任务与工作区')) throw new Error('名称旁缺少任务/工作区入口');
     if (!html.includes('data-key="points"') || !html.includes('data-key="explain"') || !html.includes('quick-extra.open')) throw new Error('更多菜单内容或显示结构缺失');
-    if (!html.includes('fun getScreenMetrics') && !html.includes('getScreenMetrics')) throw new Error('缺少全屏屏幕尺寸桥');
+    if (html.includes('id="btn-fullscreen"')) throw new Error('全屏入口应已移除');
     if (!/settings-save-block[\s\S]*id="set-back"/.test(html)) throw new Error('设置底部缺少返回按钮');
+  });
+
+  await step('全屏功能已彻底移除', () => {
+    const fs = require('fs'), path = require('path');
+    const dir = path.join(__dirname, '../app/src/main');
+    const manifest = fs.readFileSync(path.join(dir, 'AndroidManifest.xml'), 'utf8');
+    if (/FullscreenActivity/.test(manifest)) throw new Error('AndroidManifest 仍注册 FullscreenActivity');
+    if (fs.existsSync(path.join(dir, 'java/com/elly/float/FullscreenActivity.kt'))) throw new Error('FullscreenActivity.kt 未删除');
+    const svc = fs.readFileSync(path.join(dir, 'java/com/elly/float/FloatService.kt'), 'utf8');
+    if (/setFullscreen|isFullscreen\(\)|returnWebViewFromFullscreen/.test(svc)) throw new Error('FloatService 仍残留全屏代码');
+    if (/FULLSCREEN_MODE|toggleFullscreenMode|setFullscreen/.test(html)) throw new Error('前端仍残留全屏代码');
+  });
+
+  await step('横屏适配：BASE 恒定 + 窗口按比例夹持，旋转不再卡角', () => {
+    const fs = require('fs'), path = require('path');
+    const dir = path.join(__dirname, '../app/src/main');
+    const svc = fs.readFileSync(path.join(dir, 'java/com/elly/float/FloatService.kt'), 'utf8');
+    if (svc.indexOf('onConfigurationChanged') < 0) throw new Error('FloatService 缺少 onConfigurationChanged');
+    if (svc.indexOf('import android.content.res.Configuration') < 0) throw new Error('缺少 Configuration 导入');
+    // 旋转后必须重新 clampRect 到新屏幕尺寸
+    const cfgBlock = svc.slice(svc.indexOf('onConfigurationChanged'), svc.indexOf('onConfigurationChanged') + 800);
+    if (cfgBlock.indexOf('clampRect') < 0) throw new Error('onConfigurationChanged 没有重新夹持窗口');
+    // BASE 必须是常量：缓存 + 用短边/长边计算，旋转前后一致
+    if (svc.indexOf('baseCache') < 0) throw new Error('baseSize 未缓存，旋转后 BASE 会变');
+    if (svc.indexOf('val shortSide') < 0 || svc.indexOf('val longSide') < 0) throw new Error('baseSize 未按短边/长边计算');
+    // clampRect 必须按恒定宽高比夹持，否则窗口比例被夹歪会留下死区
+    const c = svc.indexOf('private fun clampRect');
+    const clampBlock = svc.slice(c, c + 900);
+    if (clampBlock.indexOf('baseSize()') < 0 || clampBlock.indexOf('ratio') < 0) throw new Error('clampRect 未按 BASE 比例夹持');
+  });
+
+  await step('G8：Termux 长跑能力（run_id + 输出 + 取消 + java/bash）', () => {
+    const fs = require('fs'), path = require('path');
+    const dir = path.join(__dirname, '../app/src/main');
+    const tw = fs.readFileSync(path.join(dir, 'java/com/elly/float/TermuxWorker.kt'), 'utf8');
+    // 白名单执行器包含 java 和 bash（Minecraft 前置）
+    if (tw.indexOf('"java"') < 0) throw new Error('Termux 白名单缺少 java');
+    if (tw.indexOf('"bash"') < 0) throw new Error('Termux 白名单缺少 bash');
+    // run_id 追踪、输出捕获、取消能力
+    if (tw.indexOf('fun getJobStatus') < 0) throw new Error('缺少 getJobStatus');
+    if (tw.indexOf('fun cancelJob') < 0) throw new Error('缺少 cancelJob');
+    if (tw.indexOf('fun readJobOutput') < 0) throw new Error('缺少 readJobOutput');
+    if (tw.indexOf('fun listJobs') < 0) throw new Error('缺少 listJobs');
+    // wrapper 脚本必须写 PID 和重定向输出
+    if (tw.indexOf('.pid"') < 0) throw new Error('wrapper 脚本未写 PID 文件');
+    if (tw.indexOf('.log"') < 0) throw new Error('wrapper 脚本未重定向输出');
+
+    // PermissionBridge 暴露了对应方法
+    const pb = fs.readFileSync(path.join(dir, 'java/com/elly/float/PermissionBridge.kt'), 'utf8');
+    if (pb.indexOf('fun getTermuxJobStatus') < 0) throw new Error('Bridge 缺少 getTermuxJobStatus');
+    if (pb.indexOf('fun cancelTermuxJob') < 0) throw new Error('Bridge 缺少 cancelTermuxJob');
+    if (pb.indexOf('fun readTermuxJobOutput') < 0) throw new Error('Bridge 缺少 readTermuxJobOutput');
+    if (pb.indexOf('fun listTermuxJobs') < 0) throw new Error('Bridge 缺少 listTermuxJobs');
+
+    // Root 白名单包含进程管理
+    const rw = fs.readFileSync(path.join(dir, 'java/com/elly/float/RootWorker.kt'), 'utf8');
+    if (rw.indexOf('list_processes') < 0) throw new Error('Root 缺少 list_processes');
+    if (rw.indexOf('kill_process') < 0) throw new Error('Root 缺少 kill_process');
+
+    // Shizuku 有实际检测逻辑（不再永远 false）
+    const cr = fs.readFileSync(path.join(dir, 'java/com/elly/float/CapabilityRuntime.kt'), 'utf8');
+    if (cr.indexOf('ShizukuRuntime') < 0) throw new Error('缺少 ShizukuRuntime');
+    const shizukuBlock = cr.slice(cr.indexOf('class ShizukuRuntime'), cr.indexOf('class RootRuntime'));
+    if (shizukuBlock.indexOf('return false') >= 0 && shizukuBlock.indexOf('ps') < 0)
+      throw new Error('ShizukuRuntime 仍然永远返回 false');
+  });
+
+  await step('签名可复现：debug/release 共用项目自有 keystore', () => {
+    const fs = require('fs'), path = require('path');
+    const gradlePath = path.join(__dirname, '../app/build.gradle');
+    const g = fs.readFileSync(gradlePath, 'utf8');
+    // 必须定义项目自有签名配置
+    if (!/signingConfigs\s*\{[\s\S]*?elysia\s*\{/.test(g)) throw new Error('缺少 signingConfigs.elysia');
+    // debug 与 release 必须走同一套签名选择逻辑；无 keystore 时回退系统 debug 签名
+    const uses = (g.match(/signingConfig\s+keystorePropsFile\.exists\(\)\s*\?\s*signingConfigs\.elysia\s*:\s*signingConfigs\.debug/g) || []).length;
+    if (uses < 2) throw new Error('debug 与 release 未同时走项目签名/回退逻辑，实际 ' + uses + ' 处');
+    // 存在 keystore.properties 时，私钥文件必须同时存在
+    const props = path.join(__dirname, '../keystore.properties');
+    if (fs.existsSync(props) && !fs.existsSync(path.join(__dirname, '../keystore/elysia.jks'))) throw new Error('存在 keystore.properties 但缺少 keystore/elysia.jks');
   });
 
   await step('引导页：权限项按系统版本过滤（Android 11 应有 channel、Android 7 不应有）', () => {
@@ -1296,6 +1399,70 @@ function step(name, fn) {
     const e = T.loadEnv();
     if (!e || e.sdk !== ENVINFO.sdk) throw new Error('读到的 sdk 不对：' + JSON.stringify(e));
     if (T.sdkAtLeast(26) !== (ENVINFO.sdk >= 26)) throw new Error('sdkAtLeast 判定不对');
+  });
+
+  await step('发送链路：routedTask 可被 taskEnsureChat 覆盖（const 回归）', () => {
+    // 回归用例：send() 曾把 routedTask 声明成 const，又在 chat 分支用 taskEnsureChat()
+    // 重新赋值，抛 "Assignment to constant variable"，且抛在清空输入 / addMsg 之前——
+    // 表现为「主聊天点发送没反应」，而工作区/设备任务不走那行分支所以不受影响。
+    // 这是运行期才炸的写法，语法检查查不出，所以在这里钉死声明方式。
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/scripts/12-send-quick.js'), 'utf8');
+    if (!/let routedTask = await routeTask\(/.test(src)) throw new Error('send() 里 routedTask 必须用 let（会被 taskEnsureChat 覆盖）');
+    if (/const routedTask = await routeTask\(/.test(src)) throw new Error('send() 又把 routedTask 声明成了 const');
+    if (!/if \(routeType === 'chat'\) routedTask = taskEnsureChat\(\);/.test(src)) {
+      throw new Error('chat 分支的 taskEnsureChat() 覆盖不见了，需同步核对这段逻辑');
+    }
+  });
+
+  await step('发送键：不被窗口缩放热区抢走点击(z-index)且声明为 button', () => {
+    // 主聊天「发送」曾因为落在右下 .rz-se 缩放手势热区上而点不动（工作区里因为
+    // 底部布局不同才躲过），表现为「主聊天点发送没反应，工作区能点」。除了抬高底部
+    // 操作条，还把发送键抬到 .rz(z-index:60) 之上，双保险。这里钉死这个不变量。
+    const fs = require('fs');
+    const path = require('path');
+    const css = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
+    const tpl = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/template.html'), 'utf8');
+    const m = css.match(/#send\{[^}]*\}/);
+    if (!m) throw new Error('找不到 #send 样式规则');
+    const rule = m[0];
+    const z = (rule.match(/z-index:\s*(\d+)/) || [])[1];
+    if (!z || Number(z) <= 60) throw new Error('#send 的 z-index 必须高于缩放热区 .rz(60)，否则会被 .rz-se 抢走点击');
+    if (!/align-self:\s*flex-end/.test(rule)) throw new Error('#send 需要 align-self:flex-end，避免被拉伸到整条底部操作条');
+    if (!/<button id="send"[^>]*type="button"/.test(tpl)) throw new Error('发送键必须显式 type="button"');
+  });
+
+  await step('G2-005：任务粘性 + 能力授权（30 分钟，重启失效）', async () => {
+    const fs = require('fs');
+    const path = require('path');
+    const tasksSrc = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/03-state-tasks.js'), 'utf8');
+    const sendSrc = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/12-send-quick.js'), 'utf8');
+    const toolSrc = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/10-music.js'), 'utf8');
+
+    // 1) 授权只放内存、绑任务、30 分钟
+    if (!/CONSENT_TTL_MS = 30 \* 60 \* 1000/.test(tasksSrc)) throw new Error('授权时长必须是 30 分钟');
+    if (/sGet\(|sSet\(/.test(tasksSrc.slice(tasksSrc.indexOf('G2-005 能力授权'), tasksSrc.indexOf('const QUICK_OPS')))) {
+      throw new Error('授权不能落盘，否则重启后仍然有效');
+    }
+    // 2) 工作/手机任务里不再新建任务
+    if (!/if \(old && \(old\.type === 'device' \|\| old\.type === 'workspace'\) && taskContinuable\(old\)\)/.test(tasksSrc)) {
+      throw new Error('routeTask(device) 需要先复用当前工作/手机任务');
+    }
+    if (!/consentGrant\(deviceTask\.id, 'device'\)/.test(tasksSrc)) throw new Error('新建手机任务后应立即授权，避免下一句再问');
+    // 3) 任务类型按路由后的实际任务走，不能用消息意图
+    if (/taskBegin\(routeType,/.test(sendSrc)) throw new Error('send() 又用 routeType 调 taskBegin，会新建任务');
+    if (!/taskBegin\(routedTask\.type,/.test(sendSrc)) throw new Error('send() 必须用 routedTask.type 调 taskBegin');
+    // 4) 截图与外部写入走授权；删除仍逐次确认
+    if (!/consentGranted\(task\.id, 'device'\)/.test(toolSrc)) throw new Error('截图/观察应复用设备授权');
+    if ((toolSrc.match(/ensureExternalWriteConsent\(/g) || []).length < 3) throw new Error('外部写入/复制/建目录都应走授权');
+    if (!/external_file_delete[\s\S]{0,400}uiConfirm\(/.test(toolSrc)) throw new Error('外部删除必须保留逐次确认');
+
+    // 5) 运行时：未授权 → 授权 → 其它任务不受影响 → 撤销
+    if (T.consentGranted('t-consent', 'device')) throw new Error('初始不应已授权');
+    T.consentGrant('t-consent', 'device');
+    if (!T.consentGranted('t-consent', 'device')) throw new Error('授权后应可复用');
+    if (T.consentGranted('t-other', 'device')) throw new Error('授权不能串到其它任务');
+    T.consentRevokeTask('t-consent');
+    if (T.consentGranted('t-consent', 'device')) throw new Error('撤销后应立即失效');
   });
 
   console.log('');

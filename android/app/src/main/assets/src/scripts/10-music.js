@@ -1018,15 +1018,29 @@ function buildTools(runTask) {
   }
   if (exposedTask.type === 'workspace' && workspaceReady() && agentActionsOn() && HAS_PERM && Perm.getTermuxWorkerState) {
     let termux = false; try { termux = JSON.parse(Perm.getTermuxWorkerState() || '{}').installed === true; } catch (e) {}
-    if (termux) tools.push({ type: 'function', function: {
-      name: 'run_termux_job', description: '在当前工作任务目录中运行一个结构化 Termux 工具。只允许 python/node/git/rg/ffmpeg，不接受 shell 字符串；执行前必须确认命令、参数和目录。',
-      parameters: { type: 'object', properties: { executor: { type: 'string', enum: ['python','node','git','rg','ffmpeg'] }, args: { type: 'array', items: { type: 'string' } }, cwd: { type: 'string', description: '当前任务工作区内的相对目录' }, timeoutMs: { type: 'integer' } }, required: ['executor','args'] } } });
+    if (termux) {
+      tools.push({ type: 'function', function: {
+        name: 'run_termux_job', description: '在当前工作任务目录中运行一个结构化 Termux 工具（支持长跑进程如服务器、bot）。只允许 python/node/git/rg/ffmpeg/java/bash，不接受 shell 字符串；执行前必须确认命令、参数和目录。返回 runId 用于后续查询状态和输出。',
+        parameters: { type: 'object', properties: { executor: { type: 'string', enum: ['python','node','git','rg','ffmpeg','java','bash'] }, args: { type: 'array', items: { type: 'string' } }, cwd: { type: 'string', description: '当前任务工作区内的相对目录' } }, required: ['executor','args'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_job_status', description: '查询 Termux 任务状态和最近输出。状态可能是 running / done / failed。',
+        parameters: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_job_output', description: '读取 Termux 任务的输出日志，可指定偏移量实现流式读取。',
+        parameters: { type: 'object', properties: { runId: { type: 'string' }, offset: { type: 'integer', description: '上次返回的 nextOffset，从 0 开始' } }, required: ['runId'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_job_cancel', description: '取消一个正在运行的 Termux 任务（先 TERM 后 KILL）。',
+        parameters: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] } } });
+      tools.push({ type: 'function', function: {
+        name: 'termux_jobs_list', description: '列出当前任务下所有 Termux 任务及其状态。',
+        parameters: { type: 'object', properties: {}, required: [] } } });
+    }
   }
   if (exposedTask.type === 'workspace' && agentActionsOn() && HAS_PERM && Perm.getAgentRuntimeState) {
     let root = false; try { root = JSON.parse(Perm.getAgentRuntimeState() || '{}').rootAvailable === true; } catch (e) {}
     if (root) tools.push({ type: 'function', function: {
-      name: 'root_operation', description: '执行受控 Root 诊断操作，只允许 id、getprop、task_files；执行前必须确认。',
-      parameters: { type: 'object', properties: { operation: { type: 'string', enum: ['id','getprop','task_files'] } }, required: ['operation'] } } });
+      name: 'root_operation', description: '执行受控 Root 操作，只允许 id、getprop、task_files、list_processes、kill_process；执行前必须确认。',
+      parameters: { type: 'object', properties: { operation: { type: 'string', enum: ['id','getprop','task_files','list_processes','kill_process'] }, pid: { type: 'integer', description: 'kill_process 时需要的进程 PID' } }, required: ['operation'] } } });
   }
 
   const musicToolsOn = plugOn('music') && !!CONFIG.musicEnabled;
@@ -1122,14 +1136,14 @@ function buildTools(runTask) {
 async function execTool(name, args, runTask) {
   const task = runTask || currentTask();
   if (!toolLive(name)) return { success: false, error: '该工具当前未获授权或已关闭。' };
-  if (!taskToolsAllowed(task.type, name)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
+  if (!taskToolsAllowed(task.type, name, task.id)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
   args = args && typeof args === 'object' ? Object.assign({}, args) : {};
   const scoped = ['workspace_list','workspace_read','workspace_write','workspace_mkdir'];
   if (scoped.indexOf(name) >= 0 && task.type === 'workspace') args.path = taskWorkspacePath(task, args.path || '');
   const cp = plugFind(name);
   if (cp) {
     const pt = cp.plugin.pluginType || 'chat';
-    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick') || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
+    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick' && !(task.type === 'workspace' && consentGranted(task.id, 'device'))) || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
     if (cp.plugin.enabled === false) return { success: false, error: '该插件已停用。' };
     if (!toolOn(name)) return { success: false, error: '该工具已关闭。' };
     return await plugExec(cp.plugin, cp.tool, args || {}, task);
@@ -1161,7 +1175,9 @@ async function execTool(name, args, runTask) {
     } catch (e) { return { success: false, error: '应用查询失败：' + errMsg(e) }; }
   }
   if (name === 'screenshot') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    // G2-005：任务内已获准操作手机后，截图不再每次重复询问
+    const shotOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !shotOk) {
       const ok = await uiConfirm('Agent 想查看当前手机画面。截图可能包含聊天、验证码或其它隐私内容，是否继续？', '允许截图', '查看手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮截图' };
     }
@@ -1174,7 +1190,8 @@ async function execTool(name, args, runTask) {
     return { success: true, note: '已截取当前屏幕画面，画面会在下一条消息里给你看。' };
   }
   if (name === 'watch_screen') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    const watchOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !watchOk) {
       const ok = await uiConfirm('Agent 想在限定时间内观察当前手机画面。最多 10 秒、每秒 2 帧，是否继续？', '允许观察', '观察手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮观察' };
     }
@@ -1186,15 +1203,35 @@ async function execTool(name, args, runTask) {
   if (name === 'run_termux_job') {
     const runTaskObj = task;
     if (runTaskObj.type !== 'workspace') return { success: false, errorCode: 'TASK_TYPE_DENIED', error: 'Termux 只能在工作任务中运行' };
-    const job = { jobId: runTaskObj.id + '-' + Date.now().toString(36), taskId: runTaskObj.id, executor: String(args.executor || ''), args: Array.isArray(args.args) ? args.args.map(String) : [], cwd: String(args.cwd || 'working'), timeoutMs: Math.max(1000, Math.min(600000, parseInt(args.timeoutMs, 10) || 60000)) };
+    const job = { jobId: runTaskObj.id + '-' + Date.now().toString(36), taskId: runTaskObj.id, executor: String(args.executor || ''), args: Array.isArray(args.args) ? args.args.map(String) : [], cwd: String(args.cwd || 'working') };
     if (!(await uiConfirm('即将通过 Termux 执行：' + job.executor + '\n参数：' + JSON.stringify(job.args) + '\n目录：' + job.cwd + '\n是否继续？', '确认执行', 'Termux 任务确认'))) return { success: false, kind: 'cancelled', error: '用户取消了 Termux 任务' };
     try { return JSON.parse(Perm.dispatchTermuxJob ? (Perm.dispatchTermuxJob(JSON.stringify(job)) || '{}') : '{}'); }
     catch (e) { return { success: false, errorCode: 'TERMUX_DISPATCH_FAILED', error: errMsg(e) }; }
   }
+  if (name === 'termux_job_status') {
+    try { return JSON.parse(Perm.getTermuxJobStatus ? (Perm.getTermuxJobStatus(String(args.runId || '')) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_STATUS_FAILED', error: errMsg(e) }; }
+  }
+  if (name === 'termux_job_output') {
+    try { return JSON.parse(Perm.readTermuxJobOutput ? (Perm.readTermuxJobOutput(String(args.runId || ''), parseInt(args.offset, 10) || 0) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_OUTPUT_FAILED', error: errMsg(e) }; }
+  }
+  if (name === 'termux_job_cancel') {
+    if (!(await uiConfirm('确定要取消 Termux 任务 ' + String(args.runId || '') + ' 吗？', '确认取消', 'Termux 取消确认'))) return { success: false, kind: 'cancelled', error: '用户取消了操作' };
+    try { return JSON.parse(Perm.cancelTermuxJob ? (Perm.cancelTermuxJob(String(args.runId || '')) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_CANCEL_FAILED', error: errMsg(e) }; }
+  }
+  if (name === 'termux_jobs_list') {
+    try { return JSON.parse(Perm.listTermuxJobs ? (Perm.listTermuxJobs(task.id) || '{}') : '{}'); }
+    catch (e) { return { success: false, errorCode: 'TERMUX_LIST_FAILED', error: errMsg(e) }; }
+  }
   if (name === 'root_operation') {
     const runTaskObj = task;
-    if (!(await uiConfirm('即将执行受控 Root 诊断操作：' + String(args.operation || '') + '\n是否继续？', '确认 Root 操作', 'Root 确认'))) return { success: false, kind: 'cancelled', error: '用户取消了 Root 操作' };
-    try { return JSON.parse(Perm.runRootOperation ? (Perm.runRootOperation(String(args.operation || ''), runTaskObj.id) || '{}') : '{}'); }
+    if (!(await uiConfirm('即将执行受控 Root 操作：' + String(args.operation || '') + (args.pid ? ' pid=' + args.pid : '') + '\n是否继续？', '确认 Root 操作', 'Root 确认'))) return { success: false, kind: 'cancelled', error: '用户取消了 Root 操作' };
+    try {
+      const extra = args.pid ? JSON.stringify({ pid: parseInt(args.pid, 10) }) : '{}';
+      return JSON.parse(Perm.runRootOperation ? (Perm.runRootOperation(String(args.operation || ''), runTaskObj.id, extra) || '{}') : '{}');
+    }
     catch (e) { return { success: false, errorCode: 'ROOT_FAILED', error: errMsg(e) }; }
   }
   if (name === 'workspace_status') {
@@ -1366,7 +1403,7 @@ async function execTool(name, args, runTask) {
     const path = String(args.path || '').trim();
     const content = String(args.content == null ? '' : args.content);
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符\n是否允许？', '允许本次写入', '外部文件修改确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符', '允许写入', '外部文件授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次外部文件写入' };
     }
     try { return JSON.parse(Perm.agentExternalWrite ? (Perm.agentExternalWrite(path, content, overwrite) || '{}') : '{}'); }
@@ -1376,7 +1413,7 @@ async function execTool(name, args, runTask) {
     const source = String(args.source || '').trim();
     const destination = String(args.destination || '').trim();
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。') + '\n是否允许本次复制？', '允许本次复制', '文件复制确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。'), '允许复制', '文件复制授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次复制' };
     }
     try { return JSON.parse(Perm.agentExternalCopy ? (Perm.agentExternalCopy(source, destination, overwrite) || '{}') : '{}'); }
@@ -1384,7 +1421,7 @@ async function execTool(name, args, runTask) {
   }
   if (name === 'external_file_mkdir') {
     const path = String(args.path || '').trim();
-    if (!(await uiConfirm('AI 请求在公共存储创建目录：\n\n' + path + '\n\n是否允许？', '允许创建目录', '外部目录确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求在公共存储创建目录：\n\n' + path, '允许创建', '外部目录授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许创建外部目录' };
     }
     try { return JSON.parse(Perm.agentExternalMkdir ? (Perm.agentExternalMkdir(path) || '{}') : '{}'); }

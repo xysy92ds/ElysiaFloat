@@ -243,39 +243,6 @@ function bindTaskUI() {
   if (nw) nw.onclick = async () => { const t = taskAdd('workspace', '新工作任务', ''); const ready = await ensureTaskWorkspace(t); drawer.classList.remove('open'); toast(ready.ok ? '已创建工作任务和独立工作区：' + t.title : (ready.error || '工作区创建失败')); };
   renderTaskDrawer(); updateTaskMode();
 }
-let FULLSCREEN_MODE = false;
-let FULLSCREEN_PREV = null;
-function readScreenMetrics() {
-  let m = {};
-  try { if (HAS_PERM && Perm.getScreenMetrics) m = JSON.parse(Perm.getScreenMetrics() || '{}'); } catch (e) { m = {}; }
-  if ((!m.screenW || !m.screenH) && loadEnv()) {
-    m.screenW = loadEnv().screenW;
-    m.screenH = loadEnv().screenH;
-  }
-  return m;
-}
-function updateFullscreenButton() {
-  const btn = $('#btn-fullscreen'); if (!btn) return;
-  const m = readScreenMetrics();
-  const ok = !!(HAS_PERM && Perm.setFullscreen);
-  btn.disabled = !ok;
-  btn.classList.toggle('unsupported', !ok);
-  btn.textContent = FULLSCREEN_MODE ? '▣' : '□';
-  btn.title = ok ? (FULLSCREEN_MODE ? '退出全屏模式' : '全屏模式') : '当前环境不允许窗口全屏';
-  btn.setAttribute('aria-label', btn.title);
-}
-function toggleFullscreenMode() {
-  try {
-    if (!HAS_PERM || !Perm.setFullscreen) return toast('当前版本不支持真正全屏');
-    const next = !FULLSCREEN_MODE;
-    const raw = Perm.setFullscreen(next);
-    const r = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw;
-    if (!r || !r.ok) return toast((r && r.error) || '当前环境不允许窗口全屏');
-    FULLSCREEN_MODE = !!r.fullscreen;
-    updateFullscreenButton();
-    toast(FULLSCREEN_MODE ? '已进入全屏模式' : '已退出全屏模式');
-  } catch (e) { toast('全屏模式切换失败：' + errMsg(e)); }
-}
 function handleNativeBack() {
   const drawer = $('#task-drawer'); if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return true; }
   const market = $('#plug-market-page'); if (market && market.classList.contains('open')) { showView('plugins'); return true; }
@@ -289,8 +256,6 @@ function bindHeader() {
   const setBtn = $('#btn-set'); if (setBtn) setBtn.onclick = () => showView('settings');
   const memBtn = $('#btn-mem'); if (memBtn) memBtn.onclick = () => showView('memory');
   const musicBtn = $('#btn-music'); if (musicBtn) musicBtn.onclick = () => { renderMusicTab('search'); showView('music'); };
-  const fs = $('#btn-fullscreen'); if (fs) fs.onclick = toggleFullscreenMode;
-  updateFullscreenButton();
   $('#btn-close').onclick = () => {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };
@@ -327,10 +292,10 @@ function bindInput() {
     inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
   });
   inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSafe(); }
   });
-  $('#send').onclick = send;
-  $('#btn-plus').onclick = () => $('#plus-modal').classList.add('open');
+  bindTap($('#send'), sendSafe);
+  bindTap($('#btn-plus'), () => $('#plus-modal').classList.add('open'));
   $('#plus-image').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('image'); };
   $('#plus-file').onclick = () => { $('#plus-modal').classList.remove('open'); startPickAttachment('file'); };
   $('#plus-cancel').onclick = () => $('#plus-modal').classList.remove('open');

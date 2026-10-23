@@ -139,10 +139,16 @@ function hideGuide() {
 }
 
 /* 首次启动公告：只记录“我知道了”，不把公告阅读当成永久权限授权。 */
-const ANNOUNCEMENT_KEY = 'via_ai_announcement_0_6_2';
+/* 公告按「版本号」记录：每个版本首次进入都提示一次，跨版本自动重新出现。 */
+const ANNOUNCEMENT_FALLBACK_VER = '0.7.0';
 const ANNOUNCEMENT_REPO = 'https://github.com/xysy92ds/ElysiaFloat';
+function announcementKey() {
+  const raw = String((loadEnv() || {}).appVer || ANNOUNCEMENT_FALLBACK_VER).trim()
+    .replace(/[^0-9A-Za-z._-]/g, '');
+  return 'via_ai_announcement_v' + (raw || ANNOUNCEMENT_FALLBACK_VER);
+}
 function showAnnouncement(force) {
-  if (!force && sGet(ANNOUNCEMENT_KEY, false)) return;
+  if (!force && sGet(announcementKey(), false)) return;
   const modal = $('#announcement-modal');
   if (modal) {
     const app = $('#app');
@@ -155,7 +161,7 @@ function hideAnnouncement() {
   if (modal) modal.classList.remove('open');
   const app = $('#app');
   if (app) app.classList.remove('announcement-visible');
-  sSet(ANNOUNCEMENT_KEY, true);
+  sSet(announcementKey(), true);
 }
 function bindAnnouncement() {
   const close = $('#announcement-close');

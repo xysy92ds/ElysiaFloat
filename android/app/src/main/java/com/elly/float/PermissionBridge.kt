@@ -25,10 +25,11 @@ class PermissionBridge(private val ctx: Context) {
     fun getAgentRuntimeState(): String = AgentRuntime.state(ctx).toString()
 
     @JavascriptInterface
-    fun runRootOperation(operation: String, taskId: String): String {
+    fun runRootOperation(operation: String, taskId: String, extraJson: String): String {
         val denied = AgentPolicy.checkAgentOnly(ctx, "L3")
         if (denied != null) return JSONObject().put("ok", false).put("errorCode", "AGENT_DENIED").put("error", denied).toString()
-        return RootWorker.run(ctx, operation, taskId).toString()
+        val extra = try { if (extraJson.isBlank()) JSONObject() else JSONObject(extraJson) } catch (_: Exception) { JSONObject() }
+        return RootWorker.run(ctx, operation, taskId, extra).toString()
     }
 
     @JavascriptInterface
@@ -46,6 +47,18 @@ class PermissionBridge(private val ctx: Context) {
     fun dispatchTermuxJob(jobJson: String): String = try {
         TermuxWorker.dispatch(ctx, JSONObject(jobJson)).toString()
     } catch (e: Exception) { JSONObject().put("ok", false).put("errorCode", "INVALID_JOB").put("error", "Termux 任务格式无效").toString() }
+
+    @JavascriptInterface
+    fun getTermuxJobStatus(runId: String): String = TermuxWorker.getJobStatus(ctx, runId).toString()
+
+    @JavascriptInterface
+    fun listTermuxJobs(taskId: String): String = TermuxWorker.listJobs(ctx, taskId).toString()
+
+    @JavascriptInterface
+    fun cancelTermuxJob(runId: String): String = TermuxWorker.cancelJob(ctx, runId).toString()
+
+    @JavascriptInterface
+    fun readTermuxJobOutput(runId: String, offset: Long): String = TermuxWorker.readJobOutput(ctx, runId, offset).toString()
 
     @JavascriptInterface
     fun listExternalAgents(): String = ExternalAgentAdapter.list(ctx).toString()
@@ -542,7 +555,7 @@ class PermissionBridge(private val ctx: Context) {
 
     @JavascriptInterface
     fun agentWorkspaceList(relative: String): String {
-        val denied = workspaceDenied("L3")
+        val denied = workspaceDenied("L1")
         if (denied != null) return JSONObject().put("ok", false).put("error", denied).toString()
         val dir = workspaceFile(relative, true) ?: return JSONObject().put("ok", false).put("error", "工作区路径不合法").toString()
         if (!dir.isDirectory) return JSONObject().put("ok", false).put("error", "目录不存在").toString()
@@ -557,7 +570,7 @@ class PermissionBridge(private val ctx: Context) {
 
     @JavascriptInterface
     fun agentWorkspaceRead(relative: String, maxChars: Int): String {
-        val denied = workspaceDenied("L3")
+        val denied = workspaceDenied("L1")
         if (denied != null) return JSONObject().put("ok", false).put("error", denied).toString()
         val file = workspaceFile(relative) ?: return JSONObject().put("ok", false).put("error", "工作区路径不合法").toString()
         if (!file.isFile) return JSONObject().put("ok", false).put("error", "文件不存在").toString()
@@ -582,7 +595,7 @@ class PermissionBridge(private val ctx: Context) {
 
     @JavascriptInterface
     fun agentWorkspaceWrite(relative: String, text: String, overwrite: Boolean): String {
-        val denied = workspaceDenied("L3")
+        val denied = workspaceDenied("L2")
         if (denied != null) return JSONObject().put("ok", false).put("error", denied).toString()
         val file = workspaceFile(relative) ?: return JSONObject().put("ok", false).put("error", "工作区路径不合法").toString()
         if (file.exists() && !overwrite) return JSONObject().put("ok", false).put("error", "文件已存在，需明确允许覆盖").toString()
@@ -608,7 +621,7 @@ class PermissionBridge(private val ctx: Context) {
 
     @JavascriptInterface
     fun agentWorkspaceMkdir(relative: String): String {
-        val denied = workspaceDenied("L3")
+        val denied = workspaceDenied("L2")
         if (denied != null) return JSONObject().put("ok", false).put("error", denied).toString()
         val dir = workspaceFile(relative) ?: return JSONObject().put("ok", false).put("error", "工作区路径不合法").toString()
         return try {
@@ -821,21 +834,6 @@ class PermissionBridge(private val ctx: Context) {
             put("screenH", dm.heightPixels)
         }.toString()
     } catch (e: Exception) { "{}" }
-
-    /** 屏幕尺寸兼容接口：全屏按钮直接读取真实显示尺寸。 */
-    @JavascriptInterface
-    fun getScreenMetrics(): String = try {
-        val dm = ctx.resources.displayMetrics
-        JSONObject().put("screenW", dm.widthPixels).put("screenH", dm.heightPixels).toString()
-    } catch (e: Exception) { "{}" }
-
-    @JavascriptInterface
-    fun setFullscreen(enabled: Boolean): String = try {
-        (ctx as? FloatService)?.setFullscreen(enabled)?.toString() ?: JSONObject().put("ok", false).put("error", "浮窗服务不可用").toString()
-    } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "全屏切换失败").toString() }
-
-    @JavascriptInterface
-    fun isFullscreen(): Boolean = (ctx as? FloatService)?.isFullscreen() == true
 
     /* ---------- 窗口移动 / 缩放 ---------- */
     @JavascriptInterface

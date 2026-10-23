@@ -3,6 +3,15 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// 项目自有固定签名：debug 与 release 共用同一把 keystore，
+// 保证任何环境（本机 / 沙箱 / CI）构建出的 APK 签名一致，升级安装不再冲突。
+// 若 keystore.properties 不存在则回退到系统默认 debug keystore。
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
 android {
     namespace 'com.elly.assistant'
     compileSdk 34
@@ -11,14 +20,30 @@ android {
         applicationId "com.elly.assistant"
         minSdk 24
         targetSdk 34
-        versionCode 13
-        versionName "0.6.5"
+        versionCode 17
+        versionName "0.7.2"
+    }
+
+    signingConfigs {
+        elysia {
+            if (keystorePropsFile.exists()) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
     }
 
     buildTypes {
+        // 仓库里不包含私钥。存在 keystore.properties 时使用项目签名；
+        // 否则回退到系统 debug 签名，保证公开源码能被任何人直接构建。
+        debug {
+            signingConfig keystorePropsFile.exists() ? signingConfigs.elysia : signingConfigs.debug
+        }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.debug
+            signingConfig keystorePropsFile.exists() ? signingConfigs.elysia : signingConfigs.debug
         }
     }
 

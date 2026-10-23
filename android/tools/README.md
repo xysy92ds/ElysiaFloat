@@ -17,15 +17,18 @@ java.io.IOException: Failed to delete '/tmp/tempdir_...'
 
 ### 用法
 
+普通 Windows / Linux / macOS **不需要**这个文件，直接 `./gradlew assembleDebug` 即可。
+
+只有在 seccomp 受限环境（如 Termux / Alpine）中构建时才需要：
+
 ```sh
-# 1. 编译出垫片（产物固定放 /workspace/libremovefix.so）
+# 1. 编译垫片
 ./build-removefix.sh
 
-# 2. 用 build.sh 构建，它会自动 LD_PRELOAD
-cd .. && ./build.sh assembleDebug --offline
+# 2. 注入后构建
+LD_PRELOAD=./libremovefix.so ./gradlew assembleDebug
 ```
 
-**在普通的 Windows / Linux / macOS 上编译不需要这个文件，加不加都不影响。**
 它不会被打进 APK，也不影响 App 在手机上的运行。
 
 ## smoke.js
