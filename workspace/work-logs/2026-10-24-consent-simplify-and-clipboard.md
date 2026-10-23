@@ -99,12 +99,17 @@ node tools/smoke.js                # 全部通过
 （`ss` 可见 SYN-SENT 到远端 443）。`build.sh` 改为无条件优先 `/workspace/jdk17`；
 本项目依赖已缓存，构建命令固定加 `--offline`，避免在受限网络里重复解析仓库。
 
-## 5. 产物
+## 5. 产物与发布
 
 - `apk/ElysiaFloat-v0.7.2-debug.apk` + `apk/ElysiaFloat-v0.7.2-SHA256SUMS`
 - `release/0.7.2/`：APK、`ElysiaFloat-v0.7.2-source.zip`、`SHA256SUMS`、`README.md`
 - `release/latest.json` 指向 v0.7.2
 - `MANIFEST.txt` 重新生成
+- 提交 `720a7aa` 已推送到 `xysy92ds/ElysiaFloat-v0.7`；
+- GitHub Release `v0.7.2`（ID 422115525）已创建并上传 APK 与 source.zip；
+  通过 API 回下载 APK 校验，SHA-256 与本地一致。
+  URL：https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.2
+- 仓库为私有，匿名 asset URL 返回 404（预期），内测期直接用 Release 页下载。
 
 ## 6. 待真机验证
 

@@ -1,5 +1,5 @@
 ElysiaFloat v0.7.2 源码快照
-生成时间: 2026-10-23T17:15:24Z
+生成时间: 2026-10-23T17:17:09Z
 
 == 接手先读 ==
 AGENT-START-HERE.md
@@ -154,9 +154,9 @@ dbe629eb29369abb     1720 release/latest.json
 ceee4be9821a1902     3668 userscript/README.md
 a03d8421cbe88564    73005 userscript/elysia-web-assistant-v0.3.user.js
 c8af81a5e7cc63d0    69450 userscript/elysia-web-assistant-v4.2.user.js
-8daa80077fa66787     6989 workspace/HANDOVER.md
+17a1b5c2fd8eb873     6955 workspace/HANDOVER.md
 4ead072d14073650     2980 workspace/README.md
-413fa6c511d3f1d0     3958 workspace/STATUS.md
+45606bcdd5c97e2e     4008 workspace/STATUS.md
 c5665a909cc90b06      821 workspace/decisions/DEC-001-agent-boundaries.md
 737b6fbd885ed894     1036 workspace/decisions/DEC-002-memory-and-file-boundaries.md
 c8a6468a1659f0da     2298 workspace/discussions/2026-10-06-agent-files-and-observation.md
@@ -214,4 +214,4 @@ e13c5e1f76f58792     4834 workspace/work-logs/2026-10-17-longpress-and-g7-1.md
 44ce269a526c9483     6636 workspace/work-logs/2026-10-17-send-button-unify-and-harden.md
 0b7b8ca4e3992995     4903 workspace/work-logs/2026-10-17-settings-chat-model-fixes.md
 74fae5d342fc5912     3693 workspace/work-logs/2026-10-17-task-continue.md
-708005567950bfc9     4884 workspace/work-logs/2026-10-24-consent-simplify-and-clipboard.md
+02fd98fb1a371c6e     5278 workspace/work-logs/2026-10-24-consent-simplify-and-clipboard.md

@@ -1,14 +1,14 @@
 # 交接说明（Handover）
 
 更新时间：2026-10-24
-当前阶段：0.7.2 内测包已构建、自动验证通过、已归档；待提交/推送/上传 Release；真机验证待做
+当前阶段：0.7.2 内测包已构建、自动验证通过、已推送并上传 Release；真机验证待做
 最新测试包：`apk/ElysiaFloat-v0.7.2-debug.apk`（versionCode 17 / versionName 0.7.2）
 SHA-256：`b74756e021a9e3066b7e2eda18e0c0d19b13a8435bac2ac239083dd08aca848d`
 
 ## 1. 一句话现状
 
 ElysiaFloat 是一个 Android 悬浮窗 AI 助手（聊天 + 手机 Agent + 文件工作区 + 插件平台）。
-0.7.2 已构建并归档到私有仓库工作区，发布链路按计划要求同步版本号、Release 资产与校验值；
+0.7.2 已提交并推送到私有仓库 `xysy92ds/ElysiaFloat-v0.7`，Release 资产与源码快照同步；
 前端已拆分为 `android/app/src/main/assets/src/`，
 构建时由 `tools/build-html.js` 合并生成单文件 `index.html`。
 
