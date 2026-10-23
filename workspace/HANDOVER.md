@@ -3,7 +3,7 @@
 更新时间：2026-10-24
 当前阶段：0.7.2 内测包已构建、自动验证通过、已推送并上传 Release；真机验证待做
 最新测试包：`apk/ElysiaFloat-v0.7.2-debug.apk`（versionCode 17 / versionName 0.7.2）
-SHA-256：`b74756e021a9e3066b7e2eda18e0c0d19b13a8435bac2ac239083dd08aca848d`
+SHA-256：`3acd847c99e886f5dc98684ec8cecc93f0e41aa3f4ee7e57cda8f74ba2126935`
 
 ## 1. 一句话现状
 

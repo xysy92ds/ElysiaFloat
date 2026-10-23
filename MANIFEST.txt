@@ -1,5 +1,5 @@
 ElysiaFloat v0.7.2 源码快照
-生成时间: 2026-10-23T17:17:09Z
+生成时间: 2026-10-23T17:19:27Z
 
 == 接手先读 ==
 AGENT-START-HERE.md
@@ -10,7 +10,7 @@ workspace/issues/ISSUE-REGISTER.md
 == 版本 ==
 versionCode 17 / versionName 0.7.2（Debug 测试包）
 当前安装包: apk/ElysiaFloat-v0.7.2-debug.apk
-SHA-256: b74756e021a9e3066b7e2eda18e0c0d19b13a8435bac2ac239083dd08aca848d
+SHA-256: 3acd847c99e886f5dc98684ec8cecc93f0e41aa3f4ee7e57cda8f74ba2126935
 GitHub Release: https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.2
 
 == 快速验证（只需 node） ==
@@ -34,7 +34,7 @@ b023ee27a7c0671e    10199 PLUGINS.md
 3c865cfd4acb2013     5352 android/app/src/main/AndroidManifest.xml
 10b86be14a28a31b    98100 android/app/src/main/assets/avatar.jpg
 495cd7a57f9847bb   204596 android/app/src/main/assets/cover.jpg
-892df3b7623c3607   540730 android/app/src/main/assets/index.html
+f68aecccbef7b714   541288 android/app/src/main/assets/index.html
 c45a0ab47884b350       65 android/app/src/main/assets/src/.migration-baseline.sha256
 5990cfdd60e69c56     3543 android/app/src/main/assets/src/manifest.json
 c4daff296edaeacc    13596 android/app/src/main/assets/src/scripts/00-compat.js
@@ -56,7 +56,7 @@ c876635b933ba9c2    94763 android/app/src/main/assets/src/scripts/10-music.js
 34076560eec64727    17820 android/app/src/main/assets/src/scripts/15-views.js
 d473ff8391859055    12455 android/app/src/main/assets/src/scripts/16-permission-boot.js
 1836a8043da1c2ce    46995 android/app/src/main/assets/src/styles/main.css
-def2f65da8b86acb    17394 android/app/src/main/assets/src/template.html
+59d18ce1fdc9b17c    17952 android/app/src/main/assets/src/template.html
 46d9b30bf08a32f7     3997 android/app/src/main/java/com/elly/float/AgentPolicy.kt
 b2c207316e12e97b     1852 android/app/src/main/java/com/elly/float/AgentRuntime.kt
 ddbd87e13556c8b8     1964 android/app/src/main/java/com/elly/float/ApkProvider.kt
@@ -117,7 +117,7 @@ b6d86f7b785f8c88     3383 android/tools/remove_fix.c
 81bba572f468764d       95 apk/ElysiaFloat-v0.6.5-SHA256SUMS
 8ca05ddb2eaa9fbc       99 apk/ElysiaFloat-v0.7.0-SHA256SUMS
 951e1fafb31c6a10       99 apk/ElysiaFloat-v0.7.1-SHA256SUMS
-19e8933bbb087a23       95 apk/ElysiaFloat-v0.7.2-SHA256SUMS
+1f736f674dbdf08f       95 apk/ElysiaFloat-v0.7.2-SHA256SUMS
 4fc1ba731cb7a489     3825 apk/README.md
 b6c66e6755312b31     2600 docs/README.md
 7bb3191210032955     8059 docs/development/plugin-system.md
@@ -150,13 +150,13 @@ c2e730340f33d5c7     2101 release/0.7.0/README.md
 1057ca1796eab353      191 release/0.7.0/SHA256SUMS
 f6f33c070ad69f41     1596 release/0.7.1/README.md
 c754cf8462ba6b0f      191 release/0.7.1/SHA256SUMS
-dbe629eb29369abb     1720 release/latest.json
+006c680d8ce62fa5     1720 release/latest.json
 ceee4be9821a1902     3668 userscript/README.md
 a03d8421cbe88564    73005 userscript/elysia-web-assistant-v0.3.user.js
 c8af81a5e7cc63d0    69450 userscript/elysia-web-assistant-v4.2.user.js
-17a1b5c2fd8eb873     6955 workspace/HANDOVER.md
+e2a3e6e8745206bf     6955 workspace/HANDOVER.md
 4ead072d14073650     2980 workspace/README.md
-45606bcdd5c97e2e     4008 workspace/STATUS.md
+a5bdc102c580fa33     4008 workspace/STATUS.md
 c5665a909cc90b06      821 workspace/decisions/DEC-001-agent-boundaries.md
 737b6fbd885ed894     1036 workspace/decisions/DEC-002-memory-and-file-boundaries.md
 c8a6468a1659f0da     2298 workspace/discussions/2026-10-06-agent-files-and-observation.md
@@ -174,7 +174,7 @@ d3110f1b5d625a9b     1310 workspace/discussions/2026-10-16-project-governance-an
 4343e615bee922c9      840 workspace/issues/README.md
 42a4ace5d50a724d     4987 workspace/plans/G3-request-manager-draft.md
 deb74691f28311d3    11982 workspace/plans/G5-devicetask-draft.md
-60120d1b5f60426e    24819 workspace/plans/MASTER-EXECUTION-PLAN.md
+e052639ad145fccf    24819 workspace/plans/MASTER-EXECUTION-PLAN.md
 3d69b31b766cb279     5624 workspace/plans/agent-task-board.md
 b84af70bea75c51c    13544 workspace/plans/borrow-and-next-steps.md
 b956fbb7741bd8ad    55068 workspace/plans/current.md
@@ -214,4 +214,4 @@ e13c5e1f76f58792     4834 workspace/work-logs/2026-10-17-longpress-and-g7-1.md
 44ce269a526c9483     6636 workspace/work-logs/2026-10-17-send-button-unify-and-harden.md
 0b7b8ca4e3992995     4903 workspace/work-logs/2026-10-17-settings-chat-model-fixes.md
 74fae5d342fc5912     3693 workspace/work-logs/2026-10-17-task-continue.md
-02fd98fb1a371c6e     5278 workspace/work-logs/2026-10-24-consent-simplify-and-clipboard.md
+c5aa990307f1935c     5489 workspace/work-logs/2026-10-24-consent-simplify-and-clipboard.md

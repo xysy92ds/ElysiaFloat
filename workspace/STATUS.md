@@ -16,7 +16,7 @@
 - Git：`main` 已与 `origin/main` 同步（上一提交 `720a7aa`）；0.7.2 改动与 Release v0.7.2 已推送/上传。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
 - 最新测试包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`）。
-- 最新测试包 SHA-256：`b74756e021a9e3066b7e2eda18e0c0d19b13a8435bac2ac239083dd08aca848d`。
+- 最新测试包 SHA-256：`3acd847c99e886f5dc98684ec8cecc93f0e41aa3f4ee7e57cda8f74ba2126935`。
 - 当前质量门：HTML 检查和 smoke 全通过；0.7.2 待真机覆盖确认。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1。
 - 发布提醒：GitHub Release `v0.7.0` 上是 versionCode 14 的旧包（仍含发送按钮缺陷）；应用内更新检查指向公开仓库的 v0.6.5 索引，私有迭代期请直接到 Release 页下载。

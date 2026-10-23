@@ -3,7 +3,7 @@
 日期：2026-10-24
 版本：versionCode 17 / versionName 0.7.2（Debug）
 APK：`apk/ElysiaFloat-v0.7.2-debug.apk`
-SHA-256：`b74756e021a9e3066b7e2eda18e0c0d19b13a8435bac2ac239083dd08aca848d`
+SHA-256：`3acd847c99e886f5dc98684ec8cecc93f0e41aa3f4ee7e57cda8f74ba2126935`
 签名：`CN=ElysiaFloat`，证书 SHA-256 `7851cb49…`（与 0.7.0/0.7.1 相同，可覆盖安装）
 
 ## 1. 用户诉求
@@ -106,8 +106,10 @@ node tools/smoke.js                # 全部通过
 - `release/latest.json` 指向 v0.7.2
 - `MANIFEST.txt` 重新生成
 - 提交 `720a7aa` 已推送到 `xysy92ds/ElysiaFloat-v0.7`；
-- GitHub Release `v0.7.2`（ID 422115525）已创建并上传 APK 与 source.zip；
-  通过 API 回下载 APK 校验，SHA-256 与本地一致。
+- 公告同步改为「应用公告 · 0.7.2」（本版更新内容 + 权限说明与新的授权策略一致），
+  重新生成 `index.html` 与 APK，`--check` / `smoke` 仍全绿；
+- GitHub Release `v0.7.2`（ID 422115525）已创建并上传 APK 与 source.zip，
+  通过 API 回下载校验 SHA-256 与本地一致；公告更新后重传资产；
   URL：https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.2
 - 仓库为私有，匿名 asset URL 返回 404（预期），内测期直接用 Release 页下载。
 
