@@ -1,5 +1,5 @@
 ElysiaFloat v0.7.2 源码快照
-生成时间: 2026-10-23T17:19:27Z
+生成时间: 2026-10-23T17:20:23Z
 
 == 接手先读 ==
 AGENT-START-HERE.md
@@ -156,7 +156,7 @@ a03d8421cbe88564    73005 userscript/elysia-web-assistant-v0.3.user.js
 c8af81a5e7cc63d0    69450 userscript/elysia-web-assistant-v4.2.user.js
 e2a3e6e8745206bf     6955 workspace/HANDOVER.md
 4ead072d14073650     2980 workspace/README.md
-a5bdc102c580fa33     4008 workspace/STATUS.md
+fb8f599038051dd0     4017 workspace/STATUS.md
 c5665a909cc90b06      821 workspace/decisions/DEC-001-agent-boundaries.md
 737b6fbd885ed894     1036 workspace/decisions/DEC-002-memory-and-file-boundaries.md
 c8a6468a1659f0da     2298 workspace/discussions/2026-10-06-agent-files-and-observation.md
