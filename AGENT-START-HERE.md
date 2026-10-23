@@ -12,13 +12,13 @@
 
 | 项 | 值 |
 |---|---|
-| 当前阶段 | **G5 / G7 已完成**（设备任务可靠性 + 文件能力），G3 统一请求层已落地 |
-| 下一阶段 | **G6 真正的 FullscreenActivity**（当前仍是 Overlay 最大化） |
-| 包名 / 版本 | `com.elly.assistant` / versionCode 13、versionName 0.6.5（Debug 测试包） |
+| 当前阶段 | **0.7.2 内测**（G2-005 安全确认精简 + I-048 复制粘贴修复）；G3/G5/G7 已完成 |
+| 下一阶段 | **G4 尾 / G5 真机收口**；G6 全屏已删除，不再排期 |
+| 包名 / 版本 | `com.elly.assistant` / versionCode 17、versionName 0.7.2（Debug 测试包） |
 | 前端形态 | 模块化源码 → 构建时拼成单文件 `index.html`（WebView 加载） |
 | 原生形态 | 纯 Android Framework + Kotlin，**零第三方依赖** |
-| 代码状态 | 本地持续开发，**未提交、未推送**；工作区是脏的，这是预期状态 |
-| 质量门 | `build-html --check` + `smoke` + `assembleDebug` 三项全绿 |
+| 代码状态 | 私有仓库 `xysy92ds/ElysiaFloat-v0.7` 持续迭代；每个版本必须同步版本号、Release 资产与校验值 |
+| 质量门 | `build-html --check` + `smoke` + `assembleDebug --offline` 三项全绿 |
 
 ---
 

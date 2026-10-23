@@ -1136,14 +1136,14 @@ function buildTools(runTask) {
 async function execTool(name, args, runTask) {
   const task = runTask || currentTask();
   if (!toolLive(name)) return { success: false, error: '该工具当前未获授权或已关闭。' };
-  if (!taskToolsAllowed(task.type, name)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
+  if (!taskToolsAllowed(task.type, name, task.id)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
   args = args && typeof args === 'object' ? Object.assign({}, args) : {};
   const scoped = ['workspace_list','workspace_read','workspace_write','workspace_mkdir'];
   if (scoped.indexOf(name) >= 0 && task.type === 'workspace') args.path = taskWorkspacePath(task, args.path || '');
   const cp = plugFind(name);
   if (cp) {
     const pt = cp.plugin.pluginType || 'chat';
-    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick') || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
+    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick' && !(task.type === 'workspace' && consentGranted(task.id, 'device'))) || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
     if (cp.plugin.enabled === false) return { success: false, error: '该插件已停用。' };
     if (!toolOn(name)) return { success: false, error: '该工具已关闭。' };
     return await plugExec(cp.plugin, cp.tool, args || {}, task);
@@ -1175,7 +1175,9 @@ async function execTool(name, args, runTask) {
     } catch (e) { return { success: false, error: '应用查询失败：' + errMsg(e) }; }
   }
   if (name === 'screenshot') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    // G2-005：任务内已获准操作手机后，截图不再每次重复询问
+    const shotOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !shotOk) {
       const ok = await uiConfirm('Agent 想查看当前手机画面。截图可能包含聊天、验证码或其它隐私内容，是否继续？', '允许截图', '查看手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮截图' };
     }
@@ -1188,7 +1190,8 @@ async function execTool(name, args, runTask) {
     return { success: true, note: '已截取当前屏幕画面，画面会在下一条消息里给你看。' };
   }
   if (name === 'watch_screen') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    const watchOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !watchOk) {
       const ok = await uiConfirm('Agent 想在限定时间内观察当前手机画面。最多 10 秒、每秒 2 帧，是否继续？', '允许观察', '观察手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮观察' };
     }
@@ -1400,7 +1403,7 @@ async function execTool(name, args, runTask) {
     const path = String(args.path || '').trim();
     const content = String(args.content == null ? '' : args.content);
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符\n是否允许？', '允许本次写入', '外部文件修改确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符', '允许写入', '外部文件授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次外部文件写入' };
     }
     try { return JSON.parse(Perm.agentExternalWrite ? (Perm.agentExternalWrite(path, content, overwrite) || '{}') : '{}'); }
@@ -1410,7 +1413,7 @@ async function execTool(name, args, runTask) {
     const source = String(args.source || '').trim();
     const destination = String(args.destination || '').trim();
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。') + '\n是否允许本次复制？', '允许本次复制', '文件复制确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。'), '允许复制', '文件复制授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次复制' };
     }
     try { return JSON.parse(Perm.agentExternalCopy ? (Perm.agentExternalCopy(source, destination, overwrite) || '{}') : '{}'); }
@@ -1418,7 +1421,7 @@ async function execTool(name, args, runTask) {
   }
   if (name === 'external_file_mkdir') {
     const path = String(args.path || '').trim();
-    if (!(await uiConfirm('AI 请求在公共存储创建目录：\n\n' + path + '\n\n是否允许？', '允许创建目录', '外部目录确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求在公共存储创建目录：\n\n' + path, '允许创建', '外部目录授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许创建外部目录' };
     }
     try { return JSON.parse(Perm.agentExternalMkdir ? (Perm.agentExternalMkdir(path) || '{}') : '{}'); }

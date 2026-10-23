@@ -225,7 +225,7 @@ function copyToClipboard(text) {
 function pasteIntoField(el) {
   if (!el) return false;
   const text = readClipboard();
-  if (!text) { toast('剪贴板里没有可粘贴的文字'); return false; }
+  if (!text) { toast('读不到剪贴板：先点一下输入框，或用键盘上的“粘贴”键'); return false; }
   try {
     if (typeof el.selectionStart === 'number') {
       const s0 = el.selectionStart, e0 = el.selectionEnd;

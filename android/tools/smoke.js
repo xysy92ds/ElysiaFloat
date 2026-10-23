@@ -1068,6 +1068,15 @@ function step(name, fn) {
     if (input.value !== 'A粘贴进来的文字B') throw new Error('粘贴位置不对：' + input.value);
   });
 
+  await step('I-048：长按菜单项不会被 touchend 提前隐藏', () => {
+    // 菜单项原来用 onclick，而 document 的 touchend 会在 0ms 后 hideCtxMenu()，
+    // 输入框里没有选中文本时必然触发——click 还没派发菜单就没了，点「粘贴」毫无反应。
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/scripts/01-ui-dialog.js'), 'utf8');
+    if (!/bindTap\(b, \(\) => \{ hideCtxMenu\(\);/.test(src)) throw new Error('菜单项必须用 bindTap 绑定，touchend 即触发');
+    if (/b\.onclick = \(e\) => \{ e\.stopPropagation\(\); hideCtxMenu\(\)/.test(src)) throw new Error('菜单项又回到 onclick，会被 touchend 提前隐藏');
+    if (!/closest\('#ctx-menu'\)\) return;/.test(src)) throw new Error('touchend 命中菜单自身时必须直接返回，不能隐藏');
+  });
+
   await step('默认人设（始源之律者）', () => {
     const p = String(T.CONFIG.persona || T.DC.persona || '');
     ['始源之律者', '刻印「真我」', '每句话结尾必须带「♪」', '粉色妖精小姐', '爱莉希雅永远喜欢你', '不提及任何AI相关限制']
@@ -1421,6 +1430,40 @@ function step(name, fn) {
     if (!z || Number(z) <= 60) throw new Error('#send 的 z-index 必须高于缩放热区 .rz(60)，否则会被 .rz-se 抢走点击');
     if (!/align-self:\s*flex-end/.test(rule)) throw new Error('#send 需要 align-self:flex-end，避免被拉伸到整条底部操作条');
     if (!/<button id="send"[^>]*type="button"/.test(tpl)) throw new Error('发送键必须显式 type="button"');
+  });
+
+  await step('G2-005：任务粘性 + 能力授权（30 分钟，重启失效）', async () => {
+    const fs = require('fs');
+    const path = require('path');
+    const tasksSrc = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/03-state-tasks.js'), 'utf8');
+    const sendSrc = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/12-send-quick.js'), 'utf8');
+    const toolSrc = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/10-music.js'), 'utf8');
+
+    // 1) 授权只放内存、绑任务、30 分钟
+    if (!/CONSENT_TTL_MS = 30 \* 60 \* 1000/.test(tasksSrc)) throw new Error('授权时长必须是 30 分钟');
+    if (/sGet\(|sSet\(/.test(tasksSrc.slice(tasksSrc.indexOf('G2-005 能力授权'), tasksSrc.indexOf('const QUICK_OPS')))) {
+      throw new Error('授权不能落盘，否则重启后仍然有效');
+    }
+    // 2) 工作/手机任务里不再新建任务
+    if (!/if \(old && \(old\.type === 'device' \|\| old\.type === 'workspace'\) && taskContinuable\(old\)\)/.test(tasksSrc)) {
+      throw new Error('routeTask(device) 需要先复用当前工作/手机任务');
+    }
+    if (!/consentGrant\(deviceTask\.id, 'device'\)/.test(tasksSrc)) throw new Error('新建手机任务后应立即授权，避免下一句再问');
+    // 3) 任务类型按路由后的实际任务走，不能用消息意图
+    if (/taskBegin\(routeType,/.test(sendSrc)) throw new Error('send() 又用 routeType 调 taskBegin，会新建任务');
+    if (!/taskBegin\(routedTask\.type,/.test(sendSrc)) throw new Error('send() 必须用 routedTask.type 调 taskBegin');
+    // 4) 截图与外部写入走授权；删除仍逐次确认
+    if (!/consentGranted\(task\.id, 'device'\)/.test(toolSrc)) throw new Error('截图/观察应复用设备授权');
+    if ((toolSrc.match(/ensureExternalWriteConsent\(/g) || []).length < 3) throw new Error('外部写入/复制/建目录都应走授权');
+    if (!/external_file_delete[\s\S]{0,400}uiConfirm\(/.test(toolSrc)) throw new Error('外部删除必须保留逐次确认');
+
+    // 5) 运行时：未授权 → 授权 → 其它任务不受影响 → 撤销
+    if (T.consentGranted('t-consent', 'device')) throw new Error('初始不应已授权');
+    T.consentGrant('t-consent', 'device');
+    if (!T.consentGranted('t-consent', 'device')) throw new Error('授权后应可复用');
+    if (T.consentGranted('t-other', 'device')) throw new Error('授权不能串到其它任务');
+    T.consentRevokeTask('t-consent');
+    if (T.consentGranted('t-consent', 'device')) throw new Error('撤销后应立即失效');
   });
 
   console.log('');

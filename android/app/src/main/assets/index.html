@@ -1707,7 +1707,9 @@ function showCtxMenu(x, y, items) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = it.label;
-    b.onclick = (e) => { e.stopPropagation(); hideCtxMenu(); try { it.run(); } catch (err) { toast('操作失败'); } };
+    // 用 bindTap：touchend 就触发，早于下面 touchend 里的“0ms 后隐藏菜单”。
+    // 原来用 onclick 时，菜单会在 click 派发前被隐藏，点「粘贴」永远没反应。
+    bindTap(b, () => { hideCtxMenu(); try { it.run(); } catch (err) { toast('操作失败'); } });
     m.appendChild(b);
   });
   const w = window.innerWidth || 360, h = window.innerHeight || 640;
@@ -1768,6 +1770,8 @@ function bindCtxMenu() {
   document.addEventListener('touchmove', cancel, { passive: true });
   document.addEventListener('touchend', (e) => {
     cancel();
+    // 点在菜单自己身上时不要隐藏：隐藏会发生在菜单项的 touchend 之后、click 之前。
+    if (e.target && e.target.closest && e.target.closest('#ctx-menu')) return;
     setTimeout(() => { if (!ctxSelectionText()) hideCtxMenu(); }, 0);
   }, { passive: true });
   document.addEventListener('touchcancel', () => { cancel(); hideCtxMenu(); }, { passive: true });
@@ -2649,6 +2653,53 @@ function taskLoadContext(t) {
   sSet(taskHistoryKey(t.id), history);
 }
 function saveTasks() { sSet(TASK_KEY, TASKS.slice(0, 50)); sSet(TASK_CURRENT_KEY, CURRENT_TASK_ID); }
+
+/* ==========================================================
+ *  G2-005 能力授权
+ *  同一任务内 30 分钟复用；只放内存，进程重启即失效。
+ *  简化的是“问人次数”：L3、无障碍、白名单、路径校验仍由原生门禁执行，
+ *  密码框、发送消息、支付、卸载、外部删除依旧逐次确认。
+ * ========================================================== */
+const CONSENT_TTL_MS = 30 * 60 * 1000;
+const CONSENTS = Object.create(null);
+function consentKey(taskId, cap) { return String(taskId || '') + ':' + String(cap || ''); }
+function consentGranted(taskId, cap) {
+  if (!taskId || !cap) return false;
+  const k = consentKey(taskId, cap), exp = CONSENTS[k] || 0;
+  if (exp > Date.now()) return true;
+  if (k in CONSENTS) delete CONSENTS[k];
+  return false;
+}
+function consentGrant(taskId, cap) {
+  if (!taskId || !cap) return false;
+  CONSENTS[consentKey(taskId, cap)] = Date.now() + CONSENT_TTL_MS;
+  try { taskEvent(taskId, 'consent_granted', { capability: String(cap), ttlSec: CONSENT_TTL_MS / 1000 }); } catch (e) {}
+  return true;
+}
+function consentRevokeTask(taskId) {
+  const prefix = consentKey(taskId, '');
+  Object.keys(CONSENTS).forEach(k => { if (k.indexOf(prefix) === 0) delete CONSENTS[k]; });
+  try { taskEvent(taskId, 'consent_revoked', {}); } catch (e) {}
+}
+/** 设备类动作：已授权直接过；未授权只问一次，拒绝返回 false */
+async function ensureDeviceConsent(task) {
+  if (!task) return false;
+  if (consentGranted(task.id, 'device')) return true;
+  const ok = await uiConfirm('这一步需要操作手机：读取屏幕、点击或输入。\n\n本次任务 30 分钟内不再重复询问；密码框、发送消息、支付和卸载仍会逐次确认。', '允许操作手机', '手机控制授权');
+  if (!ok) return false;
+  consentGrant(task.id, 'device');
+  return true;
+}
+/** 公共存储写入/复制/建目录：同一任务授权一次；删除仍逐次确认 */
+async function ensureExternalWriteConsent(task, detail, okText, title) {
+  if (!task) return false;
+  if (consentGranted(task.id, 'external_write')) return true;
+  const ok = await uiConfirm(detail + '\n\n本次任务 30 分钟内不再逐次询问；删除仍需单次确认。', okText, title);
+  if (!ok) return false;
+  consentGrant(task.id, 'external_write');
+  return true;
+}
+
 const QUICK_OPS = new Map();
 function quickOperationBegin(title, goal, timeoutMs) {
   const t = taskNormalize({ id: 'quick-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6), type: 'quick', title: title || '快捷操作', goal: goal || '', state: 'active', context: { messages: [], taskScoped: true }, deadline: Date.now() + (timeoutMs || 30000), progress: '处理中' });
@@ -2786,6 +2837,7 @@ async function deleteTask(id) {
   if (!(await uiConfirm(t.type === 'chat' ? '删除这个聊天记录？\n\n里面的消息会一起删除。' : '删除任务记录“' + t.title + '”？\n\n任务上下文会删除；工作区文件默认保留。', t.type === 'chat' ? '删除聊天' : '删除任务', '任务删除'))) return;
   const removeFiles = t.type === 'workspace' && await uiConfirm('是否同时删除该任务工作区文件？此操作不可恢复。', '删除文件', '工作区删除');
   if (removeFiles && HAS_PERM && Perm.deleteTaskWorkspace) { try { Perm.deleteTaskWorkspace(t.id); } catch (e) {} }
+  consentRevokeTask(t.id);
   clearTaskHistory(t.id);
   // 原地删除，避免把 TASKS 换成新数组导致外部引用陈旧
   for (let i = TASKS.length - 1; i >= 0; i--) if (TASKS[i].id === id) TASKS.splice(i, 1);
@@ -2795,7 +2847,7 @@ async function deleteTask(id) {
 function taskModeText(t) { return t.type === 'chat' ? '聊天' : TASK_TYPES[t.type] || '任务'; }
 function taskStateText(t) { return TASK_STATES[t.state] || '运行中'; }
 function updateTaskMode() { const t = currentTask(); const mode = $('#mode-label'); if (mode) mode.textContent = taskModeText(t); const name = $('#name'); if (name) name.textContent = CONFIG.assistantName || '爱莉希雅'; }
-function taskToolsAllowed(type, name) {
+function taskToolsAllowed(type, name, taskId) {
   const device = ['read_screen','screenshot','watch_screen','find_app','tap_screen','click_text','swipe_screen','input_text','press_key','launch_app','get_current_page'];
   const files = ['workspace_status','workspace_create','workspace_list','workspace_read','workspace_write','workspace_mkdir','external_file_list','external_file_read','external_file_write','external_file_copy','external_file_mkdir','external_file_delete'];
   const runtime = ['run_termux_job','termux_job_status','termux_job_output','termux_job_cancel','termux_jobs_list','root_operation'];
@@ -2805,7 +2857,10 @@ function taskToolsAllowed(type, name) {
   if (device.indexOf(name) >= 0) {
     // 兼容现有聊天层的只读能力探测：真正的点击、输入和启动仍只能在 device/quick 任务中执行。
     if (type === 'chat') return ['find_app', 'watch_screen'].indexOf(name) >= 0;
-    return type === 'device' || type === 'quick';
+    if (type === 'device' || type === 'quick') return true;
+    // G2-005：工作任务里获准操作手机后，设备工具留在同一任务内执行，不再切任务。
+    if (type === 'workspace') return consentGranted(taskId, 'device');
+    return false;
   }
   if (files.indexOf(name) >= 0) return type === 'workspace';
   return true;
@@ -2830,11 +2885,18 @@ async function routeTask(type, goal) {
   if (type === 'chat') { taskSetCurrent(TASKS.find(t => t.type === 'chat').id); return currentTask(); }
   if (type === 'quick') return quickOperationBegin(String(goal || '快捷操作').slice(0, 30), goal || '', 30000);
   if (type === 'device') {
-    if (!(await uiConfirm('这需要进入手机控制模式。Agent 将读取屏幕，并可能操作白名单应用；高风险动作仍会再次确认。', '进入手机控制', '任务模式确认'))) return null;
-    return taskAdd('device', String(goal || '手机控制任务').slice(0, 30), goal || '');
+    // G2-005：已经在工作/手机任务里就直接复用，不再新建任务把原工作区留在后台。
+    if (old && (old.type === 'device' || old.type === 'workspace') && taskContinuable(old)) {
+      if (!(await ensureDeviceConsent(old))) return null;
+      return old;
+    }
+    if (!(await uiConfirm('这需要进入手机控制模式。Agent 将读取屏幕，并可能操作白名单应用；高风险动作仍会再次确认。\n\n进入后本次任务 30 分钟内不再重复询问。', '进入手机控制', '任务模式确认'))) return null;
+    const deviceTask = taskAdd('device', String(goal || '手机控制任务').slice(0, 30), goal || '');
+    consentGrant(deviceTask.id, 'device');
+    return deviceTask;
   }
   if (type === 'workspace') {
-    if (!(await uiConfirm('这需要创建或切换到独立工作任务。文件修改前仍会逐次确认。', '进入工作任务', '任务模式确认'))) return null;
+    if (!(await uiConfirm('这需要创建或切换到独立工作任务。工作区内写入免逐次确认，外部文件修改会先征求同意。', '进入工作任务', '任务模式确认'))) return null;
     const task = taskAdd('workspace', String(goal || '工作任务').slice(0, 30), goal || '');
     const ready = await ensureTaskWorkspace(task);
     if (!ready.ok) { taskFinish(task.id, 'failed', ready.error || '工作区创建失败'); toast(ready.error || '工作区创建失败'); return null; }
@@ -4767,7 +4829,7 @@ function copyToClipboard(text) {
 function pasteIntoField(el) {
   if (!el) return false;
   const text = readClipboard();
-  if (!text) { toast('剪贴板里没有可粘贴的文字'); return false; }
+  if (!text) { toast('读不到剪贴板：先点一下输入框，或用键盘上的“粘贴”键'); return false; }
   try {
     if (typeof el.selectionStart === 'number') {
       const s0 = el.selectionStart, e0 = el.selectionEnd;
@@ -6763,14 +6825,14 @@ function buildTools(runTask) {
 async function execTool(name, args, runTask) {
   const task = runTask || currentTask();
   if (!toolLive(name)) return { success: false, error: '该工具当前未获授权或已关闭。' };
-  if (!taskToolsAllowed(task.type, name)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
+  if (!taskToolsAllowed(task.type, name, task.id)) return { success: false, error: '当前任务类型不能调用该工具，请切换到对应任务模式。' };
   args = args && typeof args === 'object' ? Object.assign({}, args) : {};
   const scoped = ['workspace_list','workspace_read','workspace_write','workspace_mkdir'];
   if (scoped.indexOf(name) >= 0 && task.type === 'workspace') args.path = taskWorkspacePath(task, args.path || '');
   const cp = plugFind(name);
   if (cp) {
     const pt = cp.plugin.pluginType || 'chat';
-    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick') || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
+    if ((pt === 'workspace' && task.type !== 'workspace') || (pt === 'device' && task.type !== 'device' && task.type !== 'quick' && !(task.type === 'workspace' && consentGranted(task.id, 'device'))) || (pt === 'quick' && task.type === 'chat')) return { success: false, error: '当前任务类型不能调用该类型插件。' };
     if (cp.plugin.enabled === false) return { success: false, error: '该插件已停用。' };
     if (!toolOn(name)) return { success: false, error: '该工具已关闭。' };
     return await plugExec(cp.plugin, cp.tool, args || {}, task);
@@ -6802,7 +6864,9 @@ async function execTool(name, args, runTask) {
     } catch (e) { return { success: false, error: '应用查询失败：' + errMsg(e) }; }
   }
   if (name === 'screenshot') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    // G2-005：任务内已获准操作手机后，截图不再每次重复询问
+    const shotOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !shotOk) {
       const ok = await uiConfirm('Agent 想查看当前手机画面。截图可能包含聊天、验证码或其它隐私内容，是否继续？', '允许截图', '查看手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮截图' };
     }
@@ -6815,7 +6879,8 @@ async function execTool(name, args, runTask) {
     return { success: true, note: '已截取当前屏幕画面，画面会在下一条消息里给你看。' };
   }
   if (name === 'watch_screen') {
-    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && CONFIG.agentAutoShot !== true) {
+    const watchOk = CONFIG.agentAutoShot === true || consentGranted(task.id, 'device');
+    if (CONFIG.agentEnabled === true && CONFIG.agentL2 !== false && !watchOk) {
       const ok = await uiConfirm('Agent 想在限定时间内观察当前手机画面。最多 10 秒、每秒 2 帧，是否继续？', '允许观察', '观察手机画面');
       if (!ok) return { success: false, kind: 'cancelled', error: '用户取消了本轮观察' };
     }
@@ -7027,7 +7092,7 @@ async function execTool(name, args, runTask) {
     const path = String(args.path || '').trim();
     const content = String(args.content == null ? '' : args.content);
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符\n是否允许？', '允许本次写入', '外部文件修改确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求' + (overwrite ? '覆盖' : '创建或写入') + '公共存储文件：\n\n' + path + '\n\n本次写入内容长度：' + content.length + ' 字符', '允许写入', '外部文件授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次外部文件写入' };
     }
     try { return JSON.parse(Perm.agentExternalWrite ? (Perm.agentExternalWrite(path, content, overwrite) || '{}') : '{}'); }
@@ -7037,7 +7102,7 @@ async function execTool(name, args, runTask) {
     const source = String(args.source || '').trim();
     const destination = String(args.destination || '').trim();
     const overwrite = args.overwrite === true;
-    if (!(await uiConfirm('AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。') + '\n是否允许本次复制？', '允许本次复制', '文件复制确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求复制公共存储文件：\n\n源：' + source + '\n目标：' + destination + '\n\n' + (overwrite ? '如果目标存在将覆盖。' : '目标已存在时不会覆盖。'), '允许复制', '文件复制授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许本次复制' };
     }
     try { return JSON.parse(Perm.agentExternalCopy ? (Perm.agentExternalCopy(source, destination, overwrite) || '{}') : '{}'); }
@@ -7045,7 +7110,7 @@ async function execTool(name, args, runTask) {
   }
   if (name === 'external_file_mkdir') {
     const path = String(args.path || '').trim();
-    if (!(await uiConfirm('AI 请求在公共存储创建目录：\n\n' + path + '\n\n是否允许？', '允许创建目录', '外部目录确认'))) {
+    if (!(await ensureExternalWriteConsent(task, 'AI 请求在公共存储创建目录：\n\n' + path, '允许创建', '外部目录授权'))) {
       return { success: false, kind: 'cancelled', error: '用户没有允许创建外部目录' };
     }
     try { return JSON.parse(Perm.agentExternalMkdir ? (Perm.agentExternalMkdir(path) || '{}') : '{}'); }
@@ -7875,16 +7940,19 @@ async function send() {
   let routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
   if (!routedTask) return;
   if (routeType === 'chat') routedTask = taskEnsureChat();
-  if (routeType === 'workspace') {
+  // G2-005：用路由后的实际任务类型，而不是消息意图。
+  // 在已有工作任务里操作手机时，routedTask 仍是那个 workspace，不能再用 'device' 去 taskBegin，
+  // 否则 taskBegin 会按类型再建一个新任务，工作区就被留在后台。
+  if (routedTask.type === 'workspace') {
     const ready = await ensureTaskWorkspace(routedTask);
     if (!ready.ok) { taskFinish(routedTask.id, 'failed', ready.error || '工作区不可用'); toast(ready.error || '工作区不可用'); return; }
   }
-  if (att && routeType === 'workspace') {
+  if (att && routedTask.type === 'workspace') {
     const imported = await importAttachmentToTask(routedTask, att);
     if (!imported.ok) { taskFinish(routedTask.id, 'failed', imported.error || '文件导入失败'); toast(imported.error || '文件导入失败'); return; }
     routedTask.artifacts = routedTask.artifacts || []; if (imported.relative) routedTask.artifacts.push(imported.relative); saveTasks();
   }
-  if (routeType !== 'quick') taskBegin(routeType, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
+  if (routeType !== 'quick') taskBegin(routedTask.type, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
   stopRequested = false;
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;

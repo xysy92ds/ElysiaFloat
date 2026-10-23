@@ -58,7 +58,9 @@ function showCtxMenu(x, y, items) {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = it.label;
-    b.onclick = (e) => { e.stopPropagation(); hideCtxMenu(); try { it.run(); } catch (err) { toast('操作失败'); } };
+    // 用 bindTap：touchend 就触发，早于下面 touchend 里的“0ms 后隐藏菜单”。
+    // 原来用 onclick 时，菜单会在 click 派发前被隐藏，点「粘贴」永远没反应。
+    bindTap(b, () => { hideCtxMenu(); try { it.run(); } catch (err) { toast('操作失败'); } });
     m.appendChild(b);
   });
   const w = window.innerWidth || 360, h = window.innerHeight || 640;
@@ -119,6 +121,8 @@ function bindCtxMenu() {
   document.addEventListener('touchmove', cancel, { passive: true });
   document.addEventListener('touchend', (e) => {
     cancel();
+    // 点在菜单自己身上时不要隐藏：隐藏会发生在菜单项的 touchend 之后、click 之前。
+    if (e.target && e.target.closest && e.target.closest('#ctx-menu')) return;
     setTimeout(() => { if (!ctxSelectionText()) hideCtxMenu(); }, 0);
   }, { passive: true });
   document.addEventListener('touchcancel', () => { cancel(); hideCtxMenu(); }, { passive: true });

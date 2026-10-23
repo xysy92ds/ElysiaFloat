@@ -50,16 +50,19 @@ async function send() {
   let routedTask = await routeTask(routeType, t || (att && att.name) || TASK_TYPES[routeType]);
   if (!routedTask) return;
   if (routeType === 'chat') routedTask = taskEnsureChat();
-  if (routeType === 'workspace') {
+  // G2-005：用路由后的实际任务类型，而不是消息意图。
+  // 在已有工作任务里操作手机时，routedTask 仍是那个 workspace，不能再用 'device' 去 taskBegin，
+  // 否则 taskBegin 会按类型再建一个新任务，工作区就被留在后台。
+  if (routedTask.type === 'workspace') {
     const ready = await ensureTaskWorkspace(routedTask);
     if (!ready.ok) { taskFinish(routedTask.id, 'failed', ready.error || '工作区不可用'); toast(ready.error || '工作区不可用'); return; }
   }
-  if (att && routeType === 'workspace') {
+  if (att && routedTask.type === 'workspace') {
     const imported = await importAttachmentToTask(routedTask, att);
     if (!imported.ok) { taskFinish(routedTask.id, 'failed', imported.error || '文件导入失败'); toast(imported.error || '文件导入失败'); return; }
     routedTask.artifacts = routedTask.artifacts || []; if (imported.relative) routedTask.artifacts.push(imported.relative); saveTasks();
   }
-  if (routeType !== 'quick') taskBegin(routeType, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
+  if (routeType !== 'quick') taskBegin(routedTask.type, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
   stopRequested = false;
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;

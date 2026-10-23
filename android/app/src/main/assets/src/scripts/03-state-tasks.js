@@ -148,6 +148,53 @@ function taskLoadContext(t) {
   sSet(taskHistoryKey(t.id), history);
 }
 function saveTasks() { sSet(TASK_KEY, TASKS.slice(0, 50)); sSet(TASK_CURRENT_KEY, CURRENT_TASK_ID); }
+
+/* ==========================================================
+ *  G2-005 能力授权
+ *  同一任务内 30 分钟复用；只放内存，进程重启即失效。
+ *  简化的是“问人次数”：L3、无障碍、白名单、路径校验仍由原生门禁执行，
+ *  密码框、发送消息、支付、卸载、外部删除依旧逐次确认。
+ * ========================================================== */
+const CONSENT_TTL_MS = 30 * 60 * 1000;
+const CONSENTS = Object.create(null);
+function consentKey(taskId, cap) { return String(taskId || '') + ':' + String(cap || ''); }
+function consentGranted(taskId, cap) {
+  if (!taskId || !cap) return false;
+  const k = consentKey(taskId, cap), exp = CONSENTS[k] || 0;
+  if (exp > Date.now()) return true;
+  if (k in CONSENTS) delete CONSENTS[k];
+  return false;
+}
+function consentGrant(taskId, cap) {
+  if (!taskId || !cap) return false;
+  CONSENTS[consentKey(taskId, cap)] = Date.now() + CONSENT_TTL_MS;
+  try { taskEvent(taskId, 'consent_granted', { capability: String(cap), ttlSec: CONSENT_TTL_MS / 1000 }); } catch (e) {}
+  return true;
+}
+function consentRevokeTask(taskId) {
+  const prefix = consentKey(taskId, '');
+  Object.keys(CONSENTS).forEach(k => { if (k.indexOf(prefix) === 0) delete CONSENTS[k]; });
+  try { taskEvent(taskId, 'consent_revoked', {}); } catch (e) {}
+}
+/** 设备类动作：已授权直接过；未授权只问一次，拒绝返回 false */
+async function ensureDeviceConsent(task) {
+  if (!task) return false;
+  if (consentGranted(task.id, 'device')) return true;
+  const ok = await uiConfirm('这一步需要操作手机：读取屏幕、点击或输入。\n\n本次任务 30 分钟内不再重复询问；密码框、发送消息、支付和卸载仍会逐次确认。', '允许操作手机', '手机控制授权');
+  if (!ok) return false;
+  consentGrant(task.id, 'device');
+  return true;
+}
+/** 公共存储写入/复制/建目录：同一任务授权一次；删除仍逐次确认 */
+async function ensureExternalWriteConsent(task, detail, okText, title) {
+  if (!task) return false;
+  if (consentGranted(task.id, 'external_write')) return true;
+  const ok = await uiConfirm(detail + '\n\n本次任务 30 分钟内不再逐次询问；删除仍需单次确认。', okText, title);
+  if (!ok) return false;
+  consentGrant(task.id, 'external_write');
+  return true;
+}
+
 const QUICK_OPS = new Map();
 function quickOperationBegin(title, goal, timeoutMs) {
   const t = taskNormalize({ id: 'quick-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6), type: 'quick', title: title || '快捷操作', goal: goal || '', state: 'active', context: { messages: [], taskScoped: true }, deadline: Date.now() + (timeoutMs || 30000), progress: '处理中' });
@@ -285,6 +332,7 @@ async function deleteTask(id) {
   if (!(await uiConfirm(t.type === 'chat' ? '删除这个聊天记录？\n\n里面的消息会一起删除。' : '删除任务记录“' + t.title + '”？\n\n任务上下文会删除；工作区文件默认保留。', t.type === 'chat' ? '删除聊天' : '删除任务', '任务删除'))) return;
   const removeFiles = t.type === 'workspace' && await uiConfirm('是否同时删除该任务工作区文件？此操作不可恢复。', '删除文件', '工作区删除');
   if (removeFiles && HAS_PERM && Perm.deleteTaskWorkspace) { try { Perm.deleteTaskWorkspace(t.id); } catch (e) {} }
+  consentRevokeTask(t.id);
   clearTaskHistory(t.id);
   // 原地删除，避免把 TASKS 换成新数组导致外部引用陈旧
   for (let i = TASKS.length - 1; i >= 0; i--) if (TASKS[i].id === id) TASKS.splice(i, 1);
@@ -294,7 +342,7 @@ async function deleteTask(id) {
 function taskModeText(t) { return t.type === 'chat' ? '聊天' : TASK_TYPES[t.type] || '任务'; }
 function taskStateText(t) { return TASK_STATES[t.state] || '运行中'; }
 function updateTaskMode() { const t = currentTask(); const mode = $('#mode-label'); if (mode) mode.textContent = taskModeText(t); const name = $('#name'); if (name) name.textContent = CONFIG.assistantName || '爱莉希雅'; }
-function taskToolsAllowed(type, name) {
+function taskToolsAllowed(type, name, taskId) {
   const device = ['read_screen','screenshot','watch_screen','find_app','tap_screen','click_text','swipe_screen','input_text','press_key','launch_app','get_current_page'];
   const files = ['workspace_status','workspace_create','workspace_list','workspace_read','workspace_write','workspace_mkdir','external_file_list','external_file_read','external_file_write','external_file_copy','external_file_mkdir','external_file_delete'];
   const runtime = ['run_termux_job','termux_job_status','termux_job_output','termux_job_cancel','termux_jobs_list','root_operation'];
@@ -304,7 +352,10 @@ function taskToolsAllowed(type, name) {
   if (device.indexOf(name) >= 0) {
     // 兼容现有聊天层的只读能力探测：真正的点击、输入和启动仍只能在 device/quick 任务中执行。
     if (type === 'chat') return ['find_app', 'watch_screen'].indexOf(name) >= 0;
-    return type === 'device' || type === 'quick';
+    if (type === 'device' || type === 'quick') return true;
+    // G2-005：工作任务里获准操作手机后，设备工具留在同一任务内执行，不再切任务。
+    if (type === 'workspace') return consentGranted(taskId, 'device');
+    return false;
   }
   if (files.indexOf(name) >= 0) return type === 'workspace';
   return true;
@@ -329,11 +380,18 @@ async function routeTask(type, goal) {
   if (type === 'chat') { taskSetCurrent(TASKS.find(t => t.type === 'chat').id); return currentTask(); }
   if (type === 'quick') return quickOperationBegin(String(goal || '快捷操作').slice(0, 30), goal || '', 30000);
   if (type === 'device') {
-    if (!(await uiConfirm('这需要进入手机控制模式。Agent 将读取屏幕，并可能操作白名单应用；高风险动作仍会再次确认。', '进入手机控制', '任务模式确认'))) return null;
-    return taskAdd('device', String(goal || '手机控制任务').slice(0, 30), goal || '');
+    // G2-005：已经在工作/手机任务里就直接复用，不再新建任务把原工作区留在后台。
+    if (old && (old.type === 'device' || old.type === 'workspace') && taskContinuable(old)) {
+      if (!(await ensureDeviceConsent(old))) return null;
+      return old;
+    }
+    if (!(await uiConfirm('这需要进入手机控制模式。Agent 将读取屏幕，并可能操作白名单应用；高风险动作仍会再次确认。\n\n进入后本次任务 30 分钟内不再重复询问。', '进入手机控制', '任务模式确认'))) return null;
+    const deviceTask = taskAdd('device', String(goal || '手机控制任务').slice(0, 30), goal || '');
+    consentGrant(deviceTask.id, 'device');
+    return deviceTask;
   }
   if (type === 'workspace') {
-    if (!(await uiConfirm('这需要创建或切换到独立工作任务。文件修改前仍会逐次确认。', '进入工作任务', '任务模式确认'))) return null;
+    if (!(await uiConfirm('这需要创建或切换到独立工作任务。工作区内写入免逐次确认，外部文件修改会先征求同意。', '进入工作任务', '任务模式确认'))) return null;
     const task = taskAdd('workspace', String(goal || '工作任务').slice(0, 30), goal || '');
     const ready = await ensureTaskWorkspace(task);
     if (!ready.ok) { taskFinish(task.id, 'failed', ready.error || '工作区创建失败'); toast(ready.error || '工作区创建失败'); return null; }

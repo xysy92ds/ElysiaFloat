@@ -13,6 +13,13 @@ if command -v node >/dev/null 2>&1; then
   node tools/build-html.js
 fi
 export GRADLE_USER_HOME=/workspace/gradle-home
-export JAVA_HOME=/workspace/alpine-jdk/usr/lib/jvm/java-17-openjdk
+# AGP 8.6 只验证过 JDK 17；即使环境里已有 JAVA_HOME（可能是 JDK 25），也优先用项目自带的 17
+for d in /workspace/jdk17 /workspace/alpine-jdk/usr/lib/jvm/java-17-openjdk; do
+  if [ -x "$d/bin/java" ]; then export JAVA_HOME="$d"; break; fi
+done
+if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+  echo "找不到可用的 JDK 17，请设置 JAVA_HOME" >&2
+  exit 1
+fi
 export LD_PRELOAD=/workspace/libremovefix.so
 exec gradle "$@"
