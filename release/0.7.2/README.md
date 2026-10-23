@@ -30,3 +30,6 @@ sha256sum -c SHA256SUMS
 签名与 0.7.0 / 0.7.1 一致（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖安装。
 
 > 这是本地测试用的 Debug 包，不用于正式分发。
+>
+> 仓库是私有的：未登录或无权限账号打开 Release 页/下载资产会得到 404。
+> 内测包以工作区文件 `apk/ElysiaFloat-v0.7.2-debug.apk` 直接分发，Release 仅作内部归档。

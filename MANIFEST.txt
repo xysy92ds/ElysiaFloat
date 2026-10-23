@@ -1,5 +1,5 @@
 ElysiaFloat v0.7.2 源码快照
-生成时间: 2026-10-23T17:20:23Z
+生成时间: 2026-10-23T17:26:42Z
 
 == 接手先读 ==
 AGENT-START-HERE.md
@@ -11,6 +11,7 @@ workspace/issues/ISSUE-REGISTER.md
 versionCode 17 / versionName 0.7.2（Debug 测试包）
 当前安装包: apk/ElysiaFloat-v0.7.2-debug.apk
 SHA-256: 3acd847c99e886f5dc98684ec8cecc93f0e41aa3f4ee7e57cda8f74ba2126935
+发布方式: 工作区文件直接下发（私有仓库 Release 仅内部归档，匿名访问 404）
 GitHub Release: https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.2
 
 == 快速验证（只需 node） ==
@@ -154,7 +155,7 @@ c754cf8462ba6b0f      191 release/0.7.1/SHA256SUMS
 ceee4be9821a1902     3668 userscript/README.md
 a03d8421cbe88564    73005 userscript/elysia-web-assistant-v0.3.user.js
 c8af81a5e7cc63d0    69450 userscript/elysia-web-assistant-v4.2.user.js
-e2a3e6e8745206bf     6955 workspace/HANDOVER.md
+e2a61bf8af1d3c4c     7105 workspace/HANDOVER.md
 4ead072d14073650     2980 workspace/README.md
 fb8f599038051dd0     4017 workspace/STATUS.md
 c5665a909cc90b06      821 workspace/decisions/DEC-001-agent-boundaries.md
@@ -214,4 +215,4 @@ e13c5e1f76f58792     4834 workspace/work-logs/2026-10-17-longpress-and-g7-1.md
 44ce269a526c9483     6636 workspace/work-logs/2026-10-17-send-button-unify-and-harden.md
 0b7b8ca4e3992995     4903 workspace/work-logs/2026-10-17-settings-chat-model-fixes.md
 74fae5d342fc5912     3693 workspace/work-logs/2026-10-17-task-continue.md
-c5aa990307f1935c     5489 workspace/work-logs/2026-10-24-consent-simplify-and-clipboard.md
+e2f57f11d81b9ae7     5640 workspace/work-logs/2026-10-24-consent-simplify-and-clipboard.md

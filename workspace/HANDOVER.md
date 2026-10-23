@@ -108,7 +108,8 @@ node tools/smoke.js                # 全部通过才算过
 ## 9. 已知遗留问题（非阻塞）
 
 - `node tools/build-html.js --verify-migration` 仍会失败：旧迁移基线已过期，`--check` 才是当前正确门；
-- `release/latest.json` 已更新到 v0.7.2，但应用内更新检查读的是公开仓库的 v0.6.5 索引，
-  私有仓库匿名不可读，内测期只能手动从 Release 下载（G10 处理）；
+- `release/latest.json` 已更新到 v0.7.2，但应用内更新检查读的是公开仓库的 v0.6.5 索引；
+- 私有仓库匿名访问仓库/Release 页/资产下载一律 404（已实测），Release 仅作内部归档，
+  内测包通过工作区文件 `apk/ElysiaFloat-v<版本>-debug.apk` 直接下发，不走 GitHub 链接（G10 处理）；
 - `via_ai_history` legacy 写入仍存在于记忆/插件/导入等路径（G2-002 后续清理项）；
 - GitHub Release `v0.7.0` 的资产仍是 versionCode 14 的旧包，已在发布说明顶部标注缺陷警告。

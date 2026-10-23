@@ -111,7 +111,9 @@ node tools/smoke.js                # 全部通过
 - GitHub Release `v0.7.2`（ID 422115525）已创建并上传 APK 与 source.zip，
   通过 API 回下载校验 SHA-256 与本地一致；公告更新后重传资产；
   URL：https://github.com/xysy92ds/ElysiaFloat-v0.7/releases/tag/v0.7.2
-- 仓库为私有，匿名 asset URL 返回 404（预期），内测期直接用 Release 页下载。
+- 仓库为私有：匿名访问仓库、Release 页和资产下载一律 404（已实测），Release 只作内部归档；
+  实际下发方式是把 `apk/ElysiaFloat-v0.7.2-debug.apk` 直接给用户（工作区文件），
+  不走 GitHub 链接。
 
 ## 6. 待真机验证
 
