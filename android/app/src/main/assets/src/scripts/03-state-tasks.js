@@ -600,7 +600,11 @@ function buildToolsPrompt() {
       + '「分类概览 + 重要 + 最近」的索引，正文不在眼前——需要细节就 list_memories 检索、'
       + 'read_memory 读全文，别拿标题猜内容。');
   }
-  if (agentActionsOn()) out.push('手机行为：你可以自主选择 tap_screen、click_text、swipe_screen、input_text、press_key、launch_app 完成任务。每次行为后读取页面验证；发送、删除、支付、密码等高风险行为先向用户确认。');
+  if (agentActionsOn()) out.push('手机行为：你可以自主选择 tap_screen、click_text、swipe_screen、input_text、press_key、launch_app 完成任务。每次行为后读取页面验证；发送、删除、支付、密码等高风险行为先向用户确认。要发送聊天消息时，输入完后用 press_key enter 提交，不要点被键盘挡住的按钮。只回话不调用工具等于没执行。');
+  const ct = currentTask();
+  if (ct && (ct.type === 'workspace' || ct.type === 'device' || ct.type === 'external')) {
+    out.push('如果任务是接着上一轮继续（被中断/暂停/失败），先读取当前真实状态再动作，不要复述计划，也不要假装已经完成。');
+  }
   if (tips.length) out.push(tips.join('\n'));
   return out.join('\n');
 }
@@ -634,7 +638,7 @@ function composeSystemPrompt() {
   if (CONFIG.agentEnabled === true) parts.push(AGENT_SYSTEM_PROMPT);
   if (active && active.type === 'device') {
     const d = deviceState(active);
-    parts.push('【手机控制任务】\n1. 动作用 read_screen 返回的 rx/ry 比例坐标，不要自己猜像素；\n2. 一次只做一个主要动作，做完系统会自动验证页面变化；\n3. 页面没变化时会警告，连续 3 次未生效会自动暂停；\n4. 密码框输入会请用户确认，其它输入不会打断；\n5. 只在白名单应用内操作，切到别处会被立刻终止；\n6. 动作预算 ' + (parseInt(d.actionsUsed, 10) || 0) + '/' + deviceBudget(active) + '，用完会暂停而不是失败，用户说继续就再给一批。');
+    parts.push('【手机控制任务】\n1. 动作用 read_screen 返回的 rx/ry 比例坐标，不要自己猜像素；\n2. 一次只做一个主要动作，做完系统会自动验证页面变化；\n3. 页面没变化时会警告，连续 3 次未生效会自动暂停；\n4. 密码框输入会请用户确认，其它输入不会打断；\n5. 只在白名单应用内操作，切到别处会被立刻终止；\n6. 动作预算 ' + (parseInt(d.actionsUsed, 10) || 0) + '/' + deviceBudget(active) + '，用完会暂停而不是失败，用户说继续就再给一批；\n7. 发送消息：输入完成后用 press_key enter 提交（或 click_text「发送」），不要点被键盘挡住的坐标；发送前系统会再确认；\n8. 只回话而没有调用工具等于什么都没做。上一轮被中断、失败或停过，先用 read_screen 读当前真实页面，再从那里继续，不许假装已经完成。');
   }
   const t = buildToolsPrompt();
   if (t) parts.push(t);

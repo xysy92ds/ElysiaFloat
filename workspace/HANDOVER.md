@@ -1,11 +1,16 @@
 # 交接说明（Handover）
 
 更新时间：2026-10-28
-当前阶段：**0.8.0 Beta 进行中**——N2/N3/N4/N5 已完成并由 CI 守护，剩 N1 真机回归与 0.8.0 发布
-最新可用包：`apk/ElysiaFloat-v0.7.2-debug.apk`（versionCode 17 / versionName 0.7.2）
-SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`
+当前阶段：**0.8.0 Beta 进行中**——N2/N3/N4/N5 已完成并由 CI 守护；N1 真机反馈的 5 个问题（I-055~I-059）已修复并通过自动测试，剩真机复测与 0.8.0 发布
+最新可用包：`apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（versionCode 17 / versionName 0.7.2，N1 修复候选包）
+SHA-256：`b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e`
+已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（公开 Release 资产，SHA-256 `6cf5ff19…`）
 工作转移包：`handoff/ElysiaFloat-handoff-*.zip`（以同目录 `.sha256` 为准）；
 私有仓库归档：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`。
+
+> 2026-10-28 补：本轮修复粘贴/复制（I-055）、横屏退出跑出屏幕（I-056）、
+> 音乐工具被 `toolsBroken` 毒化（I-057）、设备任务发送（I-058）、任务模式不调工具（I-059）。
+> 自动门全绿；**未出包、未真机验证**，详见 `work-logs/2026-10-28-0.8.0-n1-fixes.md`。
 
 ## 1. 一句话现状
 
@@ -54,7 +59,7 @@ commit `cb10e91`（索引更新 `1b2e09a`）、tag `v0.7.2`、Release 422140702�
 
 | 编号 | 内容 | 状态 | 证据 |
 |---|---|---|---|
-| N1 | 真机回归：发送、粘贴、长按、横屏、音乐、设备、文件、公告、市场 | **待做**（唯一的阻塞项） | 结果写到 `workspace/work-logs/<日期>-0.8.0-n1-device.md` |
+| N1 | 真机回归：发送、粘贴、长按、横屏、音乐、设备、文件、公告、市场 | **待复测**（唯一阻塞项）：0.7.2 反馈的 5 个问题已修（I-055~I-059），自动门全绿，未出包 | 修复记录 `work-logs/2026-10-28-0.8.0-n1-fixes.md`；复测结果写到 `workspace/work-logs/<日期>-0.8.0-n1-device.md` |
 | N2 | 行为测试 + CI | 已完成 | `android/tools/behavior.test.js`（7 项）、`.github/workflows/ci.yml` |
 | N3 | 发布工程：签名策略、敏感信息扫描、`latest.json` 一致性 | 已完成 | `tools/scan-secrets.js`、`tools/check-release.js`、`DEC-003` |
 | N4 | 清理：市场 MC 遗留、`via_ai_history`、过期迁移基线 | 已完成 | N4-001/002，behavior 测试守护 |
@@ -70,6 +75,7 @@ commit `cb10e91`（索引更新 `1b2e09a`）、tag `v0.7.2`、Release 422140702�
 | G5 | DeviceTask「打开应用 → 点击 → 输入 → 返回」、分辨率/刘海屏 | 代码完成，真机待验 |
 | G7 | Android 11+ 公共存储、厂商文件管理器、快照/回滚 | 代码完成，真机待验 |
 | I-048 | 长按菜单 / 复制粘贴在 Android 10+ 窗口焦点下的表现 | 已修，真机待确认 |
+| I-055~I-059 | 0.7.2 真机反馈：粘贴复制、横屏退出、音乐工具、设备发送、任务模式不调工具 | 已修（自动），真机待复测 |
 
 ### 3.4 明确延期或不做
 

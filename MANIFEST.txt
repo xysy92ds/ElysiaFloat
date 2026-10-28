@@ -1,9 +1,11 @@
 ElysiaFloat v0.7.2 源码快照（0.8.0 收口中）
-生成时间: 2026-10-28T09:33:02Z
+生成时间: 2026-10-28T11:20:51Z
 公开发布: https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2 (Beta / prerelease)
 公开 APK SHA-256: 6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03
 私有归档 APK SHA-256: 6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03
-当前阶段: 0.8.0 进行中（N2/N3/N4/N5 已完成，N1 真机回归待做）
+N1 修复候选 APK: apk/ElysiaFloat-v0.7.2-n1fix-debug.apk
+N1 修复候选 SHA-256: b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e
+当前阶段: 0.8.0 进行中（N2/N3/N4/N5 已完成；N1 反馈 I-055~I-059 已修，候选包已出，待真机复测）
 
 == 接手先读 ==
 AGENT-START-HERE.md
@@ -14,8 +16,8 @@ workspace/issues/ISSUE-REGISTER.md
 
 == 版本 ==
 versionCode 17 / versionName 0.7.2（Debug 测试包；0.8.0 尚未升版）
-当前安装包: apk/ElysiaFloat-v0.7.2-debug.apk
-SHA-256: 6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03
+当前安装包: apk/ElysiaFloat-v0.7.2-n1fix-debug.apk
+SHA-256: b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e
 分发方式: 公开仓库 Release（私有仓库 Release 仅内部归档，匿名访问 404）
 私有仓库: https://github.com/xysy92ds/ElysiaFloat-dev
 公开仓库: https://github.com/xysy92ds/ElysiaFloat
@@ -24,17 +26,16 @@ SHA-256: 6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03
 cd android && node tools/build-html.js --check && node tools/smoke.js && node tools/behavior.test.js && node tools/check-release.js && node tools/scan-secrets.js
 
 == 构建 ==
-./build.sh assembleDebug --offline（优先使用 /workspace/jdk17，依赖已缓存）
+cd android && JAVA_HOME=/root/.local/share/mise/installs/java/temurin-17.0.21+9 GRADLE_USER_HOME=/workspace/gradle-home gradle assembleDebug
 
 == 不包含 ==
-.git、android/app/build、android/build、.gradle、handoff、*.apk、*.zip（可用 ./build.sh assembleDebug 重建）
+.git、android/app/build、android/build、.gradle、handoff、*.apk、*.zip（可用 gradle assembleDebug 重建）
 
 == 文件清单（sha256 前 16 位 / 字节 / 路径） ==
 b0c4d06bcf4f05f8       1669  .github/workflows/ci.yml
 d1376227c93ad761        726  .gitignore
-133ac806c766050c      10668  AGENT-START-HERE.md
+dfe8293ada2543bf      11462  AGENT-START-HERE.md
 16378f403ff0becc       1310  GIT-STATE.txt
-9c89bfb15271ac61      17274  MANIFEST.txt
 b023ee27a7c0671e      10199  PLUGINS.md
 573763a74840ed6a      35596  README.md
 6a940245354784ad        157  android/.gitignore
@@ -43,22 +44,22 @@ e6044c8e2806d510       1994  android/app/build.gradle
 3c865cfd4acb2013       5352  android/app/src/main/AndroidManifest.xml
 10b86be14a28a31b      98100  android/app/src/main/assets/avatar.jpg
 495cd7a57f9847bb     204596  android/app/src/main/assets/cover.jpg
-951e39d6c6fbe8e8     514478  android/app/src/main/assets/index.html
+2973b4127b6ea682     518114  android/app/src/main/assets/index.html
 5990cfdd60e69c56       3543  android/app/src/main/assets/src/manifest.json
 c4daff296edaeacc      13596  android/app/src/main/assets/src/scripts/00-compat.js
 85f5b55eb88ecc3c      13073  android/app/src/main/assets/src/scripts/00b-request.js
-60dc90cde5edc0d8      21238  android/app/src/main/assets/src/scripts/01-ui-dialog.js
-5e9aaa12591412fd      24779  android/app/src/main/assets/src/scripts/02-config.js
-5835c002353b62a9      40601  android/app/src/main/assets/src/scripts/03-state-tasks.js
+aa9089720072367a      22483  android/app/src/main/assets/src/scripts/01-ui-dialog.js
+5ddcbfd5187a9827      24844  android/app/src/main/assets/src/scripts/02-config.js
+05fce4d02038ad01      41397  android/app/src/main/assets/src/scripts/03-state-tasks.js
 46056cbeea33b580      18132  android/app/src/main/assets/src/scripts/04-plugins-core.js
 b3ed3eed952ff88b      27312  android/app/src/main/assets/src/scripts/05-memory.js
 33e71238033bfd63       7072  android/app/src/main/assets/src/scripts/06-ui-render.js
 02f804887e26c38a      28919  android/app/src/main/assets/src/scripts/07-media-tts.js
 37f39b2b27631b1b      13102  android/app/src/main/assets/src/scripts/08-translate.js
 51ba76ab21656036       2088  android/app/src/main/assets/src/scripts/09-ai-request.js
-c876635b933ba9c2      94763  android/app/src/main/assets/src/scripts/10-music.js
-48f53a14fb4deb01      27656  android/app/src/main/assets/src/scripts/11-plugin-engine.js
-3df692292af30a3e      10741  android/app/src/main/assets/src/scripts/12-send-quick.js
+b446e1fa3b643d09      95507  android/app/src/main/assets/src/scripts/10-music.js
+daacac59d3c0cb49      28351  android/app/src/main/assets/src/scripts/11-plugin-engine.js
+562e5e0b7825d5e3      10832  android/app/src/main/assets/src/scripts/12-send-quick.js
 1d67f0e1b15ec63f      27462  android/app/src/main/assets/src/scripts/13-settings.js
 4d03289ed52b713b      48868  android/app/src/main/assets/src/scripts/14-update.js
 34076560eec64727      17820  android/app/src/main/assets/src/scripts/15-views.js
@@ -70,15 +71,15 @@ b2c207316e12e97b       1852  android/app/src/main/java/com/elly/float/AgentRunti
 ddbd87e13556c8b8       1964  android/app/src/main/java/com/elly/float/ApkProvider.kt
 974d653ddcfe3d5f      32705  android/app/src/main/java/com/elly/float/AudioEngine.kt
 9140e8c4bb9bf29a       2119  android/app/src/main/java/com/elly/float/CapabilityRuntime.kt
-b1c19fca6d367e33      14964  android/app/src/main/java/com/elly/float/EllyAccessibilityService.kt
+837271dabc291a3b      16147  android/app/src/main/java/com/elly/float/EllyAccessibilityService.kt
 3d616b08d0611181       1154  android/app/src/main/java/com/elly/float/EllyInputMethodService.kt
 2a807988a2d6b66e       2207  android/app/src/main/java/com/elly/float/ExternalAgentAdapter.kt
 6f9753c8b7a4e0f2      20045  android/app/src/main/java/com/elly/float/FileExtractor.kt
 f4af1f5a1bf68063       3227  android/app/src/main/java/com/elly/float/FileSafety.kt
-44006aa53323cce7      73428  android/app/src/main/java/com/elly/float/FloatService.kt
+12babd00292d4362      74585  android/app/src/main/java/com/elly/float/FloatService.kt
 8607aa7b26288e0d      29372  android/app/src/main/java/com/elly/float/JsBridge.kt
 6ab33f39edc2bbb1       2775  android/app/src/main/java/com/elly/float/MainActivity.kt
-20a47ae183614bd4      42839  android/app/src/main/java/com/elly/float/PermissionBridge.kt
+0825c3b2db33675c      43130  android/app/src/main/java/com/elly/float/PermissionBridge.kt
 2220bc9c3325e89c       8544  android/app/src/main/java/com/elly/float/PickImageActivity.kt
 a586efb0f8c697ed       2675  android/app/src/main/java/com/elly/float/RootWorker.kt
 e910293ae8542215       1486  android/app/src/main/java/com/elly/float/ScreenCaptureActivity.kt
@@ -121,17 +122,14 @@ a64abaa669b208f7       4455  android/tools/behavior.test.js
 406aa9a166b848d2      22357  android/tools/harness.js
 b6d86f7b785f8c88       3383  android/tools/remove_fix.c
 1283b8d74b3e1946       2605  android/tools/scan-secrets.js
-c8ab47c83232a9ea      93403  android/tools/smoke.js
+fc99c6255e566ab8      96606  android/tools/smoke.js
 20f89ed18f407254       6138  android/tools/split-html.js
 9de72f2a935d3112         99  apk/ElysiaFloat-v0.6.2-SHA256SUMS
 81bba572f468764d         95  apk/ElysiaFloat-v0.6.5-SHA256SUMS
-f74882cd37e94e57    2433828  apk/ElysiaFloat-v0.6.5-debug.apk
 8ca05ddb2eaa9fbc         99  apk/ElysiaFloat-v0.7.0-SHA256SUMS
-9382334689e58af7    2459080  apk/ElysiaFloat-v0.7.0-debug.apk
 951e1fafb31c6a10         99  apk/ElysiaFloat-v0.7.1-SHA256SUMS
-4b9b9cbbda98f923    2460324  apk/ElysiaFloat-v0.7.1-debug.apk
 ec4f296ec4c91cdd         95  apk/ElysiaFloat-v0.7.2-SHA256SUMS
-6cf5ff194090e182    2653759  apk/ElysiaFloat-v0.7.2-debug.apk
+7933bf73339decce        101  apk/ElysiaFloat-v0.7.2-n1fix-SHA256SUMS
 4fc1ba731cb7a489       3825  apk/README.md
 b6c66e6755312b31       2600  docs/README.md
 7bb3191210032955       8059  docs/development/plugin-system.md
@@ -158,18 +156,12 @@ d321203d8959875c      11058  marketplace/plugins/com.elly.market.minecraft/bot.j
 74a010d2dd02bb99        120  release/0.6.1-agent/SHA256SUMS
 d8c50ea7322d1701       1049  release/0.6.2/README.md
 cd6284fba915495e        108  release/0.6.2/SHA256SUMS
-f74882cd37e94e57    2433828  release/0.6.5/ElysiaFloat-v0.6.5-debug.apk
 04729658ad4a53f7        489  release/0.6.5/README.md
 81bba572f468764d         95  release/0.6.5/SHA256SUMS
-9382334689e58af7    2459080  release/0.7.0/ElysiaFloat-v0.7.0-debug.apk
-f19ef4978bd5d31e    1909582  release/0.7.0/ElysiaFloat-v0.7.0-source.zip
 c2e730340f33d5c7       2101  release/0.7.0/README.md
 1057ca1796eab353        191  release/0.7.0/SHA256SUMS
-4b9b9cbbda98f923    2460324  release/0.7.1/ElysiaFloat-v0.7.1-debug.apk
-d72fab848f99d81e    1916861  release/0.7.1/ElysiaFloat-v0.7.1-source.zip
 f6f33c070ad69f41       1596  release/0.7.1/README.md
 c754cf8462ba6b0f        191  release/0.7.1/SHA256SUMS
-6cf5ff194090e182    2653759  release/0.7.2/ElysiaFloat-v0.7.2-debug.apk
 c2b83fe01a40ccba       2637  release/0.7.2/README.md
 c7f79004ebbcdaf4        191  release/0.7.2/SHA256SUMS
 4c35d0b0a3baff29       1695  release/latest.json
@@ -177,9 +169,9 @@ bbc700ec3a2822c2       5180  tools/handoff.sh
 ceee4be9821a1902       3668  userscript/README.md
 a03d8421cbe88564      73005  userscript/elysia-web-assistant-v0.3.user.js
 c8af81a5e7cc63d0      69450  userscript/elysia-web-assistant-v4.2.user.js
-de9ef0ca89d5f281      10004  workspace/HANDOVER.md
+98eaa7d6e0e8dc0c      10842  workspace/HANDOVER.md
 4ead072d14073650       2980  workspace/README.md
-4cc2bd7b2b86fe64       5703  workspace/STATUS.md
+4f877fe959878f83       6043  workspace/STATUS.md
 c5665a909cc90b06        821  workspace/decisions/DEC-001-agent-boundaries.md
 737b6fbd885ed894       1036  workspace/decisions/DEC-002-memory-and-file-boundaries.md
 aff7529c0900e498       2173  workspace/decisions/DEC-003-signing-and-release.md
@@ -196,7 +188,7 @@ d3110f1b5d625a9b       1310  workspace/discussions/2026-10-16-project-governance
 029b6d375d0d7486       1492  workspace/issues/2026-10-06-real-device-validation.md
 97326e375409cbc5      19940  workspace/issues/2026-10-16-comprehensive-audit.md
 7ce018745d09c8d7       9529  workspace/issues/2026-10-16-music-refactor.md
-8c63f7ebd34124cc      13712  workspace/issues/ISSUE-REGISTER.md
+9e6af8cd11e3a2fb      16967  workspace/issues/ISSUE-REGISTER.md
 4343e615bee922c9        840  workspace/issues/README.md
 42a4ace5d50a724d       4987  workspace/plans/G3-request-manager-draft.md
 deb74691f28311d3      11982  workspace/plans/G5-devicetask-draft.md
@@ -244,3 +236,4 @@ e13c5e1f76f58792       4834  workspace/work-logs/2026-10-17-longpress-and-g7-1.m
 e2f57f11d81b9ae7       5640  workspace/work-logs/2026-10-24-consent-simplify-and-clipboard.md
 f5c50c11763e49ae       4251  workspace/work-logs/2026-10-24-public-release-0.7.2.md
 2876f6eee1e9d0eb       5875  workspace/work-logs/2026-10-28-0.8-n2-n5.md
+60a924450a20f048       7449  workspace/work-logs/2026-10-28-0.8.0-n1-fixes.md

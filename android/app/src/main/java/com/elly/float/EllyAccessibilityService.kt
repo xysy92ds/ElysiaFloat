@@ -160,13 +160,7 @@ class EllyAccessibilityService : AccessibilityService() {
 
     fun inputText(text: String): Boolean {
         val root = externalRoot() ?: return false
-        fun findFocused(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-            if (node == null) return null
-            if (node.isEditable && node.isFocused) return node
-            for (i in 0 until node.childCount) findFocused(node.getChild(i))?.let { return it }
-            return null
-        }
-        val node = findFocused(root)
+        val node = findFocusedEditable(root)
         if (node != null) {
             try {
                 val before = node.text?.toString()
@@ -180,6 +174,39 @@ class EllyAccessibilityService : AccessibilityService() {
         }
         // 兜底通道需要用户事先在系统输入法设置中启用并切换到爱莉希雅输入法。
         return EllyInputMethodService.commit(text)
+    }
+
+    private fun findFocusedEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        if (node == null) return null
+        if (node.isEditable && node.isFocused) return node
+        for (i in 0 until node.childCount) findFocusedEditable(node.getChild(i))?.let { return it }
+        return null
+    }
+
+    /**
+     * 提交输入框里的内容（聊天里的「发送」）。
+     * 优先走输入法的 IME_ENTER；不支持时退回「点发送按钮」。
+     * 发送属于高风险动作，原生层不做确认，确认由 JS 逐次弹出。
+     */
+    fun submitCurrentInput(): Boolean {
+        val root = externalRoot() ?: return false
+        val focused = findFocusedEditable(root)
+        if (focused != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                if (focused.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)) return true
+            } catch (_: Exception) { }
+        }
+        // IME_ENTER 不生效时，按发送按钮的常见叫法找一个可点击节点。
+        for (q in listOf("发送", "Send", "send", "提交")) {
+            val n = findNode(root, q) ?: continue
+            var target: AccessibilityNodeInfo? = n
+            repeat(6) {
+                val t = target
+                if (t?.isClickable == true && t.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+                target = t?.parent
+            }
+        }
+        return false
     }
 
     fun globalAction(name: String): Boolean = when (name.lowercase()) {

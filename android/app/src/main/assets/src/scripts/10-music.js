@@ -947,8 +947,8 @@ function buildTools(runTask) {
         nodeIndex: { type: 'integer', description: '可选：read_screen 返回的节点 i，用于明确指定目标' }
       }, required: ['text'] } } });
     tools.push({ type: 'function', function: {
-      name: 'press_key', description: '执行 back、home、recents 或 notifications 系统按键。',
-      parameters: { type: 'object', properties: { key: { type: 'string', enum: ['back', 'home', 'recents', 'notifications'] } }, required: ['key'] } } });
+      name: 'press_key', description: '执行 back、home、recents、notifications 系统按键，或 enter（提交当前输入框，例如聊天里的发送）。发送前会请用户确认。',
+      parameters: { type: 'object', properties: { key: { type: 'string', enum: ['back', 'home', 'recents', 'notifications', 'enter'] } }, required: ['key'] } } });
     tools.push({ type: 'function', function: {
       name: 'launch_app', description: '按应用显示名或包名启动白名单中的应用。会先在设备上解析真实包名，再执行白名单检查。',
       parameters: { type: 'object', properties: {
@@ -1470,6 +1470,14 @@ async function execTool(name, args, runTask) {
         const ok = await uiConfirm('要在这个密码框里输入吗？输入内容不会被记录，也不会写进日志。', '允许输入', '密码框确认');
         if (!ok) return { success: false, errorCode: 'USER_CANCELLED', error: '用户取消了密码输入' };
       }
+    }
+    // 发送属于高风险动作：无论是按发送键还是点「发送」按钮，都逐次确认。
+    const keyName = String(args.key || '').toLowerCase();
+    const sendLike = (name === 'press_key' && (keyName === 'enter' || keyName === 'send')) ||
+      (name === 'click_text' && /发送|send|submit|提交/i.test(String(args.text || '')));
+    if (sendLike) {
+      const ok = await uiConfirm('这一步会真的把内容发出去（消息、评论或表单提交），确认继续？', '确认发送', '发送确认');
+      if (!ok) return { success: false, errorCode: 'USER_CANCELLED', error: '用户取消了发送' };
     }
     if (ds.phase === 'idle' || ds.phase === 'planning') {
       deviceSetPhase(task.id, 'orienting', { action: name });

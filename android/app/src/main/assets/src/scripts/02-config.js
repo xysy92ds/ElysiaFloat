@@ -124,7 +124,7 @@ const TOOL_DOC = {
   click_text: '按文字或 content description 点击当前页面控件。',
   swipe_screen: '在手机屏幕上滑动或滚动。执行后重新读取页面验证。',
   input_text: '向当前获得焦点的输入控件输入文字。密码、发送和敏感内容必须先确认。',
-  press_key: '执行 back、home、recents 或 notifications 系统按键。',
+  press_key: '执行 back、home、recents、notifications 系统按键，或 enter 提交当前输入框（发送）。发送前会确认。',
   launch_app: '按应用名称或包名启动白名单中的应用。',
   workspace_status: '查看文件访问权限和 ElysiaFloat 工作区状态。',
   workspace_create: '在 Documents/ElysiaFloat/workspace 创建用户工作区。',

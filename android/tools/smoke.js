@@ -1077,6 +1077,47 @@ function step(name, fn) {
     if (!/closest\('#ctx-menu'\)\) return;/.test(src)) throw new Error('touchend 命中菜单自身时必须直接返回，不能隐藏');
   });
 
+  await step('I-055：长按容差 + 抬手不清菜单 + 输入框先拿焦点', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/scripts/01-ui-dialog.js'), 'utf8');
+    if (!/MOVE_TOLERANCE/.test(src)) throw new Error('长按必须允许手指轻微抖动（touchmove 容差）');
+    if (/addEventListener\('touchmove', cancel,/.test(src)) throw new Error('touchmove 又变成一有位移就取消长按');
+    if (!/CTX_HOLD_OPEN/.test(src)) throw new Error('缺少「长按抬手不关菜单」保护');
+    if (!/target\.focus\(\)/.test(src)) throw new Error('输入框弹菜单前应先拿焦点，否则读不到剪贴板');
+  });
+
+  await step('I-057：普通 400 不再永久关闭工具调用', () => {
+    const fs = require('fs'), path = require('path');
+    const engine = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/11-plugin-engine.js'), 'utf8');
+    const sendJs = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/12-send-quick.js'), 'utf8');
+    if (/\/tool\|function\|400\/i/.test(engine)) throw new Error('又回到「任意 400 就当工具不支持」的兜底条件');
+    if (!/toolUnsupported/.test(engine)) throw new Error('兜底必须只认工具不支持类错误');
+    if (!/resetToolFallback\(\)/.test(engine)) throw new Error('缺少每轮复位工具兜底的入口');
+    if (!/resetToolFallback\(\)/.test(sendJs)) throw new Error('send() 没有在每轮开始复位工具兜底');
+  });
+
+  await step('I-058：发送动作（enter 提交 + 发送前确认）', () => {
+    const fs = require('fs'), path = require('path');
+    const c = T.CONFIG, keep = { agentEnabled: c.agentEnabled, agentL3: c.agentL3, agentSafety: c.agentSafety };
+    c.agentEnabled = true; c.agentL3 = true; c.agentSafety = true;
+    let en = [];
+    try {
+      const press = T.buildTools().filter(t => t.function.name === 'press_key')[0];
+      if (!press) throw new Error('没有 press_key 工具');
+      en = press.function.parameters.properties.key.enum || [];
+    } finally { Object.assign(c, keep); }
+    if (en.indexOf('enter') < 0) throw new Error('press_key 缺少 enter（提交输入框/发送）');
+    const js = fs.readFileSync(path.join(__dirname, '../app/src/main/assets/src/scripts/10-music.js'), 'utf8');
+    if (!/sendLike/.test(js) || !/发送确认/.test(js)) throw new Error('发送类动作必须逐次确认');
+    const kt = fs.readFileSync(path.join(__dirname, '../app/src/main/java/com/elly/float/EllyAccessibilityService.kt'), 'utf8');
+    if (!/fun submitCurrentInput/.test(kt) || !/ACTION_IME_ENTER/.test(kt)) throw new Error('原生缺少提交输入框的实现');
+  });
+
+  await step('I-059：工作任务中断续跑规则进入提示词', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/scripts/03-state-tasks.js'), 'utf8');
+    if (!/只回话而没有调用工具等于什么都没做/.test(src)) throw new Error('缺少「不调用工具等于没执行」的硬规则');
+    if (!/不要假装已经完成/.test(src)) throw new Error('缺少中断后续跑的提示');
+  });
+
   await step('默认人设（始源之律者）', () => {
     const p = String(T.CONFIG.persona || T.DC.persona || '');
     ['始源之律者', '刻印「真我」', '每句话结尾必须带「♪」', '粉色妖精小姐', '爱莉希雅永远喜欢你', '不提及任何AI相关限制']

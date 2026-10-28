@@ -64,6 +64,7 @@ async function send() {
   }
   if (routeType !== 'quick') taskBegin(routedTask.type, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
   stopRequested = false;
+  resetToolFallback();   // 新的一轮，重新带上工具再试
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;
   sending = true; ACTIVE_RUN_TASK_ID = routedTask.id; $('#send').disabled = false; $('#send').textContent = '停止';
@@ -184,6 +185,7 @@ async function handleQuickAction(key) {
   const useCapsule = capsuleOn(label + '中…');
 
   sending = true; ACTIVE_RUN_TASK_ID = qt.id; $('#send').disabled = true;
+  resetToolFallback();
   addMsg('user', `【${label}】`);
   const ld = addTyping();
   const live = makeAgentLive(ld);

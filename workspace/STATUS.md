@@ -1,7 +1,7 @@
 # ElysiaFloat 工作区状态与导航
 
 更新时间：2026-10-28
-状态：0.7.2 Beta 已发布到公开仓库 `xysy92ds/ElysiaFloat`（tag `v0.7.2` / Release 422140702 / commit `cb10e91`）；G2-005 安全确认精简、I-048 长按菜单/粘贴修复已落地；0.8.0 进行中（N2/N3/N4/N5 已完成，N1 真机待验）；0.9~0.15 路线与逐步执行清单见 `plans/PLATFORM-0.8-0.15.md`
+状态：0.7.2 Beta 已发布到公开仓库 `xysy92ds/ElysiaFloat`（tag `v0.7.2` / Release 422140702 / commit `cb10e91`）；G2-005 安全确认精简、I-048 长按菜单/粘贴修复已落地；0.8.0 进行中（N2/N3/N4/N5 已完成；0.7.2 真机反馈的 I-055~I-059 已修复并通过自动门，待出包真机复测）；0.9~0.15 路线与逐步执行清单见 `plans/PLATFORM-0.8-0.15.md`
 
 > 本文件是工作区导航，不替代技术文档。项目当前真正的执行入口是：
 > - `plans/MASTER-EXECUTION-PLAN.md`：唯一任务链和阶段出口；
@@ -16,10 +16,12 @@
 - 私有 Git：`main` 上一提交 `819ea69`；本轮新增的文档、签名回退与校验值改动尚未提交。
 - 公开 Git：`xysy92ds/ElysiaFloat` `main` = `1b2e09a`（发布提交 `cb10e91`），tag `v0.7.2`。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
-- 最新测试包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`，与公开 Release 资产同一构建）。
-- 最新测试包 SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`。
+- 最新测试包：`apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（N1 修复候选，versionCode 17 / versionName 0.7.2，可覆盖已装 0.7.2）。
+- 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`，与公开 Release 资产同一构建）。
+- 已发布包 SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`。
+- N1 修复候选包 SHA-256：`b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e`。
 - 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
-- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js` 全通过；0.7.2 仍待真机覆盖确认。
+- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js` 全通过（2026-10-28 复跑）；I-055~I-059 修复仍待真机复测。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。
 - 更新链路：应用内更新检查读取公开仓库 `release/latest.json`，当前已指向 v0.7.2（私有归档副本已同步为公开 URL）。
 - 平台化路线：全部 0.x Beta 小步走——0.9 核心体验+模型中心 → 0.10 开放式插件运行时 →

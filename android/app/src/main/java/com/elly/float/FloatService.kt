@@ -203,12 +203,14 @@ class FloatService : Service() {
         runOnMain {
             val wv = webView ?: return@runOnMain
             val p = params ?: return@runOnMain
+            // 隐藏时的存档也要跟着新方向重新夹持，否则从横屏切回竖屏后
+            // 恢复窗口时会用旧方向的坐标（见 showWebView）。
+            savedRect?.let { savedRect = clampRect(it[0], it[1], it[2], it[3]) }
             // 用当前矩形重新夹持到新屏幕尺寸
-            val r = clampRect(p.x, p.y, p.width, p.height)
-            p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3]
-            winRect = r
-            try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
-            pushRectToJs(false)
+            clampCurrentWindow(p, wv)
+            // displayMetrics 在旋转后可能有一小段延迟才稳定，再补两次夹持
+            main.postDelayed({ if (params === p) clampCurrentWindow(p, wv) }, 120)
+            main.postDelayed({ if (params === p) clampCurrentWindow(p, wv) }, 400)
             // 迷你条也重新夹持
             miniParams?.let { mp ->
                 val mdm = resources.displayMetrics
@@ -497,6 +499,17 @@ class FloatService : Service() {
         return intArrayOf(nx, ny, nw, nh)
     }
 
+    /** 把当前窗口重新夹回屏幕；隐藏态（移出屏幕）不处理，否则会把隐藏窗口拉回来。 */
+    private fun clampCurrentWindow(p: WindowManager.LayoutParams, wv: WebView) {
+        if (winHidden) return
+        val r = clampRect(p.x, p.y, p.width, p.height)
+        if (r[0] == p.x && r[1] == p.y && r[2] == p.width && r[3] == p.height) return
+        p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3]
+        winRect = r
+        try { wm?.updateViewLayout(wv, p) } catch (_: Exception) { }
+        pushRectToJs(false)
+    }
+
     /**
      * JS 按住边缘缩放时回调，坐标与尺寸均为物理像素。
      *
@@ -627,8 +640,13 @@ class FloatService : Service() {
         val wv = webView ?: return
         // 优先用台面上的存档；万一没存过（比如被截屏流程直接藏掉），
         // 退回到持久化的位置，总比被系统夹到固定角落强。
-        savedRect?.let { p.x = it[0]; p.y = it[1]; p.width = it[2]; p.height = it[3] }
-            ?: restorePersistedWinRect(p)
+        // 存档是「隐藏那一刻」的方向下记的；期间可能转过屏，必须重新夹持，
+        // 否则横屏隐藏、竖屏恢复时窗口会带着横屏坐标跑到屏幕外。
+        savedRect?.let {
+            val r = clampRect(it[0], it[1], it[2], it[3])
+            p.x = r[0]; p.y = r[1]; p.width = r[2]; p.height = r[3]
+            savedRect = r
+        } ?: restorePersistedWinRect(p)
         if (savedFlags != 0) p.flags = savedFlags
         winHidden = false
         p.alpha = 1f

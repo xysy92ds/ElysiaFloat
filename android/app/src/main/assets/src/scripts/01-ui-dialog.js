@@ -29,6 +29,8 @@ function bindTap(el, fn) {
  *  只有长按才出现，不做常驻按钮。
  * ========================================================== */
 let CTX_TARGET = null, CTX_TIMER = null, CTX_LAST_TOUCH = null, CTX_DOWN = false;
+/** 长按刚弹出菜单时，抬手会立刻触发 touchend；这一下必须忽略，否则菜单「一闪就没」。 */
+let CTX_HOLD_OPEN = false;
 
 function ensureCtxMenu() {
   let m = $('#ctx-menu');
@@ -45,6 +47,7 @@ function hideCtxMenu() {
   const m = $('#ctx-menu');
   if (m) m.hidden = true;
   CTX_TARGET = null;
+  CTX_HOLD_OPEN = false;
 }
 
 function ctxSelectionText() {
@@ -77,6 +80,9 @@ function openCtxFor(target, x, y) {
   const tag = String(target.tagName || '').toUpperCase();
   const sel = ctxSelectionText();
   if (tag === 'INPUT' || tag === 'TEXTAREA') {
+    // 先让输入框拿到焦点：Android 10+ 只允许有焦点的应用读剪贴板，
+    // 覆盖层窗口没焦点时 getClipboard() 会返回空，粘贴就永远「读不到剪贴板」。
+    try { target.focus(); } catch (e) {}
     const items = [{ label: '粘贴', run: () => pasteIntoField(target) }];
     if (sel) items.unshift({ label: '复制', run: () => { if (copyToClipboard(sel)) toast('已复制'); } });
     items.push({ label: '全选', run: () => { try { target.select(); } catch (e) {} } });
@@ -113,16 +119,31 @@ function bindCtxMenu() {
     CTX_TIMER = setTimeout(() => {
       if (!CTX_DOWN) return;
       const info = CTX_LAST_TOUCH;
-      if (info) openCtxFor(info.target, info.x, info.y);
+      if (info) {
+        CTX_HOLD_OPEN = true;   // 这一抬手不要关菜单，等用户去点菜单项
+        openCtxFor(info.target, info.x, info.y);
+      }
       CTX_TIMER = null;
     }, 550);
     function cancel2() { if (CTX_TIMER) { clearTimeout(CTX_TIMER); CTX_TIMER = null; } }
   }, { passive: true });
-  document.addEventListener('touchmove', cancel, { passive: true });
+  // 长按期间手指几乎不可能完全不动：以前只要收到 touchmove 就取消，
+  // 真机上轻微微抖（1~3px）就把菜单吞掉了，表现就是「长按没反应」。
+  // 现在只有移动超过阈值才算滑动，才取消长按。
+  const MOVE_TOLERANCE = 14;
+  document.addEventListener('touchmove', (e) => {
+    if (!CTX_DOWN) return;
+    const t = e.touches && e.touches[0];
+    if (!t || !CTX_LAST_TOUCH) { cancel(); return; }
+    if (Math.abs(t.clientX - CTX_LAST_TOUCH.x) > MOVE_TOLERANCE ||
+        Math.abs(t.clientY - CTX_LAST_TOUCH.y) > MOVE_TOLERANCE) cancel();
+  }, { passive: true });
   document.addEventListener('touchend', (e) => {
     cancel();
     // 点在菜单自己身上时不要隐藏：隐藏会发生在菜单项的 touchend 之后、click 之前。
     if (e.target && e.target.closest && e.target.closest('#ctx-menu')) return;
+    // 长按抬手：菜单是刚弹出来的，这一下不能关，否则用户根本点不到。
+    if (CTX_HOLD_OPEN) { CTX_HOLD_OPEN = false; return; }
     setTimeout(() => { if (!ctxSelectionText()) hideCtxMenu(); }, 0);
   }, { passive: true });
   document.addEventListener('touchcancel', () => { cancel(); hideCtxMenu(); }, { passive: true });

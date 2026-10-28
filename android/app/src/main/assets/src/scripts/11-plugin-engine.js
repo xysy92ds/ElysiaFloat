@@ -316,6 +316,8 @@ function plugExecJs(plugin, tool, args, runTask) {
 }
 
 let toolsBroken = false;
+/** 每轮新的用户消息都重新试一次工具调用：一次性的 400 不该毒化整个会话。 */
+function resetToolFallback() { toolsBroken = false; }
 
 /** 找出对话里最后一条带图片的 user 消息（截图 / 用户上传的图片） */
 function lastImageMsgIndex(list) {
@@ -417,7 +419,12 @@ async function chatReqTools(messages, hooks) {
           continue;
         }
       }
-      if (/tool|function|400/i.test(errText)) { fallback = true; } else { throw new Error(errText); }
+      // 只有「这个模型压根不支持工具调用」才降级成无工具对话。
+      // 以前把任意 400 都当成工具不支持，一旦撞上上下文超长之类的普通 400，
+      // 就会把 toolsBroken 永久置真 —— 之后每轮都不再发工具，
+      // 表现就是「她只回话、不调用工具，怎么强调都没用」。
+      const toolUnsupported = /tool[_ ]?call|tool[_ ]?choice|function[_ ]?call|does not support (tools|functions)|tools? (are|is) not supported|unsupported.{0,20}tool/i.test(errText);
+      if (toolUnsupported) { fallback = true; } else { throw new Error(errText); }
     }
     if (fallback) { toolsBroken = true; return await chatReq(messages); }
     if (msg === null) return await chatReq(messages);

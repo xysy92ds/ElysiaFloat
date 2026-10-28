@@ -111,6 +111,19 @@ export LD_PRELOAD=/workspace/libremovefix.so    # musl seccomp 下删目录会 E
 - `android/local.properties` 里 `sdk.dir=/workspace/android-sdk`，换机器要改；
 - 如果读不到项目根以外的路径，请相应调整这三行，**不需要改任何项目源码**。
 
+2026-10-28 实测效果（本沙箱）：
+
+- JDK 17 用 `mise install java@temurin-17`，之后
+  `export JAVA_HOME=/root/.local/share/mise/installs/java/temurin-17.0.21+9`；
+- SDK 用 `commandlinetools-linux-11076708` 装到 `/workspace/android-sdk`
+  （`platform-tools`、`platforms;android-34`、`build-tools;34.0.0`），需要走 `HTTPS_PROXY`；
+- Maven Central 在共享出口会 429，用 `$GRADLE_USER_HOME/init.d/mirror.gradle`
+  把 `pluginManagement` / `dependencyResolutionManagement` 换到阿里云镜像；
+- `android/gradle.properties` 的 `android.aapt2FromMavenOverride=/workspace/aapt2-wrapper/aapt2`
+  需要存在，软链到 `build-tools/34.0.0/aapt2` 即可；
+- 当前沙箱没有 `libremovefix.so`，直接 `gradle assembleDebug` 也能成功（glibc 环境）。
+
+
 ### 构建成功的判据
 
 `assembleDebug` 输出 `BUILD SUCCESSFUL`，且 `grep -cE '^e: ' 日志` 为 0。

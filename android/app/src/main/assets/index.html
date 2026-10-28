@@ -1682,6 +1682,8 @@ function bindTap(el, fn) {
  *  只有长按才出现，不做常驻按钮。
  * ========================================================== */
 let CTX_TARGET = null, CTX_TIMER = null, CTX_LAST_TOUCH = null, CTX_DOWN = false;
+/** 长按刚弹出菜单时，抬手会立刻触发 touchend；这一下必须忽略，否则菜单「一闪就没」。 */
+let CTX_HOLD_OPEN = false;
 
 function ensureCtxMenu() {
   let m = $('#ctx-menu');
@@ -1698,6 +1700,7 @@ function hideCtxMenu() {
   const m = $('#ctx-menu');
   if (m) m.hidden = true;
   CTX_TARGET = null;
+  CTX_HOLD_OPEN = false;
 }
 
 function ctxSelectionText() {
@@ -1730,6 +1733,9 @@ function openCtxFor(target, x, y) {
   const tag = String(target.tagName || '').toUpperCase();
   const sel = ctxSelectionText();
   if (tag === 'INPUT' || tag === 'TEXTAREA') {
+    // 先让输入框拿到焦点：Android 10+ 只允许有焦点的应用读剪贴板，
+    // 覆盖层窗口没焦点时 getClipboard() 会返回空，粘贴就永远「读不到剪贴板」。
+    try { target.focus(); } catch (e) {}
     const items = [{ label: '粘贴', run: () => pasteIntoField(target) }];
     if (sel) items.unshift({ label: '复制', run: () => { if (copyToClipboard(sel)) toast('已复制'); } });
     items.push({ label: '全选', run: () => { try { target.select(); } catch (e) {} } });
@@ -1766,16 +1772,31 @@ function bindCtxMenu() {
     CTX_TIMER = setTimeout(() => {
       if (!CTX_DOWN) return;
       const info = CTX_LAST_TOUCH;
-      if (info) openCtxFor(info.target, info.x, info.y);
+      if (info) {
+        CTX_HOLD_OPEN = true;   // 这一抬手不要关菜单，等用户去点菜单项
+        openCtxFor(info.target, info.x, info.y);
+      }
       CTX_TIMER = null;
     }, 550);
     function cancel2() { if (CTX_TIMER) { clearTimeout(CTX_TIMER); CTX_TIMER = null; } }
   }, { passive: true });
-  document.addEventListener('touchmove', cancel, { passive: true });
+  // 长按期间手指几乎不可能完全不动：以前只要收到 touchmove 就取消，
+  // 真机上轻微微抖（1~3px）就把菜单吞掉了，表现就是「长按没反应」。
+  // 现在只有移动超过阈值才算滑动，才取消长按。
+  const MOVE_TOLERANCE = 14;
+  document.addEventListener('touchmove', (e) => {
+    if (!CTX_DOWN) return;
+    const t = e.touches && e.touches[0];
+    if (!t || !CTX_LAST_TOUCH) { cancel(); return; }
+    if (Math.abs(t.clientX - CTX_LAST_TOUCH.x) > MOVE_TOLERANCE ||
+        Math.abs(t.clientY - CTX_LAST_TOUCH.y) > MOVE_TOLERANCE) cancel();
+  }, { passive: true });
   document.addEventListener('touchend', (e) => {
     cancel();
     // 点在菜单自己身上时不要隐藏：隐藏会发生在菜单项的 touchend 之后、click 之前。
     if (e.target && e.target.closest && e.target.closest('#ctx-menu')) return;
+    // 长按抬手：菜单是刚弹出来的，这一下不能关，否则用户根本点不到。
+    if (CTX_HOLD_OPEN) { CTX_HOLD_OPEN = false; return; }
     setTimeout(() => { if (!ctxSelectionText()) hideCtxMenu(); }, 0);
   }, { passive: true });
   document.addEventListener('touchcancel', () => { cancel(); hideCtxMenu(); }, { passive: true });
@@ -2301,7 +2322,7 @@ const TOOL_DOC = {
   click_text: '按文字或 content description 点击当前页面控件。',
   swipe_screen: '在手机屏幕上滑动或滚动。执行后重新读取页面验证。',
   input_text: '向当前获得焦点的输入控件输入文字。密码、发送和敏感内容必须先确认。',
-  press_key: '执行 back、home、recents 或 notifications 系统按键。',
+  press_key: '执行 back、home、recents、notifications 系统按键，或 enter 提交当前输入框（发送）。发送前会确认。',
   launch_app: '按应用名称或包名启动白名单中的应用。',
   workspace_status: '查看文件访问权限和 ElysiaFloat 工作区状态。',
   workspace_create: '在 Documents/ElysiaFloat/workspace 创建用户工作区。',
@@ -3109,7 +3130,11 @@ function buildToolsPrompt() {
       + '「分类概览 + 重要 + 最近」的索引，正文不在眼前——需要细节就 list_memories 检索、'
       + 'read_memory 读全文，别拿标题猜内容。');
   }
-  if (agentActionsOn()) out.push('手机行为：你可以自主选择 tap_screen、click_text、swipe_screen、input_text、press_key、launch_app 完成任务。每次行为后读取页面验证；发送、删除、支付、密码等高风险行为先向用户确认。');
+  if (agentActionsOn()) out.push('手机行为：你可以自主选择 tap_screen、click_text、swipe_screen、input_text、press_key、launch_app 完成任务。每次行为后读取页面验证；发送、删除、支付、密码等高风险行为先向用户确认。要发送聊天消息时，输入完后用 press_key enter 提交，不要点被键盘挡住的按钮。只回话不调用工具等于没执行。');
+  const ct = currentTask();
+  if (ct && (ct.type === 'workspace' || ct.type === 'device' || ct.type === 'external')) {
+    out.push('如果任务是接着上一轮继续（被中断/暂停/失败），先读取当前真实状态再动作，不要复述计划，也不要假装已经完成。');
+  }
   if (tips.length) out.push(tips.join('\n'));
   return out.join('\n');
 }
@@ -3143,7 +3168,7 @@ function composeSystemPrompt() {
   if (CONFIG.agentEnabled === true) parts.push(AGENT_SYSTEM_PROMPT);
   if (active && active.type === 'device') {
     const d = deviceState(active);
-    parts.push('【手机控制任务】\n1. 动作用 read_screen 返回的 rx/ry 比例坐标，不要自己猜像素；\n2. 一次只做一个主要动作，做完系统会自动验证页面变化；\n3. 页面没变化时会警告，连续 3 次未生效会自动暂停；\n4. 密码框输入会请用户确认，其它输入不会打断；\n5. 只在白名单应用内操作，切到别处会被立刻终止；\n6. 动作预算 ' + (parseInt(d.actionsUsed, 10) || 0) + '/' + deviceBudget(active) + '，用完会暂停而不是失败，用户说继续就再给一批。');
+    parts.push('【手机控制任务】\n1. 动作用 read_screen 返回的 rx/ry 比例坐标，不要自己猜像素；\n2. 一次只做一个主要动作，做完系统会自动验证页面变化；\n3. 页面没变化时会警告，连续 3 次未生效会自动暂停；\n4. 密码框输入会请用户确认，其它输入不会打断；\n5. 只在白名单应用内操作，切到别处会被立刻终止；\n6. 动作预算 ' + (parseInt(d.actionsUsed, 10) || 0) + '/' + deviceBudget(active) + '，用完会暂停而不是失败，用户说继续就再给一批；\n7. 发送消息：输入完成后用 press_key enter 提交（或 click_text「发送」），不要点被键盘挡住的坐标；发送前系统会再确认；\n8. 只回话而没有调用工具等于什么都没做。上一轮被中断、失败或停过，先用 read_screen 读当前真实页面，再从那里继续，不许假装已经完成。');
   }
   const t = buildToolsPrompt();
   if (t) parts.push(t);
@@ -6352,8 +6377,8 @@ function buildTools(runTask) {
         nodeIndex: { type: 'integer', description: '可选：read_screen 返回的节点 i，用于明确指定目标' }
       }, required: ['text'] } } });
     tools.push({ type: 'function', function: {
-      name: 'press_key', description: '执行 back、home、recents 或 notifications 系统按键。',
-      parameters: { type: 'object', properties: { key: { type: 'string', enum: ['back', 'home', 'recents', 'notifications'] } }, required: ['key'] } } });
+      name: 'press_key', description: '执行 back、home、recents、notifications 系统按键，或 enter（提交当前输入框，例如聊天里的发送）。发送前会请用户确认。',
+      parameters: { type: 'object', properties: { key: { type: 'string', enum: ['back', 'home', 'recents', 'notifications', 'enter'] } }, required: ['key'] } } });
     tools.push({ type: 'function', function: {
       name: 'launch_app', description: '按应用显示名或包名启动白名单中的应用。会先在设备上解析真实包名，再执行白名单检查。',
       parameters: { type: 'object', properties: {
@@ -6876,6 +6901,14 @@ async function execTool(name, args, runTask) {
         if (!ok) return { success: false, errorCode: 'USER_CANCELLED', error: '用户取消了密码输入' };
       }
     }
+    // 发送属于高风险动作：无论是按发送键还是点「发送」按钮，都逐次确认。
+    const keyName = String(args.key || '').toLowerCase();
+    const sendLike = (name === 'press_key' && (keyName === 'enter' || keyName === 'send')) ||
+      (name === 'click_text' && /发送|send|submit|提交/i.test(String(args.text || '')));
+    if (sendLike) {
+      const ok = await uiConfirm('这一步会真的把内容发出去（消息、评论或表单提交），确认继续？', '确认发送', '发送确认');
+      if (!ok) return { success: false, errorCode: 'USER_CANCELLED', error: '用户取消了发送' };
+    }
     if (ds.phase === 'idle' || ds.phase === 'planning') {
       deviceSetPhase(task.id, 'orienting', { action: name });
       try { await deviceOrient(task); } catch (e) {}
@@ -7395,6 +7428,8 @@ function plugExecJs(plugin, tool, args, runTask) {
 }
 
 let toolsBroken = false;
+/** 每轮新的用户消息都重新试一次工具调用：一次性的 400 不该毒化整个会话。 */
+function resetToolFallback() { toolsBroken = false; }
 
 /** 找出对话里最后一条带图片的 user 消息（截图 / 用户上传的图片） */
 function lastImageMsgIndex(list) {
@@ -7496,7 +7531,12 @@ async function chatReqTools(messages, hooks) {
           continue;
         }
       }
-      if (/tool|function|400/i.test(errText)) { fallback = true; } else { throw new Error(errText); }
+      // 只有「这个模型压根不支持工具调用」才降级成无工具对话。
+      // 以前把任意 400 都当成工具不支持，一旦撞上上下文超长之类的普通 400，
+      // 就会把 toolsBroken 永久置真 —— 之后每轮都不再发工具，
+      // 表现就是「她只回话、不调用工具，怎么强调都没用」。
+      const toolUnsupported = /tool[_ ]?call|tool[_ ]?choice|function[_ ]?call|does not support (tools|functions)|tools? (are|is) not supported|unsupported.{0,20}tool/i.test(errText);
+      if (toolUnsupported) { fallback = true; } else { throw new Error(errText); }
     }
     if (fallback) { toolsBroken = true; return await chatReq(messages); }
     if (msg === null) return await chatReq(messages);
@@ -7670,6 +7710,7 @@ async function send() {
   }
   if (routeType !== 'quick') taskBegin(routedTask.type, routedTask.title, t || routedTask.goal, routeType === 'chat' ? 30000 : CONFIG.agentTaskTimeout);
   stopRequested = false;
+  resetToolFallback();   // 新的一轮，重新带上工具再试
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;
   sending = true; ACTIVE_RUN_TASK_ID = routedTask.id; $('#send').disabled = false; $('#send').textContent = '停止';
@@ -7790,6 +7831,7 @@ async function handleQuickAction(key) {
   const useCapsule = capsuleOn(label + '中…');
 
   sending = true; ACTIVE_RUN_TASK_ID = qt.id; $('#send').disabled = true;
+  resetToolFallback();
   addMsg('user', `【${label}】`);
   const ld = addTyping();
   const live = makeAgentLive(ld);

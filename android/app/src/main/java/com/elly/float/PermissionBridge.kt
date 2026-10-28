@@ -308,6 +308,10 @@ class PermissionBridge(private val ctx: Context) {
     fun agentKey(name: String): String {
         val denied = AgentPolicy.check(ctx, "L3")
         if (denied != null) return agentResult("L3", false, denied)
+        if (name.trim().lowercase() == "enter" || name.trim().lowercase() == "send") {
+            val ok = EllyAccessibilityService.instance?.submitCurrentInput() == true
+            return agentResult("L3", ok, if (ok) "" else "没有找到可提交的输入框或发送按钮")
+        }
         val ok = EllyAccessibilityService.instance?.globalAction(name) == true
         return agentResult("L3", ok, if (ok) "" else "不支持的系统按键或执行失败")
     }
