@@ -68,6 +68,7 @@ async function send() {
   RUN_TOKEN++;
   const myRunToken = RUN_TOKEN;
   sending = true; ACTIVE_RUN_TASK_ID = routedTask.id; $('#send').disabled = false; $('#send').textContent = '停止';
+  updateRunStatus();
   inputEl.value = ''; inputEl.style.height = 'auto';
 
   addMsg('user', t || (att && att.kind === 'image' ? '（图片）' : '（文件）'));
@@ -131,6 +132,7 @@ async function send() {
   stopRequested = false;
   ACTIVE_RUN_TASK_ID = '';
   sending = false; $('#send').disabled = false; $('#send').textContent = '发送';
+  updateRunStatus();
 }
 
 /** 发送壳：send() 前半段（路由 / 切任务）如果抛错，以前是静默失败，
@@ -185,6 +187,7 @@ async function handleQuickAction(key) {
   const useCapsule = capsuleOn(label + '中…');
 
   sending = true; ACTIVE_RUN_TASK_ID = qt.id; $('#send').disabled = true;
+  updateRunStatus();
   resetToolFallback();
   addMsg('user', `【${label}】`);
   const ld = addTyping();
@@ -211,5 +214,6 @@ async function handleQuickAction(key) {
   if (QUICK_OPS.has(qt.id) && QUICK_OPS.get(qt.id).state === 'active') quickOperationFinish(qt.id, 'completed');
   ACTIVE_RUN_TASK_ID = '';
   sending = false; $('#send').disabled = false;
+  updateRunStatus();
 }
 

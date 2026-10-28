@@ -1,7 +1,11 @@
 /* ==========================================================
  *  视图切换
+ *
+ *  E1-001/002：聊天是唯一首页；其它页面都是次级页，返回时按进入顺序回退。
  * ========================================================== */
-function showView(v) {
+let CURRENT_VIEW = 'chat';
+const VIEW_STACK = ['chat'];
+function showView(v, opts) {
   const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
   const settings = $('#settings'), music = $('#music'), mini = $('#mini-player'),
     memory = $('#memory'), memEdit = $('#mem-edit'), trans = $('#trans'),
@@ -40,6 +44,67 @@ function showView(v) {
     trans.classList.add('open');
     renderTrans();
   }
+
+  // 首页固定为聊天；其它页面按进入顺序压栈，返回时逐层退回。
+  CURRENT_VIEW = v;
+  if (v === 'chat') {
+    VIEW_STACK.length = 0;
+    VIEW_STACK.push('chat');
+  } else if (!opts || !opts.noStack) {
+    if (VIEW_STACK[VIEW_STACK.length - 1] !== v) VIEW_STACK.push(v);
+  }
+}
+
+/** 返回上一级；已经在聊天页时返回 false（交给系统处理）。 */
+function viewBack() {
+  if (VIEW_STACK.length > 1) VIEW_STACK.pop();
+  const prev = VIEW_STACK[VIEW_STACK.length - 1] || 'chat';
+  showView(prev, { noStack: true });
+  return true;
+}
+function currentViewId() { return CURRENT_VIEW; }
+
+/* ==========================================================
+ *  E1-006 运行状态条
+ *  只在有任务运行时出现；显示心跳、当前目标和停止键。
+ *  它是聊天页里的一个普通 flex 子项，位于输入区上方，不覆盖输入。
+ * ========================================================== */
+let RUN_STATUS_START = 0;
+let RUN_STATUS_TIMER = 0;
+function runStatusLabel() {
+  const t = (TASKS || []).find(x => x.id === ACTIVE_RUN_TASK_ID) || currentTask() || {};
+  const goal = String(t.goal || t.title || '').trim();
+  const sec = Math.max(0, Math.round((Date.now() - RUN_STATUS_START) / 1000));
+  const phase = String(t.progress || '').trim();
+  let s = '运行中 ' + sec + 's';
+  if (phase) s += ' · ' + phase;
+  if (goal) s += ' · ' + goal;
+  return s;
+}
+function updateRunStatus() {
+  const box = $('#run-status');
+  if (!box) return;
+  const active = typeof sending !== 'undefined' && sending && ACTIVE_RUN_TASK_ID;
+  if (!active) {
+    box.hidden = true;
+    RUN_STATUS_START = 0;
+    if (RUN_STATUS_TIMER) { clearInterval(RUN_STATUS_TIMER); RUN_STATUS_TIMER = 0; }
+    return;
+  }
+  if (!RUN_STATUS_START) RUN_STATUS_START = Date.now();
+  box.hidden = false;
+  const el = $('#run-status-text');
+  if (el) el.textContent = runStatusLabel();
+  if (!RUN_STATUS_TIMER) RUN_STATUS_TIMER = setInterval(updateRunStatus, 1000);
+}
+function bindRunStatus() {
+  const stop = $('#run-status-stop');
+  if (stop) stop.onclick = () => {
+    if (typeof sending !== 'undefined' && sending) { send(); return; }
+    try { cancelTaskRequests(ACTIVE_RUN_TASK_ID || currentTask().id); } catch (e) {}
+    updateRunStatus();
+  };
+  updateRunStatus();
 }
 
 /**
@@ -47,7 +112,7 @@ function showView(v) {
  */
 function bindPluginsPage() {
   const back = $('#plug-back');
-  if (back) back.onclick = () => showView('settings');
+  if (back) back.onclick = () => viewBack();
 
   const pb = $('#plug-preview-btn');
   if (pb) pb.onclick = () => {
@@ -82,7 +147,7 @@ function bindPluginsPage() {
   const market = $('#plug-market');
   if (market) market.onclick = () => showView('plug-market');
   const marketBack = $('#plug-market-back');
-  if (marketBack) marketBack.onclick = () => showView('plugins');
+  if (marketBack) marketBack.onclick = () => viewBack();
   const marketSourceToggle = $('#plug-market-source-toggle');
   if (marketSourceToggle) marketSourceToggle.onclick = () => {
     const box = $('#plug-market-url-box');
@@ -141,7 +206,7 @@ function renderMusicCacheInfo() {
 
 function bindMusicUI() {
   $$('.mtab').forEach(tab => { tab.onclick = () => renderMusicTab(tab.dataset.tab); });
-  $('#music-back').onclick = () => showView('chat');
+  $('#music-back').onclick = () => viewBack();
   $('#fav-cnt').textContent = favorites.length;
 
   const doSearch = async (append) => {
@@ -245,10 +310,8 @@ function bindTaskUI() {
 }
 function handleNativeBack() {
   const drawer = $('#task-drawer'); if (drawer && drawer.classList.contains('open')) { drawer.classList.remove('open'); return true; }
-  const market = $('#plug-market-page'); if (market && market.classList.contains('open')) { showView('plugins'); return true; }
-  const plugins = $('#plugins'); if (plugins && plugins.classList.contains('open')) { showView('settings'); return true; }
-  const open = ['settings','music','memory','trans'].some(id => { const x = $('#' + id); return x && (x.classList.contains('open') || x.style.display === 'flex'); });
-  if (open) { showView('chat'); return true; }
+  // 所有次级页都走同一个返回栈，最终一定落回聊天。
+  if (CURRENT_VIEW !== 'chat') { viewBack(); return true; }
   return false;
 }
 window.__nativeBack = handleNativeBack;
@@ -258,6 +321,7 @@ function bindHeader() {
   const musicBtn = $('#btn-music'); if (musicBtn) musicBtn.onclick = () => { renderMusicTab('search'); showView('music'); };
   const autoBtn = $('#btn-auto-confirm'); if (autoBtn) autoBtn.onclick = () => toggleAutoConfirm();
   updateAutoConfirmBtn();
+  bindRunStatus();
   $('#btn-close').onclick = () => {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };

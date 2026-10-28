@@ -242,6 +242,20 @@ step('会话级自动确认：只在当前任务生效、过期即失效并留�
   T.taskSetCurrent(t.id);
 });
 
+step('聊天首页与返回栈：次级页逐层退回聊天（E1-001/002）', () => {
+  T.showView('settings');
+  T.showView('music');
+  if (T.currentViewId() !== 'music') throw new Error('没有切到音乐页');
+  if (!T.handleNativeBack() || T.currentViewId() !== 'settings') {
+    throw new Error('返回栈没有退回设置，实际：' + T.currentViewId());
+  }
+  if (!T.handleNativeBack() || T.currentViewId() !== 'chat') {
+    throw new Error('返回栈没有退回聊天，实际：' + T.currentViewId());
+  }
+  if (T.VIEW_STACK.length !== 1 || T.VIEW_STACK[0] !== 'chat') throw new Error('聊天首页没有清空返回栈');
+  if (T.handleNativeBack() !== false) throw new Error('聊天首页不应再拦截系统返回');
+});
+
 (async () => {
   // E2-005：连接测试只探测 /models，不发付费推理请求。
   const calls = require('./harness').calls;

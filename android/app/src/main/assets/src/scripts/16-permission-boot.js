@@ -237,6 +237,7 @@ function boot() {
     sSet('via_ai_config', CONFIG);
   }
   memMigrateLegacy();   // 旧版那条单一「长期记忆总结」→ 记忆库里的 1 条
+  showView('chat');     // E1-001：启动永远落在聊天首页
   applyTheme();
   renderActions();
   renderSettings();

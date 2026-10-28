@@ -35,6 +35,11 @@
 
   <div id="actions"></div>
   <div id="body"></div>
+  <div id="run-status" hidden aria-live="polite">
+    <span class="run-dot" aria-hidden="true"></span>
+    <span id="run-status-text">运行中</span>
+    <button id="run-status-stop" type="button">停止</button>
+  </div>
   <div id="mini-player" aria-label="正在播放">
     <div class="mini-disc">♪</div>
     <div class="mini-info"><div class="mini-name">未播放</div><div class="mini-artist">—</div></div>

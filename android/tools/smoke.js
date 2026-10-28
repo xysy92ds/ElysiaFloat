@@ -416,6 +416,22 @@ function step(name, fn) {
     }
   });
 
+  await step('聊天首页、返回栈与运行状态条（E1-001/002/006）', () => {
+    if (!/const VIEW_STACK = \['chat'\]/.test(js) || !/function viewBack\(\)/.test(js)) throw new Error('缺少返回栈');
+    if (!/CURRENT_VIEW !== 'chat'/.test(js)) throw new Error('系统返回没有走返回栈');
+    if (!/showView\('chat'\);\s+\/\/ E1-001/.test(js)) throw new Error('启动没有固定落在聊天首页');
+    for (const id of ['run-status', 'run-status-text', 'run-status-stop']) {
+      if (!html.includes('id="' + id + '"')) throw new Error('缺少运行状态条结构：#' + id);
+    }
+    if (!/const active = typeof sending !== 'undefined' && sending && ACTIVE_RUN_TASK_ID/.test(js)) throw new Error('状态条没有跟随运行状态');
+    if ((js.match(/updateRunStatus\(\);/g) || []).length < 4) throw new Error('发送/结束/快捷任务没有刷新状态条');
+    const css = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
+    const rule = (css.match(/#run-status\{[^}]*\}/g) || []).join('');
+    if (!rule) throw new Error('缺少 #run-status 样式');
+    if (/position:\s*(fixed|absolute)/.test(rule)) throw new Error('状态条不应浮在输入区上方遮挡输入');
+    if (!/@keyframes runPulse/.test(css)) throw new Error('状态条缺少心跳动画');
+  });
+
   await step('G2：长任务预算和设置保存按钮结构', () => {
     if (!/agentTaskTimeout: 1200000/.test(html) || !/max="7200"/.test(html) || !/Math\.min\(7200000/.test(html)) throw new Error('长任务默认预算或最大值未接入');
     if (!/id="set-save"[^>]*type="button"/.test(html) || !/const saveHandler/.test(html)) throw new Error('设置保存按钮未绑定可靠点击处理');
