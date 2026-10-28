@@ -31,7 +31,8 @@ const PLUG_PERMISSION_INFO = {
   'memory.write': { label: '写入长期记忆', risk: '可新增或修改记忆' },
   'memory.delete': { label: '删除长期记忆', risk: '可请求删除记忆；仍需用户确认' },
   'music.control': { label: '控制音乐', risk: '可搜索、播放、切歌、收藏和管理本地缓存' },
-  'dependencies.manage': { label: '安装/卸载依赖', risk: '可从 HTTPS 下载并校验 SHA-256 后装进插件沙箱；APK 依赖仍走系统安装器确认' }};
+  'dependencies.manage': { label: '安装/卸载依赖', risk: '可从 HTTPS 下载并校验 SHA-256 后装进插件沙箱；APK 依赖仍走系统安装器确认' },
+  'runtime.termux': { label: 'Termux 长任务', risk: '可在受控工作任务内用白名单执行器（node/python 等）启动长驻进程；每次派发仍需用户确认' }};
 const PLUG_CAPABILITY_PERMS = {
   read_screen_once: 'device.read', external_file_list: 'files.public.read', external_file_read: 'files.public.read',
   external_file_write: 'files.public.write', external_file_copy: ['files.public.read', 'files.public.write'],
@@ -46,7 +47,11 @@ const PLUG_CAPABILITY_PERMS = {
   list_memories: 'memory.read', read_memory: 'memory.read', list_memory_categories: 'memory.read',
   save_memory: 'memory.write', update_memory: 'memory.write', pin_memory: 'memory.write',
   delete_memory: 'memory.delete',
-  search_and_play_music: 'music.control', music_control: 'music.control'
+  search_and_play_music: 'music.control', music_control: 'music.control',
+  // R-001：Termux 运行时只开放五个受控工具，root_operation 永远不给插件
+  run_termux_job: 'runtime.termux', termux_job_status: 'runtime.termux',
+  termux_job_output: 'runtime.termux', termux_job_cancel: 'runtime.termux',
+  termux_jobs_list: 'runtime.termux'
 };
 const PLUG_PERMISSION_NAMES = Object.keys(PLUG_PERMISSION_INFO);
 /* 0.12 / E5-001：依赖声明只认这五类；下载类必须 HTTPS + SHA-256。 */
@@ -80,6 +85,45 @@ function plugNormalizeDependency(d) {
     license: String(d.license || '').slice(0, 40),
     why: String(d.why || d.reason || '').slice(0, 200)
   };
+}
+/* 0.13 / R-002：清单 v2 的长驻运行时块。入口只认插件沙箱内的相对 .js 路径。 */
+const PLUG_RUNTIME_KINDS = ['termux-node'];
+const PLUG_RUNTIME_RESTART = ['none', 'on-failure', 'always'];
+const PLUG_RUNTIME_ENTRY_RE = /^[A-Za-z0-9_][A-Za-z0-9_./-]{0,118}\.js$/;
+function plugRuntimeIsObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+/** 规整 runtime 块；不合法返回 null。没声明就返回 null。 */
+function plugNormalizeRuntime(raw) {
+  if (!plugRuntimeIsObject(raw)) return null;
+  const kind = String(raw.kind || '').trim();
+  const entry = String(raw.entry || '').trim();
+  if (PLUG_RUNTIME_KINDS.indexOf(kind) < 0) return null;
+  if (!PLUG_RUNTIME_ENTRY_RE.test(entry) || entry.indexOf('..') >= 0) return null;
+  const health = parseInt(raw.healthcheckMs, 10) || 15000;
+  const logMax = parseInt(raw.logMaxBytes, 10) || 1048576;
+  return {
+    kind,
+    entry,
+    // source 为空表示入口文件由用户自己放进运行时工作区；有值则由宿主在启动前写入。
+    source: typeof raw.source === 'string' ? raw.source.slice(0, 200000) : '',
+    args: (Array.isArray(raw.args) ? raw.args : []).slice(0, 20).map(a => String(a).slice(0, 200)).filter(a => a.indexOf('\u0000') < 0),
+    autostart: raw.autostart === true,
+    // 启动前把插件配置写成 runtime-config.json，入口脚本从工作目录读取（避免把配置拼进代码）。
+    configFile: raw.configFile === true,
+    restart: PLUG_RUNTIME_RESTART.indexOf(String(raw.restart || '')) >= 0 ? String(raw.restart) : 'on-failure',
+    healthcheckMs: Math.min(Math.max(health, 5000), 300000),
+    logMaxBytes: Math.min(Math.max(logMax, 65536), 10485760)
+  };
+}
+/** runtime 块的结构性错误；合法返回空串。 */
+function plugRuntimeError(raw, declared) {
+  if (raw === undefined) return '';
+  if (!plugRuntimeIsObject(raw)) return 'runtime 必须是对象';
+  if (PLUG_RUNTIME_KINDS.indexOf(String(raw.kind || '')) < 0) return 'runtime.kind 只支持 termux-node';
+  if (!plugNormalizeRuntime(raw)) return 'runtime.entry 必须是插件沙箱内的相对 .js 路径';
+  if (raw.source !== undefined && typeof raw.source !== 'string') return 'runtime.source 必须是字符串';
+  if ((declared || []).indexOf('runtime.termux') < 0) return '声明 runtime 的插件必须同时申请 runtime.termux';
+  if (raw.restart !== undefined && PLUG_RUNTIME_RESTART.indexOf(String(raw.restart)) < 0) return 'runtime.restart 只支持 none/on-failure/always';
+  return '';
 }
 function plugNormalizePermissions(value) {
   if (!Array.isArray(value)) return [];
@@ -205,7 +249,8 @@ function plugNormalize(m) {
     configFields: config.fields,
     dependencies: (Array.isArray(m.dependencies) ? m.dependencies.slice(0, 40) : [])
       .map(plugNormalizeDependency).filter(Boolean),
-    models: plugPlainObject(m.models) ? plugJsonSafe(m.models, 0) : {}
+    models: plugPlainObject(m.models) ? plugJsonSafe(m.models, 0) : {},
+    runtime: manifestVersion === 2 ? plugNormalizeRuntime(m.runtime) : null
   };
 }
 function plugPermissionDeclared(plugin, permission) {

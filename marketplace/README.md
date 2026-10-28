@@ -42,7 +42,7 @@ marketplace/
 
 市场插件必须：
 
-1. 使用 Manifest v1 和兼容的 `apiVersion`；
+1. 使用 Manifest v1 或 v2（v2 需声明 `surfaces`，长驻进程另需 `runtime` 块）；
 2. 声明最小插件级和工具级权限；
 3. 为每个工具说明输入、返回值、错误和隐私影响；
 4. 提供 `manifest.json` 和 `README.md`；

@@ -312,6 +312,286 @@ function step(name, fn) {
     T.refreshSystemPrompt(false);
   });
 
+  await step('R-001/R-002：Termux 运行时权限与清单 runtime 块', async () => {
+    if (!T.PLUG_PERMISSION_INFO['runtime.termux']) throw new Error('缺少 runtime.termux 权限说明');
+    for (const name of ['run_termux_job', 'termux_job_status', 'termux_job_output', 'termux_job_cancel', 'termux_jobs_list']) {
+      if (T.PLUG_CAPABILITY_PERMS[name] !== 'runtime.termux') throw new Error(name + ' 没有映射到 runtime.termux');
+    }
+    if (T.PLUG_CAPABILITY_PERMS.root_operation) throw new Error('root_operation 不能开放给插件');
+
+    const raw = {
+      manifestVersion: 2, apiVersion: '0.2', id: 'com.test.rt', name: '运行时插件', permissions: ['runtime.termux'],
+      runtime: { kind: 'termux-node', entry: 'index.js', autostart: true },
+      surfaces: [{ type: 'page', id: 'home', tree: { type: 'text', text: 'hi' } }]
+    };
+    if (T.plugManifestV2Error(raw)) throw new Error('合法 runtime 清单被拒：' + T.plugManifestV2Error(raw));
+    const m = T.plugNormalize(Object.assign({}, raw, { grantedPermissions: ['runtime.termux'] }));
+    if (!m || !m.runtime) throw new Error('runtime 块没有进入规整结果');
+    if (m.runtime.restart !== 'on-failure' || m.runtime.healthcheckMs !== 15000 || m.runtime.logMaxBytes !== 1048576)
+      throw new Error('runtime 默认值不对：' + JSON.stringify(m.runtime));
+    if (m.runtime.autostart !== true) throw new Error('autostart 没有保留');
+
+    const clamp = T.plugNormalizeRuntime({ kind: 'termux-node', entry: 'bin/bot.js', healthcheckMs: 1, logMaxBytes: 999999999 });
+    if (!clamp || clamp.healthcheckMs !== 5000 || clamp.logMaxBytes !== 10485760) throw new Error('runtime 数值没有夹紧');
+
+    const bad = [
+      { runtime: { kind: 'termux-node', entry: '../escape.js' }, why: '越界入口' },
+      { runtime: { kind: 'termux-node', entry: '/abs/index.js' }, why: '绝对路径入口' },
+      { runtime: { kind: 'shell', entry: 'index.js' }, why: '未知 kind' },
+      { runtime: { kind: 'termux-node', entry: 'index.js', restart: 'sometimes' }, why: '未知 restart' },
+      { runtime: { kind: 'termux-node', entry: 'index.js' }, permissions: [], why: '缺少 runtime.termux' }
+    ];
+    for (const c of bad) {
+      const v = Object.assign({}, raw, c.runtime ? { runtime: c.runtime } : {}, c.permissions ? { permissions: c.permissions } : {});
+      if (!T.plugManifestV2Error(v)) throw new Error(c.why + ' 没有被拒绝');
+    }
+    const v1 = T.plugNormalize({ manifestVersion: 1, apiVersion: '0.1', id: 'com.test.v1rt', name: 'v1',
+      permissions: [], runtime: { kind: 'termux-node', entry: 'index.js' },
+      tools: [{ name: 'rt_tool', permissions: [], kind: 'js', code: 'async function run(){return 1;}' }] });
+    if (v1 && v1.runtime) throw new Error('v1 清单不应该接受 runtime 块');
+
+    const before = { on: T.CONFIG.plugins && T.CONFIG.plugins.runtime, agent: T.CONFIG.agentEnabled, l3: T.CONFIG.agentL3, safety: T.CONFIG.agentSafety };
+    T.CONFIG.plugins = Object.assign({}, T.CONFIG.plugins, { runtime: false });
+    T.CONFIG.agentEnabled = true; T.CONFIG.agentL3 = true; T.CONFIG.agentSafety = true;
+    if (T.toolLive('run_termux_job') || T.toolLive('termux_job_status')) throw new Error('运行时开关关闭后仍能调用');
+    T.CONFIG.plugins.runtime = true;
+    T.CONFIG.agentEnabled = false;
+    if (T.toolLive('termux_job_status')) throw new Error('Agent 关闭后仍能调用');
+    T.CONFIG.plugins.runtime = before.on;
+    T.CONFIG.agentEnabled = before.agent; T.CONFIG.agentL3 = before.l3; T.CONFIG.agentSafety = before.safety;
+  });
+
+  await step('R-003/R-007：宿主托管长驻运行时（node-hello 启停）', async () => {
+    const raw = {
+      manifestVersion: 2, apiVersion: '0.2', id: 'com.test.nodehello', name: 'Node 示例',
+      permissions: ['runtime.termux'],
+      runtime: { kind: 'termux-node', entry: 'hello.js', source: 'setInterval(function(){}, 1000);', autostart: true },
+      surfaces: [{ type: 'page', id: 'home', tree: { type: 'text', text: 'hello' } }]
+    };
+    if (T.plugManifestV2Error(raw)) throw new Error('node-hello 清单被拒：' + T.plugManifestV2Error(raw));
+    const p = T.plugNormalize(Object.assign({}, raw, { grantedPermissions: ['runtime.termux'] }));
+    if (!p || !p.runtime || p.runtime.entry !== 'hello.js') throw new Error('node-hello 清单规整失败');
+    T.USER_PLUGINS.push(p);
+
+    const keepCfg = { agent: T.CONFIG.agentEnabled, l3: T.CONFIG.agentL3, safety: T.CONFIG.agentSafety, plugins: T.CONFIG.plugins };
+    T.CONFIG.agentEnabled = true; T.CONFIG.agentL3 = true; T.CONFIG.agentSafety = true;
+    T.CONFIG.plugins = Object.assign({}, T.CONFIG.plugins, { runtime: true });
+    const keepPerm = { create: Perm.createTaskWorkspace, dispatch: Perm.dispatchTermuxJob };
+    Perm.createTaskWorkspace = () => JSON.stringify({ ok: true, created: true });
+    Perm.dispatchTermuxJob = json => {
+      const job = JSON.parse(json);
+      const id = 'rtrun' + (++Perm.__fixedSeq);
+      Perm.__fixedJobs[id] = 'running';
+      calls.deps.push(['rt', job.executor, (job.args || []).join(' ')]);
+      return JSON.stringify({ ok: true, runId: id });
+    };
+
+    const modalOpen = () => { try { return T.$('#modal').classList.contains('open'); } catch (e) { return false; } };
+    try {
+      const started = await (async () => {
+        const pr = T.plugRuntimeStart(p);
+        await new Promise(r => setTimeout(r, 30));
+        if (modalOpen()) T.closeModal(true);
+        return await pr;
+      })();
+      if (!started.ok) throw new Error('启动失败：' + JSON.stringify(started));
+      const dispatched = calls.deps.filter(x => x[0] === 'rt').pop();
+      if (!dispatched || dispatched[1] !== 'node' || dispatched[2] !== 'hello.js')
+        throw new Error('没有按白名单执行器派发 node 入口：' + JSON.stringify(dispatched));
+      const rtTask = T.TASKS.filter(t => t.id === 'plug-com.test.nodehello.runtime')[0];
+      if (!rtTask) throw new Error('没有创建隐藏运行时任务');
+      if (!rtTask.hidden) throw new Error('运行时任务没有标记为隐藏');
+      if (rtTask.type !== 'workspace') throw new Error('运行时任务不是工作任务');
+      if (T.currentTask().id === rtTask.id) throw new Error('运行时任务抢走了当前任务');
+      if (T.plugRuntimeStateOf(p).runId !== started.runId) throw new Error('runId 没有记住');
+
+      const st = await T.plugRuntimeStatus(p);
+      if (!st.running || st.state !== 'running') throw new Error('状态没有报告运行中：' + JSON.stringify(st));
+
+      const stopped = await (async () => {
+        const pr = T.plugRuntimeStop(p);
+        await new Promise(r => setTimeout(r, 30));
+        if (modalOpen()) T.closeModal(true);
+        return await pr;
+      })();
+      if (!stopped.ok) throw new Error('停止失败：' + JSON.stringify(stopped));
+      const after = await T.plugRuntimeStatus(p);
+      if (after.running) throw new Error('停止后仍报告运行中');
+      if (T.plugRuntimeStateOf(p).runId) throw new Error('停止后没有清空 runId');
+
+      T.CONFIG.agentEnabled = false;
+      if (!T.plugRuntimeGuard(p)) throw new Error('Agent 关闭时没有拒绝启动');
+      T.CONFIG.agentEnabled = true;
+      p.grantedPermissions = [];
+      if (!T.plugRuntimeGuard(p)) throw new Error('未授权 runtime.termux 时没有拒绝启动');
+    } finally {
+      T.CONFIG.agentEnabled = keepCfg.agent; T.CONFIG.agentL3 = keepCfg.l3; T.CONFIG.agentSafety = keepCfg.safety;
+      T.CONFIG.plugins = keepCfg.plugins;
+      Perm.createTaskWorkspace = keepPerm.create; Perm.dispatchTermuxJob = keepPerm.dispatch;
+      const i = T.USER_PLUGINS.indexOf(p); if (i >= 0) T.USER_PLUGINS.splice(i, 1);
+      for (let k = T.TASKS.length - 1; k >= 0; k--) if (T.TASKS[k].hidden) T.TASKS.splice(k, 1);
+    }
+  });
+
+  await step('R-005/R-006：环境准备、运行面板、心跳退避与停止清理', async () => {
+    const raw = {
+      manifestVersion: 2, apiVersion: '0.2', id: 'com.test.mcenv', name: 'MC 环境',
+      permissions: ['runtime.termux', 'dependencies.manage'],
+      dependencies: [
+        { kind: 'termux-pkg', id: 'node', version: '22.11.0', source: 'nodejs' },
+        { kind: 'npm', id: 'mineflayer', version: '4.20.0', source: 'mineflayer' }
+      ],
+      runtime: { kind: 'termux-node', entry: 'bot.js', source: 'setInterval(function(){}, 1000);', autostart: true },
+      surfaces: [{ type: 'page', id: 'home', tree: { type: 'text', text: 'mc' } }]
+    };
+    if (T.plugManifestV2Error(raw)) throw new Error('带依赖的 runtime 清单被拒：' + T.plugManifestV2Error(raw));
+    const p = T.plugNormalize(Object.assign({}, raw, { grantedPermissions: ['runtime.termux', 'dependencies.manage'] }));
+    if (!p || !p.runtime) throw new Error('runtime 清单规整失败');
+    T.USER_PLUGINS.push(p);
+
+    const keepCfg = { agent: T.CONFIG.agentEnabled, l3: T.CONFIG.agentL3, safety: T.CONFIG.agentSafety, plugins: T.CONFIG.plugins };
+    T.CONFIG.agentEnabled = true; T.CONFIG.agentL3 = true; T.CONFIG.agentSafety = true;
+    T.CONFIG.plugins = Object.assign({}, T.CONFIG.plugins, { runtime: true });
+    const keepPerm = { create: Perm.createTaskWorkspace, dispatch: Perm.dispatchTermuxJob };
+    Perm.createTaskWorkspace = () => JSON.stringify({ ok: true, created: true });
+    Perm.dispatchTermuxJob = json => {
+      const job = JSON.parse(json);
+      const id = 'envrun' + (++Perm.__fixedSeq);
+      Perm.__fixedJobs[id] = 'running';
+      calls.deps.push(['rt', job.executor, (job.args || []).join(' ')]);
+      return JSON.stringify({ ok: true, runId: id });
+    };
+
+    const modalOpen = () => { try { return T.$('#modal').classList.contains('open'); } catch (e) { return false; } };
+    const drive = async (pr) => {
+      let done = false, res = null;
+      pr.then(r => { res = r; done = true; }, e => { res = { ok: false, error: e.message }; done = true; });
+      for (let i = 0; i < 400 && !done; i++) {
+        await new Promise(r => setTimeout(r, 25));
+        if (modalOpen()) T.closeModal(true);
+      }
+      if (!done) throw new Error('操作超时未结束');
+      return res;
+    };
+
+    try {
+      const env0 = T.plugRuntimeEnvOf(p);
+      if (!env0.termux) throw new Error('Termux 已装时环境判定为未装');
+      if (!env0.node || env0.nodeState !== 'missing') throw new Error('Node 依赖没有判为缺失');
+      if (env0.missing.length !== 2 || env0.ready) throw new Error('未就绪环境判定不对');
+      const cmd = T.plugRuntimeEnvCommands(p);
+      if (!/pkg update -y && pkg install -y nodejs/.test(cmd)) throw new Error('手动命令缺 Termux 包：' + cmd);
+      if (!/npm install -g mineflayer@4.20.0/.test(cmd)) throw new Error('手动命令缺 npm：' + cmd);
+
+      const panel0 = T.plugRuntimePanelHtml(p);
+      if (!panel0.includes('一键准备环境') || !panel0.includes('data-rt-start') || !panel0.includes('不会静默拉起'))
+        throw new Error('运行面板缺少关键入口或说明');
+      if (!T.plugRuntimeRowHTML(p).includes('运行面板')) throw new Error('插件行缺少运行面板入口');
+
+      const prep = await drive(T.plugRuntimePrepare(p));
+      if (!prep || !prep.ok) throw new Error('一键准备环境失败：' + JSON.stringify(prep));
+      if (T.plugRuntimeEnvOf(p).ready !== true) throw new Error('准备完成后环境仍未就绪');
+      if (T.plugDepStateOf(p, p.dependencies[1]) !== 'installed') throw new Error('npm 依赖没有记录为已安装');
+
+      const started = await drive(T.plugRuntimeStart(p));
+      if (!started || !started.ok) throw new Error('启动失败：' + JSON.stringify(started));
+      if (!T.plugRuntimeLogText(p).includes('启动')) throw new Error('启动没有写运行日志');
+      const live = await T.plugRuntimeStatus(p);
+      if (!live.running) throw new Error('启动后状态不是运行中');
+      if (!(T.plugRuntimeStateOf(p).lastSeenAt)) throw new Error('运行中没有心跳时间');
+
+      // R-006：异常退出 → 清 runId、记录错误、给出退避建议；绝不静默拉起
+      Perm.__fixedJobs[started.runId] = 'failed';
+      const seqBefore = Perm.__fixedSeq;
+      const fail = await T.plugRuntimeStatus(p);
+      if (fail.state !== 'failed') throw new Error('异常退出状态不对：' + fail.state);
+      if (Perm.__fixedSeq !== seqBefore) throw new Error('异常退出后发生了静默派发');
+      const st = T.plugRuntimeStateOf(p);
+      if (st.runId) throw new Error('异常退出后没有清空 runId');
+      if (!st.nextRetryAt) throw new Error('异常退出后没有退避时间');
+      if (!T.plugRuntimePanelHtml(p).includes('宿主不会自动重启')) throw new Error('失败后面板没有说明不会自动重启');
+
+      const stopped = await drive(T.plugRuntimeStop(p));
+      if (!stopped || !stopped.ok) throw new Error('停止失败：' + JSON.stringify(stopped));
+      const st2 = T.plugRuntimeStateOf(p);
+      if (st2.nextRetryAt || st2.runId) throw new Error('停止后没有清理重试计划');
+      if (T.plugRuntimePanelHtml(p).indexOf('就绪') < 0) throw new Error('停止后面板没有环境状态');
+    } finally {
+      T.CONFIG.agentEnabled = keepCfg.agent; T.CONFIG.agentL3 = keepCfg.l3; T.CONFIG.agentSafety = keepCfg.safety;
+      T.CONFIG.plugins = keepCfg.plugins;
+      Perm.createTaskWorkspace = keepPerm.create; Perm.dispatchTermuxJob = keepPerm.dispatch;
+      delete Perm.__deps[p.id];
+      const i = T.USER_PLUGINS.indexOf(p); if (i >= 0) T.USER_PLUGINS.splice(i, 1);
+      for (let k = T.TASKS.length - 1; k >= 0; k--) if (T.TASKS[k].hidden) T.TASKS.splice(k, 1);
+      T.plugRuntimeLogClear(p);
+    }
+  });
+
+  await step('MC-001/M-002：Minecraft 插件清单、运行时与工具边界', () => {
+    const fs = require('fs'), path = require('path');
+    const file = path.join(__dirname, '../../marketplace/plugins/com.elly.market.minecraft/manifest.json');
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const err = T.plugManifestV2Error(raw);
+    if (err) throw new Error('MC 清单不合法：' + err);
+    if (raw.manifestVersion !== 2) throw new Error('MC 清单不是 v2');
+    if (raw.permissions.indexOf('runtime.termux') < 0 || raw.permissions.indexOf('network.local') < 0)
+      throw new Error('MC 清单缺少 runtime.termux / network.local');
+
+    const p = T.plugNormalize(raw);
+    if (!p || !p.runtime) throw new Error('MC 清单规整失败');
+    if (p.runtime.entry !== 'bot.js' || !p.runtime.configFile || p.runtime.autostart !== false)
+      throw new Error('MC runtime 块不正确');
+    if (p.runtime.source.length < 1000) throw new Error('runtime.source 没有内嵌 bot.js');
+    if (!/hosted on port/.test(p.runtime.source)) throw new Error('bot.js 没有解析「Local game hosted on port」');
+    if (!/listen\(CONTROL_PORT, '127\.0\.0\.1'/.test(p.runtime.source)) throw new Error('bot.js 控制接口没有只监听本机');
+    // M-009：动作审计 + 限频；M-007：游戏内聊天只读桥
+    if (!/audit\.log/.test(p.runtime.source)) throw new Error('bot.js 没有动作审计日志');
+    if (!/RATE_LIMIT_PER_MIN/.test(p.runtime.source)) throw new Error('bot.js 没有动作限频');
+    if (!/url === '\/chat'/.test(p.runtime.source)) throw new Error('bot.js 没有聊天读取接口');
+    if (!/sinceTs > 0 && item\.ts <= sinceTs/.test(p.runtime.source)) throw new Error('聊天读取没有按 since 过滤');
+    // 未进世界时取快照不能因为 bot.inventory 还没初始化而崩溃
+    if (!/bot\.inventory && typeof bot\.inventory\.items === 'function'/.test(p.runtime.source)) throw new Error('状态快照没有保护未初始化的背包');
+
+    if (p.dependencies.length !== 5) throw new Error('依赖数量不对：' + p.dependencies.length);
+    if (!p.dependencies.some(d => d.kind === 'termux-pkg')) throw new Error('缺少 Termux Node 依赖');
+    if (p.dependencies.filter(d => d.kind === 'npm').length !== 4) throw new Error('npm 依赖不全');
+
+    const settings = p.surfaces.filter(s => s.type === 'settings')[0];
+    if (!settings) throw new Error('缺少设置页');
+    const keys = settings.config.fields.map(f => f.key);
+    ['host', 'port', 'username', 'version', 'allowActions', 'autoReconnect', 'allowedHosts'].forEach(k => {
+      if (keys.indexOf(k) < 0) throw new Error('设置页缺字段：' + k);
+    });
+    if (!p.surfaces.some(s => s.type === 'page')) throw new Error('缺少使用说明页');
+
+    const cmdTool = p.tools.filter(t => t.name === 'minecraft_bot')[0];
+    const stTool = p.tools.filter(t => t.name === 'minecraft_bot_status')[0];
+    const chatTool = p.tools.filter(t => t.name === 'minecraft_chat_read')[0];
+    if (!cmdTool || !stTool || !chatTool) throw new Error('缺少 bot 工具');
+    if (!/\/chat\?since=/.test(chatTool.code)) throw new Error('minecraft_chat_read 没有读聊天接口');
+    [cmdTool, stTool, chatTool].forEach(t => {
+      if (t.permissions.indexOf('network.local') < 0) throw new Error(t.name + ' 没有声明 network.local');
+      if (!/127\.0\.0\.1:39271/.test(t.code)) throw new Error(t.name + ' 没有指向本机控制接口');
+      if (/https?:\/\/(?!127\.0\.0\.1)/.test(t.code)) throw new Error(t.name + ' 访问了非本机地址');
+      const fn = new Function('host', '"use strict";' + t.code + '\n;return (typeof run==="function")?run:null;');
+      if (typeof fn !== 'function') throw new Error(t.name + ' 的沙箱代码不能执行');
+    });
+  });
+
+  await step('MC-002：内置市场里的 Minecraft 条目可直接安装且与清单同源', () => {
+    const fs = require('fs'), path = require('path');
+    const file = path.join(__dirname, '../../marketplace/plugins/com.elly.market.minecraft/manifest.json');
+    const raw = fs.readFileSync(file, 'utf8');
+    const bundled = T.PLUGIN_MARKET_INDEX.filter(p => p.id === 'com.elly.market.minecraft')[0];
+    if (!bundled) throw new Error('APK 内置市场缺少 Minecraft 插件');
+    // 内置条目必须和 marketplace 清单逐字一致，否则会出现两份漂移
+    if (JSON.stringify(bundled) !== JSON.stringify(JSON.parse(raw))) throw new Error('内置条目与 marketplace 清单不一致，请跑 node tools/build-mc-manifest.js');
+    if (T.plugManifestError(bundled)) throw new Error('内置条目不能通过安装校验：' + T.plugManifestError(bundled));
+    if (!bundled.runtime || bundled.runtime.entry !== 'bot.js') throw new Error('内置条目丢了 runtime 块');
+    const list = T.plugMarketEntries();
+    if (list.filter(p => p.id === 'com.elly.market.minecraft').length !== 1) throw new Error('市场里 MC 条目重复');
+  });
+
   await step('E4-001~006：挂载点、样式白名单、主题包与会话引擎', async () => {
     const okStyle = T.plugNormalizeStyle({ bg: '#123456', color: '#fff', radius: '12px', fontSize: '15px',
       shadow: '0 2px 8px #000000', danger: 'red', css: 'expression(alert(1))' });

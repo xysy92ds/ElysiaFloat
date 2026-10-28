@@ -14,6 +14,7 @@
     "scripts/03-state-tasks.js",
     "scripts/03b-persist.js",
     "scripts/04-plugins-core.js",
+    "scripts/04a-mc-market.js",
     "scripts/04b-plugin-runtime.js",
     "scripts/04c-plugin-deps.js",
     "scripts/05-memory.js",

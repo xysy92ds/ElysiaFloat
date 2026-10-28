@@ -3785,7 +3785,7 @@ async function runChatTask(task, runner) { return await runner(task); }
 async function runQuickTask(task, runner) { return await runner(task); }
 async function runDeviceTask(task, runner) { return await runner(task); }
 async function runWorkspaceTask(task, runner) { return await runner(task); }
-function renderTaskDrawer() { const box = $('#task-list'); if (!box) return; const list = TASKS.filter(t => t.state !== 'archived').slice(0, 12); const cur = currentTask();
+function renderTaskDrawer() { const box = $('#task-list'); if (!box) return; const list = TASKS.filter(t => t.state !== 'archived' && !t.hidden).slice(0, 12); const cur = currentTask();
   const detail = (cur && cur.type === 'workspace' && cur.workspaceReady) ? (function () {
     const idx = taskIndex(cur); const snaps = taskSnapshots(cur);
     const files = idx && Array.isArray(idx.files) ? idx.files.slice(0, 6) : [];
@@ -3950,7 +3950,9 @@ function toolLive(name) {
     // 工作区外仍然要求 L3 + 安全开关 + 所有文件访问
     return plugOn('files') && hasAllFilesAccess() && agentLevelAtLeast('L3');
   }
-  if (name === 'run_termux_job' || name === 'root_operation') return plugOn('runtime') && agentActionsOn();
+  if (name === 'run_termux_job' || name === 'root_operation'
+    || name === 'termux_job_status' || name === 'termux_job_output'
+    || name === 'termux_job_cancel' || name === 'termux_jobs_list') return plugOn('runtime') && agentActionsOn();
   if (name === 'open_url' || name === 'set_clipboard') return plugOn('system');
   if (name === 'fetch_url' || name === 'web_search') return plugOn('web');
   if (name === 'search_and_play_music' || name === 'music_control') return plugOn('music') && !!CONFIG.musicEnabled && !(CONFIG.toolOff && CONFIG.toolOff[name]);
@@ -4492,7 +4494,8 @@ const PLUG_PERMISSION_INFO = {
   'memory.write': { label: '写入长期记忆', risk: '可新增或修改记忆' },
   'memory.delete': { label: '删除长期记忆', risk: '可请求删除记忆；仍需用户确认' },
   'music.control': { label: '控制音乐', risk: '可搜索、播放、切歌、收藏和管理本地缓存' },
-  'dependencies.manage': { label: '安装/卸载依赖', risk: '可从 HTTPS 下载并校验 SHA-256 后装进插件沙箱；APK 依赖仍走系统安装器确认' }};
+  'dependencies.manage': { label: '安装/卸载依赖', risk: '可从 HTTPS 下载并校验 SHA-256 后装进插件沙箱；APK 依赖仍走系统安装器确认' },
+  'runtime.termux': { label: 'Termux 长任务', risk: '可在受控工作任务内用白名单执行器（node/python 等）启动长驻进程；每次派发仍需用户确认' }};
 const PLUG_CAPABILITY_PERMS = {
   read_screen_once: 'device.read', external_file_list: 'files.public.read', external_file_read: 'files.public.read',
   external_file_write: 'files.public.write', external_file_copy: ['files.public.read', 'files.public.write'],
@@ -4507,7 +4510,11 @@ const PLUG_CAPABILITY_PERMS = {
   list_memories: 'memory.read', read_memory: 'memory.read', list_memory_categories: 'memory.read',
   save_memory: 'memory.write', update_memory: 'memory.write', pin_memory: 'memory.write',
   delete_memory: 'memory.delete',
-  search_and_play_music: 'music.control', music_control: 'music.control'
+  search_and_play_music: 'music.control', music_control: 'music.control',
+  // R-001：Termux 运行时只开放五个受控工具，root_operation 永远不给插件
+  run_termux_job: 'runtime.termux', termux_job_status: 'runtime.termux',
+  termux_job_output: 'runtime.termux', termux_job_cancel: 'runtime.termux',
+  termux_jobs_list: 'runtime.termux'
 };
 const PLUG_PERMISSION_NAMES = Object.keys(PLUG_PERMISSION_INFO);
 /* 0.12 / E5-001：依赖声明只认这五类；下载类必须 HTTPS + SHA-256。 */
@@ -4541,6 +4548,45 @@ function plugNormalizeDependency(d) {
     license: String(d.license || '').slice(0, 40),
     why: String(d.why || d.reason || '').slice(0, 200)
   };
+}
+/* 0.13 / R-002：清单 v2 的长驻运行时块。入口只认插件沙箱内的相对 .js 路径。 */
+const PLUG_RUNTIME_KINDS = ['termux-node'];
+const PLUG_RUNTIME_RESTART = ['none', 'on-failure', 'always'];
+const PLUG_RUNTIME_ENTRY_RE = /^[A-Za-z0-9_][A-Za-z0-9_./-]{0,118}\.js$/;
+function plugRuntimeIsObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+/** 规整 runtime 块；不合法返回 null。没声明就返回 null。 */
+function plugNormalizeRuntime(raw) {
+  if (!plugRuntimeIsObject(raw)) return null;
+  const kind = String(raw.kind || '').trim();
+  const entry = String(raw.entry || '').trim();
+  if (PLUG_RUNTIME_KINDS.indexOf(kind) < 0) return null;
+  if (!PLUG_RUNTIME_ENTRY_RE.test(entry) || entry.indexOf('..') >= 0) return null;
+  const health = parseInt(raw.healthcheckMs, 10) || 15000;
+  const logMax = parseInt(raw.logMaxBytes, 10) || 1048576;
+  return {
+    kind,
+    entry,
+    // source 为空表示入口文件由用户自己放进运行时工作区；有值则由宿主在启动前写入。
+    source: typeof raw.source === 'string' ? raw.source.slice(0, 200000) : '',
+    args: (Array.isArray(raw.args) ? raw.args : []).slice(0, 20).map(a => String(a).slice(0, 200)).filter(a => a.indexOf('\u0000') < 0),
+    autostart: raw.autostart === true,
+    // 启动前把插件配置写成 runtime-config.json，入口脚本从工作目录读取（避免把配置拼进代码）。
+    configFile: raw.configFile === true,
+    restart: PLUG_RUNTIME_RESTART.indexOf(String(raw.restart || '')) >= 0 ? String(raw.restart) : 'on-failure',
+    healthcheckMs: Math.min(Math.max(health, 5000), 300000),
+    logMaxBytes: Math.min(Math.max(logMax, 65536), 10485760)
+  };
+}
+/** runtime 块的结构性错误；合法返回空串。 */
+function plugRuntimeError(raw, declared) {
+  if (raw === undefined) return '';
+  if (!plugRuntimeIsObject(raw)) return 'runtime 必须是对象';
+  if (PLUG_RUNTIME_KINDS.indexOf(String(raw.kind || '')) < 0) return 'runtime.kind 只支持 termux-node';
+  if (!plugNormalizeRuntime(raw)) return 'runtime.entry 必须是插件沙箱内的相对 .js 路径';
+  if (raw.source !== undefined && typeof raw.source !== 'string') return 'runtime.source 必须是字符串';
+  if ((declared || []).indexOf('runtime.termux') < 0) return '声明 runtime 的插件必须同时申请 runtime.termux';
+  if (raw.restart !== undefined && PLUG_RUNTIME_RESTART.indexOf(String(raw.restart)) < 0) return 'runtime.restart 只支持 none/on-failure/always';
+  return '';
 }
 function plugNormalizePermissions(value) {
   if (!Array.isArray(value)) return [];
@@ -4666,7 +4712,8 @@ function plugNormalize(m) {
     configFields: config.fields,
     dependencies: (Array.isArray(m.dependencies) ? m.dependencies.slice(0, 40) : [])
       .map(plugNormalizeDependency).filter(Boolean),
-    models: plugPlainObject(m.models) ? plugJsonSafe(m.models, 0) : {}
+    models: plugPlainObject(m.models) ? plugJsonSafe(m.models, 0) : {},
+    runtime: manifestVersion === 2 ? plugNormalizeRuntime(m.runtime) : null
   };
 }
 function plugPermissionDeclared(plugin, permission) {
@@ -4851,6 +4898,8 @@ let sending = false;
 let stopRequested = false;
 let ACTIVE_RUN_TASK_ID = '';
 
+/* 由 tools/build-mc-manifest.js 从 marketplace 清单生成，请勿手改。 */
+PLUGIN_MARKET_INDEX.push({"manifestVersion":2,"apiVersion":"0.2","id":"com.elly.market.minecraft","name":"Minecraft 联机助手","icon":"⛏","version":"0.3.1","author":"ElysiaFloat","homepage":"https://github.com/xysy92ds/ElysiaFloat","docs":"plugins/com.elly.market.minecraft/README.md","desc":"让 AI 陪你玩 Java 版 Minecraft：Termux 里常驻 Mineflayer bot，支持离线登录、移动、挖掘、放置、攻击、跟随、聊天、状态快照与动作审计。","permissions":["runtime.termux","dependencies.manage","network.local"],"dependencies":[{"kind":"termux-pkg","id":"nodejs","version":"latest","source":"nodejs","why":"运行 Mineflayer 桥接进程"},{"kind":"npm","id":"mineflayer","version":"latest","source":"mineflayer","license":"MIT","why":"Minecraft Java 协议客户端"},{"kind":"npm","id":"mineflayer-pathfinder","version":"latest","source":"mineflayer-pathfinder","license":"MIT","why":"寻路、跟随与躲避"},{"kind":"npm","id":"minecraft-data","version":"latest","source":"minecraft-data","license":"MIT","why":"方块与实体数据"},{"kind":"npm","id":"vec3","version":"latest","source":"vec3","license":"MIT","why":"坐标向量"}],"runtime":{"kind":"termux-node","entry":"bot.js","source":"// ElysiaFloat Minecraft 桥接进程（0.3.0）\n//\n// 由宿主 runtime 启动：宿主把插件配置写成工作目录里的 runtime-config.json，\n// 本进程读取后连接游戏、接受本机 HTTP 指令，并把状态写回同一目录。\n//\n//   读：runtime-config.json\n//   写：status.json（状态快照）、chat.log（聊天尾部）、audit.log（动作审计）\n//   听：127.0.0.1:39271  GET /status · GET /health · GET /chat · POST /cmd\n//\n// 依赖（全局 npm，由插件运行面板安装）：\n//   mineflayer mineflayer-pathfinder minecraft-data vec3\n// 只支持 Java 版离线登录（局域网房间或 online-mode=false 的服务器）。\n\n'use strict';\n\nconst fs = require('fs');\nconst path = require('path');\nconst http = require('http');\n\nconst CONTROL_PORT = 39271;\nconst STATUS_INTERVAL_MS = 2000;\nconst CHAT_MAX_BYTES = 65536;\nconst AUDIT_MAX_BYTES = 262144;\nconst MAX_TARGET_DISTANCE = 128;\nconst MAX_BODY_BYTES = 65536;\nconst RATE_LIMIT_PER_MIN = 30;   // 每分钟最多 30 个动作，超了直接拒绝，避免把服务器刷到踢人\nconst CHAT_READ_MAX = 100;\n\n/* Termux 的 npm 是全局安装，默认不会进 require 解析路径。 */\nconst PREFIX = process.env.PREFIX || '/data/data/com.termux/files/usr';\nprocess.env.NODE_PATH = [path.join(PREFIX, 'lib', 'node_modules'), '/usr/local/lib/node_modules', process.env.NODE_PATH || '']\n  .filter(Boolean).join(':');\ntry { require('module')._initPaths(); } catch (e) { /* 旧版 Node 没有 _initPaths */ }\n\nfunction log(msg) {\n  console.log('[' + new Date().toISOString().slice(11, 19) + '] ' + msg);\n}\nfunction sleep(ms) { return new Promise(r => setTimeout(r, ms)); }\nfunction readJson(file) {\n  try {\n    const text = fs.readFileSync(file, 'utf8').replace(/^\\uFEFF/, '');\n    return text.trim() ? JSON.parse(text) : null;\n  } catch (e) {\n    return null;\n  }\n}\nfunction writeJsonAtomic(file, value) {\n  try {\n    const tmp = file + '.tmp';\n    fs.writeFileSync(tmp, JSON.stringify(value));\n    fs.renameSync(tmp, file);\n  } catch (e) {\n    log('写 ' + path.basename(file) + ' 失败：' + e.message);\n  }\n}\n\n/* ---------------- 配置 ---------------- */\n\nconst rawStart = readJson(path.join(process.cwd(), 'runtime-config.json')) || {};\nconst cfg = (rawStart.config && typeof rawStart.config === 'object') ? rawStart.config : {};\n\n/** 解析 host/port：支持直接粘贴游戏里的「Local game hosted on port 12345」。 */\nfunction parseEndpoint(hostInput, portInput) {\n  let host = String(hostInput == null ? '' : hostInput).trim().replace(/^https?:\\/\\//i, '');\n  let port = parseInt(portInput, 10) || 0;\n  const m = host.match(/hosted on port\\s+(\\d{1,5})/i);\n  if (m) {\n    // 单人开房间时端口是随机的，世界里只会给出端口；对局就在本机。\n    return { host: '127.0.0.1', port: parseInt(m[1], 10), fromLanHint: true };\n  }\n  const withPort = host.match(/^([A-Za-z0-9._-]+):(\\d{1,5})$/);\n  if (withPort) {\n    host = withPort[1];\n    if (!port) port = parseInt(withPort[2], 10);\n  }\n  if (!host) host = '127.0.0.1';\n  if (!port) port = 25565;\n  return { host, port, fromLanHint: false };\n}\n\nconst endpoint = parseEndpoint(cfg.host, cfg.port);\nconst CONFIG = {\n  host: endpoint.host,\n  port: endpoint.port,\n  username: String(cfg.username || 'Elly').trim().slice(0, 16) || 'Elly',\n  version: String(cfg.version || '').trim(),\n  allowActions: String(cfg.allowActions || 'full') === 'safe' ? 'safe' : 'full',\n  autoReconnect: cfg.autoReconnect !== false,\n  allowedHosts: String(cfg.allowedHosts || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean)\n};\nconst SAFE_MODE = CONFIG.allowActions === 'safe';\nconst DANGEROUS_ACTIONS = ['dig', 'digAt', 'place', 'placeAt', 'attack', 'attackNearest', 'toss'];\n\n/* ---------------- 状态文件 ---------------- */\n\nlet bot = null;\nlet connecting = false;\nlet reconnects = 0;\nlet reconnectTimer = null;\nlet stopping = false;\nlet lastResult = null;\nlet lastError = '';\nlet lastEvent = 'start';\nlet dirty = true;\nlet lastStatusWrite = 0;\nlet movements = null;\nlet currentAction = '';\n\n/** 状态快照：面板按 username/health/food/position/onGround/players/connected/event 读取。 */\nfunction snapshot() {\n  const entity = bot && bot.entity;\n  const state = {\n    ts: Date.now(),\n    plugin: (rawStart.plugin && rawStart.plugin.name) || 'Minecraft 联机助手',\n    connected: !!(bot && bot.entity),\n    connecting: connecting,\n    host: CONFIG.host,\n    port: CONFIG.port,\n    lanHint: endpoint.fromLanHint,\n    username: bot ? bot.username : CONFIG.username,\n    version: bot ? bot.version : (CONFIG.version || ''),\n    allowActions: CONFIG.allowActions,\n    autoReconnect: CONFIG.autoReconnect,\n    reconnects: reconnects,\n    controlPort: CONTROL_PORT,\n    health: bot && bot.health != null ? Math.round(bot.health * 10) / 10 : null,\n    food: bot && bot.food != null ? Math.round(bot.food * 10) / 10 : null,\n    position: entity ? {\n      x: Math.round(entity.position.x * 100) / 100,\n      y: Math.round(entity.position.y * 100) / 100,\n      z: Math.round(entity.position.z * 100) / 100,\n      yaw: Math.round(entity.yaw * 100) / 100\n    } : null,\n    onGround: entity ? !!entity.onGround : null,\n    players: bot && bot.players ? Object.keys(bot.players).filter(n => n !== bot.username) : [],\n    nearbyPlayers: bot && bot.players ? Object.keys(bot.players).filter(n => n !== bot.username && bot.players[n].entity).map(n => {\n      const e = bot.players[n].entity;\n      return { name: n, pos: { x: Math.round(e.position.x), y: Math.round(e.position.y), z: Math.round(e.position.z) } };\n    }) : [],\n    // 连接尚未进入世界时 inventory 还没有，取快照不能因为只读状态把进程带崩。\n    inventory: bot && bot.inventory && typeof bot.inventory.items === 'function'\n      ? bot.inventory.items().slice(0, 36).map(i => ({ name: i.name, count: i.count })) : [],\n    currentAction: currentAction || null,\n    lastResult: lastResult,\n    lastError: lastError,\n    event: lastEvent\n  };\n  return state;\n}\nfunction writeStatus(force) {\n  const now = Date.now();\n  if (!force && !dirty && now - lastStatusWrite < STATUS_INTERVAL_MS) return;\n  lastStatusWrite = now;\n  dirty = false;\n  let snap;\n  try { snap = snapshot(); } catch (e) { log('生成状态失败：' + e.message); return; }\n  writeJsonAtomic(path.join(process.cwd(), 'status.json'), snap);\n}\n\n/* ---------------- 聊天记录 ---------------- */\n\nfunction appendChat(user, msg) {\n  try {\n    const file = path.join(process.cwd(), 'chat.log');\n    const line = JSON.stringify({ ts: Date.now(), user: String(user || ''), msg: String(msg || '').slice(0, 300) }) + '\\n';\n    if (fs.existsSync(file) && fs.statSync(file).size + line.length > CHAT_MAX_BYTES) {\n      const keep = fs.readFileSync(file, 'utf8');\n      fs.writeFileSync(file, keep.slice(Math.floor(keep.length / 2)));\n    }\n    fs.appendFileSync(file, line);\n  } catch (e) { /* 聊天记录失败不影响主流程 */ }\n}\n\n/** 读最近聊天：since 是毫秒时间戳，返回其后的消息（最多 CHAT_READ_MAX 条）。 */\nfunction readChat(sinceTs, limit) {\n  const file = path.join(process.cwd(), 'chat.log');\n  let lines = [];\n  try { lines = fs.readFileSync(file, 'utf8').split('\\n'); } catch (e) { return []; }\n  const out = [];\n  for (let i = 0; i < lines.length; i++) {\n    if (!lines[i].trim()) continue;\n    let item;\n    try { item = JSON.parse(lines[i]); } catch (e) { continue; }\n    if (!item || typeof item.ts !== 'number') continue;\n    if (sinceTs > 0 && item.ts <= sinceTs) continue;\n    out.push({ ts: item.ts, user: String(item.user || ''), msg: String(item.msg || '') });\n  }\n  return out.slice(-limit);\n}\n\n/* ---------------- 审计 ---------------- */\n\n/** 每个被执行的指令都落一行 JSON，便于事后核对 AI 到底做了什么。 */\nfunction audit(record) {\n  try {\n    const file = path.join(process.cwd(), 'audit.log');\n    const line = JSON.stringify(record) + '\\n';\n    if (fs.existsSync(file) && fs.statSync(file).size + line.length > AUDIT_MAX_BYTES) {\n      const keep = fs.readFileSync(file, 'utf8');\n      fs.writeFileSync(file, keep.slice(Math.floor(keep.length / 2)));\n    }\n    fs.appendFileSync(file, line);\n  } catch (e) { /* 审计失败不影响主流程 */ }\n}\n\nconst actionTimes = [];\nfunction rateLimited() {\n  const now = Date.now();\n  while (actionTimes.length && now - actionTimes[0] > 60000) actionTimes.shift();\n  if (actionTimes.length >= RATE_LIMIT_PER_MIN) return true;\n  actionTimes.push(now);\n  return false;\n}\n\n/** 审计里只保留动作和关键参数，不落整段聊天以外的自由文本。 */\nfunction auditArgs(cmd) {\n  const keys = ['direction', 'ticks', 'x', 'y', 'z', 'player', 'distance', 'item', 'count', 'filter', 'timeoutMs'];\n  const out = {};\n  keys.forEach(k => { if (cmd[k] != null) out[k] = typeof cmd[k] === 'string' ? cmd[k].slice(0, 64) : cmd[k]; });\n  if (cmd.text != null) out.text = String(cmd.text).slice(0, 80);\n  return out;\n}\n\n/* ---------------- 动作 ---------------- */\n\nfunction fail(message) { return { ok: false, error: message }; }\n\nfunction distTo(p) {\n  const e = bot && bot.entity;\n  if (!e || !p) return 0;\n  const dx = e.position.x - p.x, dy = e.position.y - p.y, dz = e.position.z - p.z;\n  return Math.sqrt(dx * dx + dy * dy + dz * dz);\n}\nfunction intArg(v, name) {\n  const n = parseInt(v, 10);\n  if (!Number.isFinite(n)) throw new Error('参数 ' + name + ' 必须是整数');\n  return n;\n}\nfunction numArg(v, name) {\n  const n = Number(v);\n  if (!Number.isFinite(n)) throw new Error('参数 ' + name + ' 必须是数字');\n  return n;\n}\nfunction itemByName(name) {\n  const key = String(name || '').toLowerCase();\n  const items = bot.inventory.items();\n  return key ? (items.filter(i => i.name === key)[0] || items.filter(i => i.name.indexOf(key) >= 0)[0] || null) : null;\n}\nfunction findPlaceableItem(hint) {\n  const hinted = hint ? itemByName(hint) : null;\n  if (hinted) return hinted;\n  if (!hint) {\n    const blocks = (bot.registry && bot.registry.blocksByName) || {};\n    const hit = bot.inventory.items().filter(i => !!blocks[i.name])[0];\n    if (hit) return hit;\n  }\n  return null;\n}\nfunction unitFace(from, to) {\n  const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;\n  if (Math.abs(dx) >= Math.abs(dy) && Math.abs(dx) >= Math.abs(dz)) return { x: Math.sign(dx), y: 0, z: 0 };\n  if (Math.abs(dy) >= Math.abs(dz)) return { x: 0, y: Math.sign(dy), z: 0 };\n  return { x: 0, y: 0, z: Math.sign(dz) };\n}\n/** 在 target 格放方块：找一个相邻实心方块当参考面。 */\nasync function placeAt(targetPos, itemName) {\n  const vec3 = require('vec3');\n  const target = bot.blockAt(new vec3(targetPos.x, targetPos.y, targetPos.z));\n  if (!target) return fail('目标位置不在已加载的区块里');\n  if (target.name !== 'air' && target.name !== 'cave_air' && target.name !== 'void_air') return fail('目标位置不是空气：' + target.name);\n  const item = findPlaceableItem(itemName);\n  if (!item) return fail(itemName ? ('背包里没有方块：' + itemName) : '背包里没有可放置的方块');\n  await bot.equip(item, 'hand');\n  const around = [[0, -1, 0], [0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]];\n  for (const off of around) {\n    const pos = { x: target.position.x + off[0], y: target.position.y + off[1], z: target.position.z + off[2] };\n    const ref = bot.blockAt(new vec3(pos.x, pos.y, pos.z));\n    if (!ref || ref.name === 'air' || ref.name === 'cave_air' || ref.name === 'void_air') continue;\n    const face = unitFace(ref.position, target.position);\n    await bot.placeBlock(ref, new vec3(face.x, face.y, face.z));\n    return { ok: true, action: 'placeAt', block: item.name, pos: targetPos };\n  }\n  return fail('目标四周没有可依附的方块');\n}\nfunction nearestHostile(range) {\n  return bot.nearestEntity(e => e !== bot.entity && e.type !== 'player' &&\n    /(zombie|skeleton|creeper|spider|enderman|witch|husk|drowned|stray|phantom|pillager|vindicator|ravager|blaze|slime|magma_cube|wither)/i.test(e.name || '') &&\n    distTo(e.position) <= range);\n}\nasync function gotoWithTimeout(goal, timeoutMs) {\n  const timer = sleep(timeoutMs).then(() => 'timeout');\n  const run = bot.pathfinder.goto(goal).then(() => 'ok', e => 'error:' + e.message);\n  const out = await Promise.race([run, timer]);\n  if (out !== 'ok') {\n    try { bot.pathfinder.setGoal(null); } catch (e) {}\n    if (out === 'timeout') return fail('寻路超时（' + Math.round(timeoutMs / 1000) + ' 秒）');\n    return fail('寻路失败：' + out.slice(6));\n  }\n  return null;\n}\n\nasync function execute(cmd) {\n  const type = String(cmd.action || '').trim();\n  if (!type) return fail('缺少 action');\n  if (!bot || !bot.entity) return fail('bot 尚未连接游戏');\n  if (SAFE_MODE && DANGEROUS_ACTIONS.indexOf(type) >= 0) {\n    return fail('当前是安全模式（只允许移动/寻路/聊天/查看）；要挖掘、放置或攻击请到插件配置把「行为边界」改成完整');\n  }\n  const vec3 = require('vec3');\n  currentAction = type;\n  try {\n    switch (type) {\n      case 'say': {\n        const text = String(cmd.text || '').replace(/[\\r\\n]+/g, ' ').trim().slice(0, 240);\n        if (!text) return fail('聊天内容不能为空');\n        bot.chat(text);\n        return { ok: true, action: 'say', text };\n      }\n      case 'move': {\n        const dir = String(cmd.direction || cmd.dir || 'forward');\n        const valid = ['forward', 'back', 'left', 'right', 'jump', 'sprint', 'sneak'];\n        if (valid.indexOf(dir) < 0) return fail('无效方向：' + dir + '（可用 ' + valid.join('/') + '）');\n        const ticks = Math.max(1, Math.min(200, intArg(cmd.ticks == null ? 10 : cmd.ticks, 'ticks')));\n        bot.setControlState(dir, true);\n        await bot.waitForTicks(ticks);\n        bot.setControlState(dir, false);\n        return { ok: true, action: 'move', direction: dir, ticks };\n      }\n      case 'jump': {\n        bot.setControlState('jump', true);\n        await bot.waitForTicks(10);\n        bot.setControlState('jump', false);\n        return { ok: true, action: 'jump' };\n      }\n      case 'look': {\n        const yaw = numArg(cmd.yaw, 'yaw');\n        const pitch = cmd.pitch == null ? 0 : numArg(cmd.pitch, 'pitch');\n        await bot.look(yaw, pitch, true);\n        return { ok: true, action: 'look', yaw, pitch };\n      }\n      case 'lookAt': {\n        await bot.lookAt(new vec3(numArg(cmd.x, 'x'), numArg(cmd.y, 'y'), numArg(cmd.z, 'z')), true);\n        return { ok: true, action: 'lookAt' };\n      }\n      case 'dig': {\n        const block = bot.blockAtCursor(4);\n        if (!block) return fail('视线 4 格内没有方块');\n        await bot.dig(block);\n        return { ok: true, action: 'dig', block: block.name };\n      }\n      case 'digAt': {\n        const pos = { x: intArg(cmd.x, 'x'), y: intArg(cmd.y, 'y'), z: intArg(cmd.z, 'z') };\n        if (distTo(pos) > MAX_TARGET_DISTANCE) return fail('目标太远（上限 ' + MAX_TARGET_DISTANCE + ' 格）');\n        const block = bot.blockAt(new vec3(pos.x, pos.y, pos.z));\n        if (!block) return fail('目标位置不在已加载的区块里');\n        if (block.name === 'air' || block.name === 'cave_air' || block.name === 'void_air') return fail('目标位置已经是空气');\n        await bot.dig(block);\n        return { ok: true, action: 'digAt', block: block.name, pos };\n      }\n      case 'place': {\n        const ref = bot.blockAtCursor(4);\n        if (!ref) return fail('视线 4 格内没有可依附的方块');\n        return await placeAt({ x: ref.position.x, y: ref.position.y + 1, z: ref.position.z }, cmd.item);\n      }\n      case 'placeAt': {\n        const pos = { x: intArg(cmd.x, 'x'), y: intArg(cmd.y, 'y'), z: intArg(cmd.z, 'z') };\n        if (distTo(pos) > MAX_TARGET_DISTANCE) return fail('目标太远（上限 ' + MAX_TARGET_DISTANCE + ' 格）');\n        return await placeAt(pos, cmd.item);\n      }\n      case 'attack': {\n        const target = bot.nearestEntity(e => e !== bot.entity && (e.type === 'mob' || e.type === 'hostile') && distTo(e.position) <= 4);\n        if (!target) return fail('4 格内没有可以攻击的生物');\n        await bot.attack(target);\n        return { ok: true, action: 'attack', target: target.name || target.username || target.type };\n      }\n      case 'attackNearest': {\n        if (cmd.filter === 'player') return fail('不允许攻击玩家；只允许攻击敌对生物');\n        const target = nearestHostile(16);\n        if (!target) return fail('16 格内没有敌对生物');\n        await bot.attack(target);\n        return { ok: true, action: 'attackNearest', target: target.name || target.type };\n      }\n      case 'flee': {\n        const threat = nearestHostile(16);\n        if (!threat) return fail('16 格内没有需要躲避的敌对生物');\n        const { goals } = require('mineflayer-pathfinder');\n        bot.pathfinder.setGoal(new goals.GoalInvert(new goals.GoalFollow(threat, 12)), true);\n        await sleep(3000);\n        try { bot.pathfinder.setGoal(null); } catch (e) {}\n        return { ok: true, action: 'flee', from: threat.name || threat.type, distance: Math.round(distTo(threat.position)) };\n      }\n      case 'pathfind': {\n        const pos = { x: Math.floor(numArg(cmd.x, 'x')), y: Math.floor(numArg(cmd.y, 'y')), z: Math.floor(numArg(cmd.z, 'z')) };\n        if (distTo(pos) > MAX_TARGET_DISTANCE) return fail('目标太远（上限 ' + MAX_TARGET_DISTANCE + ' 格）');\n        const { goals } = require('mineflayer-pathfinder');\n        const bad = await gotoWithTimeout(new goals.GoalBlock(pos.x, pos.y, pos.z), Math.max(5000, Math.min(60000, intArg(cmd.timeoutMs == null ? 25000 : cmd.timeoutMs, 'timeoutMs'))));\n        return bad || { ok: true, action: 'pathfind', pos };\n      }\n      case 'follow': {\n        const name = String(cmd.player || '').trim();\n        if (!name) return fail('需要 player 参数');\n        const p = bot.players[name];\n        if (!p || !p.entity) return fail('找不到玩家：' + name);\n        const { goals } = require('mineflayer-pathfinder');\n        const distance = Math.max(1, Math.min(8, intArg(cmd.distance == null ? 2 : cmd.distance, 'distance')));\n        bot.pathfinder.setGoal(new goals.GoalFollow(p.entity, distance), true);\n        return { ok: true, action: 'follow', player: name, distance, note: '跟随会持续到 stop' };\n      }\n      case 'equip': {\n        const item = itemByName(cmd.item);\n        if (!item) return fail('背包里没有物品：' + String(cmd.item || ''));\n        await bot.equip(item, cmd.hand === 'off-hand' ? 'off-hand' : 'hand');\n        return { ok: true, action: 'equip', item: item.name };\n      }\n      case 'toss': {\n        const item = itemByName(cmd.item);\n        if (!item) return fail('背包里没有物品：' + String(cmd.item || ''));\n        const count = Math.max(1, Math.min(item.count, intArg(cmd.count == null ? 1 : cmd.count, 'count')));\n        await bot.toss(item.type, null, count);\n        return { ok: true, action: 'toss', item: item.name, count };\n      }\n      case 'stop': {\n        try { bot.pathfinder.setGoal(null); } catch (e) {}\n        ['forward', 'back', 'left', 'right', 'jump', 'sprint', 'sneak'].forEach(c => bot.setControlState(c, false));\n        try { bot.stopDigging(); } catch (e) {}\n        return { ok: true, action: 'stop' };\n      }\n      case 'status':\n        return { ok: true, action: 'status', status: snapshot() };\n      default:\n        return fail('未知动作：' + type + '（可用 say/move/jump/look/lookAt/dig/digAt/place/placeAt/attack/attackNearest/flee/pathfind/follow/equip/toss/stop/status）');\n    }\n  } catch (e) {\n    return fail(type + ' 失败：' + (e && e.message ? e.message : String(e)));\n  } finally {\n    currentAction = '';\n    dirty = true;\n  }\n}\n\n/* ---------------- 连接 ---------------- */\n\nfunction loadMineflayer() {\n  let mineflayer, pathfinderMod, mcDataFn;\n  try {\n    mineflayer = require('mineflayer');\n    pathfinderMod = require('mineflayer-pathfinder');\n    mcDataFn = require('minecraft-data');\n    require('vec3');\n  } catch (e) {\n    log('缺少 Node 依赖：' + e.message);\n    log('请先在插件运行面板点「一键准备环境」，或在 Termux 里执行：npm install -g mineflayer mineflayer-pathfinder minecraft-data vec3');\n    lastError = '缺少 Node 依赖：' + e.message;\n    lastEvent = 'missing-dependency';\n    writeStatus(true);\n    process.exit(2);\n  }\n  return { mineflayer, pathfinderMod, mcDataFn };\n}\n\nfunction connect() {\n  if (stopping) return;\n  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }\n  connecting = true;\n  lastEvent = reconnects > 0 ? 'reconnect' : 'connecting';\n  dirty = true;\n  writeStatus(true);\n  log('连接 ' + CONFIG.host + ':' + CONFIG.port + '（离线登录，玩家名 ' + CONFIG.username + '）');\n  const { mineflayer, pathfinderMod, mcDataFn } = loadMineflayer();\n  let next;\n  try {\n    next = mineflayer.createBot({\n      host: CONFIG.host,\n      port: CONFIG.port,\n      username: CONFIG.username,\n      auth: 'offline',\n      version: CONFIG.version || false,\n      hideErrors: true\n    });\n  } catch (e) {\n    connecting = false;\n    lastError = '创建连接失败：' + e.message;\n    lastEvent = 'error';\n    dirty = true;\n    writeStatus(true);\n    scheduleReconnect();\n    return;\n  }\n  bot = next;\n  next.loadPlugin(pathfinderMod.pathfinder);\n\n  next.on('spawn', () => {\n    connecting = false;\n    reconnects = 0;\n    lastError = '';\n    lastEvent = 'spawn';\n    log('已进入世界，版本 ' + next.version);\n    try {\n      movements = new pathfinderMod.Movements(next, mcDataFn(next.version));\n      movements.canDig = false;          // 寻路不挖方块，避免破坏你的世界\n      movements.allow1by1towers = false; // 不自动垫柱子\n      next.pathfinder.setMovements(movements);\n    } catch (e) { log('寻路初始化失败：' + e.message); }\n    dirty = true;\n    writeStatus(true);\n  });\n\n  next.on('chat', (username, message) => {\n    if (!username || username === next.username) return;\n    appendChat(username, message);\n    log('[聊天] ' + username + ': ' + message.slice(0, 160));\n    dirty = true;\n  });\n\n  next.on('playerJoined', p => { log('玩家进入：' + p.username); dirty = true; });\n  next.on('playerLeft', p => { log('玩家离开：' + p.username); dirty = true; });\n  next.on('health', () => { dirty = true; });\n  next.on('death', () => {\n    lastEvent = 'death';\n    lastError = 'bot 死亡，等待复活或服务器处理';\n    log('bot 死亡，坐标 ' + JSON.stringify(next.entity ? next.entity.position : null));\n    dirty = true;\n    writeStatus(true);\n  });\n  next.on('kicked', reason => {\n    lastError = '被服务器踢出：' + (typeof reason === 'string' ? reason : JSON.stringify(reason)).slice(0, 300);\n    lastEvent = 'kicked';\n    log(lastError);\n    dirty = true;\n  });\n  next.on('error', err => {\n    lastError = '连接错误：' + (err && err.message ? err.message : String(err));\n    lastEvent = 'error';\n    log(lastError);\n    dirty = true;\n  });\n  next.on('end', reason => {\n    connecting = false;\n    bot = null;\n    lastEvent = 'end';\n    log('连接结束（' + String(reason || '未知') + '）');\n    dirty = true;\n    writeStatus(true);\n    scheduleReconnect();\n  });\n}\n\nfunction scheduleReconnect() {\n  if (stopping || !CONFIG.autoReconnect || reconnectTimer) return;\n  reconnects++;\n  const delay = Math.min(60000, 3000 * Math.pow(2, Math.min(reconnects - 1, 5)));\n  lastEvent = 'waiting-reconnect';\n  log(Math.round(delay / 1000) + ' 秒后重连（第 ' + reconnects + ' 次）');\n  dirty = true;\n  writeStatus(true);\n  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, delay);\n}\n\n/* ---------------- 本机控制接口 ---------------- */\n\nconst queue = [];\nlet running = false;\n\nfunction enqueue(cmd) {\n  return new Promise((resolve, reject) => {\n    if (queue.length >= 8) return reject(new Error('命令队列已满，请稍后再试'));\n    queue.push({ cmd, resolve, reject });\n    pump();\n  });\n}\nasync function pump() {\n  if (running) return;\n  const job = queue.shift();\n  if (!job) return;\n  running = true;\n  const started = Date.now();\n  const cmd = job.cmd || {};\n  const action = String(cmd.action || '').trim();\n  try {\n    // status 是只读快照，不参与限频；其它动作每分钟最多 RATE_LIMIT_PER_MIN 个。\n    let result;\n    if (action !== 'status' && rateLimited()) {\n      result = { ok: false, error: '动作太频繁：每分钟最多 ' + RATE_LIMIT_PER_MIN + ' 个，请稍后再试' };\n    } else {\n      result = await execute(cmd);\n    }\n    lastResult = { ts: Date.now(), action: action, ok: result.ok, error: result.error || '' };\n    if (result.ok) lastError = ''; else lastError = String(result.error || '');\n    audit({ ts: Date.now(), action: action, ok: result.ok === true, error: result.ok ? '' : String(result.error || '').slice(0, 240), ms: Date.now() - started, args: auditArgs(cmd) });\n    dirty = true;\n    job.resolve(result);\n  } catch (e) {\n    job.reject(e);\n  } finally {\n    running = false;\n    writeStatus(true);\n    if (queue.length) pump();\n  }\n}\n\nfunction sendJson(res, code, value) {\n  const body = JSON.stringify(value);\n  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body), 'Connection': 'close' });\n  res.end(body);\n}\nfunction isLoopback(req) {\n  const a = String((req.socket && req.socket.remoteAddress) || '');\n  return a === '127.0.0.1' || a === '::1' || a === '::ffff:127.0.0.1';\n}\nfunction readQuery(req, key) {\n  const q = String((req.url || '')).split('?')[1] || '';\n  const parts = q.split('&');\n  for (let i = 0; i < parts.length; i++) {\n    const kv = parts[i].split('=');\n    if (decodeURIComponent(kv[0] || '') === key) {\n      try { return decodeURIComponent(kv.slice(1).join('=') || ''); } catch (e) { return ''; }\n    }\n  }\n  return '';\n}\n\nfunction startServer() {\n  const server = http.createServer((req, res) => {\n    if (!isLoopback(req)) { sendJson(res, 403, { ok: false, error: '只接受本机连接' }); return; }\n    const url = String(req.url || '/').split('?')[0];\n    if (req.method === 'GET' && (url === '/status' || url === '/health')) {\n      sendJson(res, 200, Object.assign({ ok: true }, snapshot()));\n      return;\n    }\n    if (req.method === 'GET' && url === '/chat') {\n      const since = Math.max(0, parseInt(readQuery(req, 'since'), 10) || 0);\n      const limit = Math.max(1, Math.min(CHAT_READ_MAX, parseInt(readQuery(req, 'limit'), 10) || 30));\n      const messages = readChat(since, limit);\n      const lastTs = messages.length ? messages[messages.length - 1].ts : since;\n      sendJson(res, 200, { ok: true, since: since, lastTs: lastTs, count: messages.length, messages: messages });\n      return;\n    }\n    if (req.method !== 'POST' || url !== '/cmd') {\n      sendJson(res, 404, { ok: false, error: '未知接口：' + req.method + ' ' + url + '（可用 GET /status、GET /chat、POST /cmd）' });\n      return;\n    }\n    const chunks = [];\n    let size = 0;\n    req.on('data', c => {\n      size += c.length;\n      if (size > MAX_BODY_BYTES) { sendJson(res, 413, { ok: false, error: '请求体过大' }); req.destroy(); return; }\n      chunks.push(c);\n    });\n    req.on('end', () => {\n      if (size > MAX_BODY_BYTES) return;\n      let cmd;\n      try { cmd = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); }\n      catch (e) { sendJson(res, 400, { ok: false, error: '请求体不是合法 JSON' }); return; }\n      if (!cmd || typeof cmd !== 'object' || Array.isArray(cmd)) { sendJson(res, 400, { ok: false, error: '指令必须是对象' }); return; }\n      enqueue(cmd).then(\n        r => sendJson(res, 200, r),\n        e => sendJson(res, 429, { ok: false, error: (e && e.message) || '执行失败' })\n      );\n    });\n    req.on('error', () => { try { res.destroy(); } catch (e) {} });\n  });\n  server.on('error', e => {\n    lastError = '控制端口 ' + CONTROL_PORT + ' 不可用：' + e.message;\n    lastEvent = 'error';\n    log(lastError);\n    dirty = true;\n    writeStatus(true);\n    process.exit(3);\n  });\n  server.listen(CONTROL_PORT, '127.0.0.1', () => {\n    log('控制接口已就绪：http://127.0.0.1:' + CONTROL_PORT + '（只监听本机）');\n  });\n  return server;\n}\n\n/* ---------------- 启动 ---------------- */\n\nfunction shutdown(signal) {\n  if (stopping) return;\n  stopping = true;\n  log('收到 ' + signal + '，正在停止…');\n  try { if (bot) bot.quit(); } catch (e) {}\n  lastEvent = 'stopped';\n  lastError = '';\n  dirty = true;\n  writeStatus(true);\n  setTimeout(() => process.exit(0), 300);\n}\nprocess.on('SIGTERM', () => shutdown('SIGTERM'));\nprocess.on('SIGINT', () => shutdown('SIGINT'));\nprocess.on('uncaughtException', e => {\n  log('未捕获异常：' + (e && e.stack ? e.stack : e));\n  lastError = '未捕获异常：' + (e && e.message ? e.message : e);\n  dirty = true;\n  writeStatus(true);\n});\n\nfunction validateConfig() {\n  const bad = [];\n  if (!/^[A-Za-z0-9._-]{1,64}$/.test(CONFIG.host)) bad.push('host 不合法：' + CONFIG.host);\n  if (!(CONFIG.port >= 1 && CONFIG.port <= 65535)) bad.push('port 不合法：' + CONFIG.port);\n  if (!/^[A-Za-z0-9_]{1,16}$/.test(CONFIG.username)) bad.push('用户名只允许字母、数字和下划线，最长 16 位');\n  if (CONFIG.allowedHosts.length && CONFIG.allowedHosts.indexOf(CONFIG.host.toLowerCase()) < 0) {\n    bad.push('host ' + CONFIG.host + ' 不在授权列表（' + CONFIG.allowedHosts.join('、') + '）里');\n  }\n  return bad;\n}\n\nfunction main() {\n  log('ElysiaFloat Minecraft 桥接进程启动，工作目录 ' + process.cwd());\n  const bad = validateConfig();\n  if (bad.length) {\n    lastError = bad.join('；');\n    lastEvent = 'config-error';\n    dirty = true;\n    writeStatus(true);\n    log('配置错误：' + lastError);\n    process.exit(2);\n    return;\n  }\n  log('目标 ' + CONFIG.host + ':' + CONFIG.port +\n    (endpoint.fromLanHint ? '（已从「Local game hosted on port」解析为本机端口）' : '') +\n    '；行为边界 ' + (SAFE_MODE ? '安全模式' : '完整') + '；自动重连 ' + (CONFIG.autoReconnect ? '开' : '关'));\n  startServer();\n  writeStatus(true);\n  connect();\n  setInterval(() => { dirty = true; writeStatus(false); }, STATUS_INTERVAL_MS);\n}\n\nmain();\n","configFile":true,"autostart":false,"restart":"on-failure","healthcheckMs":15000,"logMaxBytes":2097152},"surfaces":[{"type":"settings","id":"mc-config","title":"连接与行为","desc":"配置服务器地址、离线用户名和行为边界。改动会立即保存，下次启动时生效。","config":{"schemaVersion":1,"fields":[{"key":"host","type":"string","label":"服务器地址","required":true,"default":"127.0.0.1","desc":"同机就填 127.0.0.1，局域网填开房间那台设备的 IP。也可以直接粘贴游戏里的「Local game hosted on port 12345」，会自动取端口并连本机。"},{"key":"port","type":"number","label":"端口","required":true,"default":25565,"min":1,"max":65535,"desc":"Java 版默认 25565；单人「对局域网开放」的端口每次随机，以游戏内提示为准。"},{"key":"username","type":"string","label":"离线用户名","default":"Elly","desc":"离线登录名，只允许字母、数字和下划线，最长 16 位。"},{"key":"version","type":"string","label":"游戏版本","default":"","desc":"留空自动识别；协议不匹配时手填，例如 1.20.4。"},{"key":"allowActions","type":"enum","label":"行为边界","default":"full","options":[{"value":"full","label":"完整：移动、挖掘、放置、攻击"},{"value":"safe","label":"安全：只移动、寻路、聊天、查看"}],"desc":"安全模式下挖掘/放置/攻击/丢弃一律拒绝，AI 无法改变你的世界。"},{"key":"autoReconnect","type":"boolean","label":"断线自动重连","default":true,"desc":"在 bot 进程内部重连，退避最长 60 秒；关掉后断线就停在未连接状态。"},{"key":"allowedHosts","type":"string","label":"授权服务器（可选）","default":"","desc":"逗号分隔的主机名或 IP；留空不限制。填了就只允许连列表里的地址。"}]}},{"type":"page","id":"mc-guide","title":"使用说明","icon":"📖","desc":"从装依赖到和 AI 一起联机的完整步骤。","tree":[{"type":"text","size":"lg","text":"Minecraft 联机助手（Java 版）"},{"type":"text","muted":true,"text":"bot 在 Termux 里常驻，App 只负责配置、启停、状态和日志；AI 通过受控工具给它下指令。"},{"type":"divider"},{"type":"list","items":[{"title":"1. 准备环境","desc":"插件行 → 依赖，或打开运行面板点「一键准备环境」，装好 Node.js 与 mineflayer 等 npm 包。"},{"title":"2. 开好世界","desc":"Java 版单人游戏 → 对局域网开放，记下聊天栏里的「Local game hosted on port xxxxx」。"},{"title":"3. 填配置","desc":"把提示整段粘到「服务器地址」即可；或手动填 IP:端口。离线用户名就是 bot 在游戏里的名字。"},{"title":"4. 启动","desc":"运行面板点「启动」，首次会弹一次 Termux 派发确认；进入世界后状态会显示坐标、血量与同服玩家。"},{"title":"5. 和 AI 协作","desc":"直接对 AI 说「让 bot 跟我走」「挖三格石头」；它调用 minecraft_bot 执行，minecraft_bot_status 看快照，minecraft_chat_read 读游戏内聊天。"},{"title":"6. 停止","desc":"运行面板点「停止」。宿主不会静默拉起进程，异常退出只报告并给出重试建议。"},{"title":"7. 事后核对","desc":"每个动作都记到工作目录的 audit.log；动作限频每分钟 30 个，超了会直接拒绝并说明原因。"}]},{"type":"divider"},{"type":"text","muted":true,"text":"限制：只支持 Java 版离线登录；不绕过反作弊、不自动交易、不群发；寻路不会挖穿你的建筑。"}]}],"tools":[{"name":"minecraft_bot","description":"控制 Minecraft bot：移动、跳跃、看向、挖掘、放置、攻击敌对生物、躲避、寻路、跟随、装备、丢弃、聊天、停止。bot 未启动或未连接时返回明确错误。","permissions":["network.local"],"timeout":60000,"parameters":{"type":"object","properties":{"action":{"type":"string","enum":["say","move","jump","look","lookAt","dig","digAt","place","placeAt","attack","attackNearest","flee","pathfind","follow","equip","toss","stop","status"],"description":"要执行的动作"},"text":{"type":"string","description":"say 的聊天内容，最长 240 字"},"direction":{"type":"string","enum":["forward","back","left","right","jump","sprint","sneak"],"description":"move 的方向"},"ticks":{"type":"integer","description":"move 的持续 tick 数，1–200，默认 10"},"yaw":{"type":"number","description":"look 的水平朝向（弧度）"},"pitch":{"type":"number","description":"look 的俯仰（弧度）"},"x":{"type":"number","description":"lookAt / digAt / placeAt / pathfind 的 X"},"y":{"type":"number","description":"lookAt / digAt / placeAt / pathfind 的 Y"},"z":{"type":"number","description":"lookAt / digAt / placeAt / pathfind 的 Z"},"player":{"type":"string","description":"follow 的目标玩家名"},"distance":{"type":"integer","description":"follow 的保持距离，1–8，默认 2"},"filter":{"type":"string","description":"attackNearest 只允许 mob（不攻击玩家）"},"item":{"type":"string","description":"placeAt / equip / toss 的物品名，可用部分匹配"},"count":{"type":"integer","description":"toss 的数量，默认 1"},"timeoutMs":{"type":"integer","description":"pathfind 的超时，5000–60000，默认 25000"}},"required":["action"]},"kind":"js","code":"async function run(args) {\n  var base = \"http://127.0.0.1:39271\";\n  var body = {};\n  Object.keys(args || {}).forEach(function (k) { body[k] = args[k]; });\n  if (!body.action) throw new Error(\"缺少 action\");\n  var r;\n  try {\n    r = await host.request({ method: \"POST\", url: base + \"/cmd\", headers: { \"Content-Type\": \"application/json\" }, body: JSON.stringify(body), timeout: 45000 });\n  } catch (e) {\n    throw new Error(\"连不上 Minecraft bot（127.0.0.1:39271）：\" + ((e && e.message) || e) + \"。请先在插件设置里打开「运行面板」并点启动。\");\n  }\n  var d = null;\n  try { d = JSON.parse((r && r.text) || \"{}\"); } catch (e) { throw new Error(\"bot 返回的不是 JSON\"); }\n  if (!d || d.ok !== true) throw new Error((d && d.error) || \"bot 执行失败\");\n  return d;\n}"},{"name":"minecraft_bot_status","description":"读取 Minecraft bot 的状态快照：连接状态、坐标、血量、饥饿、背包、同服玩家、上次动作结果。","permissions":["network.local"],"timeout":15000,"parameters":{"type":"object","properties":{},"required":[]},"kind":"js","code":"async function run() {\n  var r;\n  try {\n    r = await host.request({ method: \"GET\", url: \"http://127.0.0.1:39271/status\", timeout: 15000 });\n  } catch (e) {\n    throw new Error(\"连不上 Minecraft bot（127.0.0.1:39271）：\" + ((e && e.message) || e) + \"。请先在插件运行面板启动运行时。\");\n  }\n  var d = null;\n  try { d = JSON.parse((r && r.text) || \"{}\"); } catch (e) { throw new Error(\"bot 返回的不是 JSON\"); }\n  if (!d || d.ok !== true) throw new Error((d && d.error) || \"bot 状态不可用\");\n  return d;\n}"},{"name":"minecraft_chat_read","description":"读取游戏内聊天记录（别人说了什么）。只读，不会替玩家发话；用上次返回的 lastTs 作为下次的 since 可以只拿新增部分。","permissions":["network.local"],"timeout":15000,"parameters":{"type":"object","properties":{"since":{"type":"number","description":"只取这个毫秒时间戳之后的消息，默认 0（取最近一批）"},"limit":{"type":"integer","description":"最多返回多少条，1–100，默认 30"}},"required":[]},"kind":"js","code":"async function run(args) {\n  var since = Number((args && args.since) || 0);\n  var limit = Number((args && args.limit) || 30);\n  var r;\n  try {\n    r = await host.request({ method: \"GET\", url: \"http://127.0.0.1:39271/chat?since=\" + encodeURIComponent(since) + \"&limit=\" + encodeURIComponent(limit), timeout: 15000 });\n  } catch (e) {\n    throw new Error(\"连不上 Minecraft bot（127.0.0.1:39271）：\" + ((e && e.message) || e) + \"。请先在插件运行面板启动运行时。\");\n  }\n  var d = null;\n  try { d = JSON.parse((r && r.text) || \"{}\"); } catch (e) { throw new Error(\"bot 返回的不是 JSON\"); }\n  if (!d || d.ok !== true) throw new Error((d && d.error) || \"读取聊天失败\");\n  if (!d.count) return { ok: true, since: d.since, lastTs: d.lastTs, count: 0, messages: [], note: \"这段时间没有新聊天；把 lastTs 作为下次的 since 继续往后读。\" };\n  return d;\n}"}]});
 /* ==========================================================
  *  E3 开放式插件运行时（0.10）
  *
@@ -5026,6 +5075,9 @@ function plugManifestV2Error(raw) {
   if (raw.dependencies !== undefined && !Array.isArray(raw.dependencies)) return 'dependencies 必须是数组';
   if (Array.isArray(raw.dependencies) && raw.dependencies.length > 40) return 'dependencies 最多 40 项';
   if (raw.models !== undefined && !plugPlainObject(raw.models)) return 'models 必须是对象';
+  // R-002：长驻运行时块；入口必须落在插件沙箱内，且必须申请 runtime.termux。
+  const runtimeErr = plugRuntimeError(raw.runtime, plugNormalizePermissions(raw.permissions));
+  if (runtimeErr) return runtimeErr;
   if (!Array.isArray(raw.surfaces) || !raw.surfaces.length) return 'v2 清单至少需要一个 surface';
   if (raw.surfaces.length > 80) return 'surfaces 最多 80 项';
   const declared = plugNormalizePermissions(raw.permissions);
@@ -5986,6 +6038,12 @@ function plugRenderPage() {
       ? plugDepPanelHtml(plugin) : '<div class="mini-note">依赖运行时不可用。</div>';
     return;
   }
+  if (PLUG_PAGE_CTX.mode === 'runtime') {
+    titleEl.textContent = '插件运行面板 · ' + plugin.name;
+    body.innerHTML = typeof plugRuntimePanelHtml === 'function'
+      ? plugRuntimePanelHtml(plugin) : '<div class="mini-note">运行时面板不可用。</div>';
+    return;
+  }
   const surface = plugPluginSurfaces(plugin, 'page').filter(s => s.id === PLUG_PAGE_CTX.surfaceId)[0];
   if (!surface) { titleEl.textContent = plugin.name; body.innerHTML = '<div class="mini-note">页面不存在。</div>'; return; }
   titleEl.textContent = (surface.icon ? surface.icon + ' ' : '') + surface.title + ' · ' + plugin.name;
@@ -6131,6 +6189,419 @@ async function plugCommandRun(hit, rawArgs) {
   const act = JSON.parse(JSON.stringify(action));
   if (act.type === 'message.send') act.text = String(act.text || '').replace(/\{\{\s*args\s*\}\}/g, args);
   return await plugRunAction(hit.plugin, act, { command: hit.surface.command, args });
+}
+
+/* ==========================================================
+ *  R-003：宿主托管的长驻运行时（0.13）
+ *
+ *  插件只在清单里声明 runtime 块，进程由宿主在自己的隐藏工作任务里启停：
+ *    - 任务 id 固定为 plug-<插件id>.runtime，不进任务抽屉，不抢用户的当前任务；
+ *    - 仍然走 run_termux_job 的全部门禁：runtime.termux 授权 + 高级运行时开关
+ *      + Agent L3/安全开关 + 每次派发的用户确认；宿主不提供任何静默启动通道；
+ *    - 进程只拿着插件在运行时工作区里的入口文件，不接触插件沙箱外的路径。
+ * ========================================================== */
+function plugRuntimeTaskIdOf(plugin) { return 'plug-' + String(plugin && plugin.id || 'x') + '.runtime'; }
+function plugRuntimeTaskOf(plugin) {
+  const id = plugRuntimeTaskIdOf(plugin);
+  const hit = TASKS.filter(t => t.id === id)[0];
+  if (hit) return hit;
+  const t = taskNormalize({
+    id, type: 'workspace', hidden: true, origin: 'plugin:' + plugin.id,
+    title: String(plugin.name || plugin.id) + ' · 运行时', goal: '插件长驻进程：' + plugin.id
+  });
+  if (!t) return null;
+  TASKS.unshift(t);
+  saveTasks();
+  return t;
+}
+function plugRuntimeStateOf(plugin) {
+  const data = plugStateGet(plugin);
+  return plugPlainObject(data.runtime) ? data.runtime : {};
+}
+function plugRuntimeWriteState(plugin, patch) {
+  const next = Object.assign({}, plugRuntimeStateOf(plugin), patch || {});
+  plugStateSet(plugin, 'runtime', next);
+  return next;
+}
+/** 启动前置条件；返回空串表示可以启动。 */
+function plugRuntimeGuard(plugin) {
+  if (!plugin || !plugin.runtime) return '插件没有声明 runtime';
+  if (plugStateOf(plugin) === 'disabled') return '插件已停用';
+  if (!plugPermissionGranted(plugin, 'runtime.termux')) return '未获准 runtime.termux';
+  if (!toolLive('run_termux_job')) return '高级运行时或 Agent 未开启';
+  return '';
+}
+function plugRuntimeStatusText(state) {
+  return ({ running: '运行中', done: '已退出', failed: '异常退出', stopped: '未启动', not_found: '未找到进程' })[state] || '未知';
+}
+/** 启动：写入入口文件（如果清单自带 source）后派发 node。仍会弹一次确认。 */
+async function plugRuntimeStart(plugin) {
+  const bad = plugRuntimeGuard(plugin);
+  if (bad) return { ok: false, error: bad };
+  const rt = plugin.runtime;
+  const t = plugRuntimeTaskOf(plugin);
+  if (!t) return { ok: false, error: '无法创建运行时任务' };
+  const ws = await ensureTaskWorkspace(t);
+  if (!ws || ws.ok === false) return { ok: false, error: '运行时工作区不可用：' + ((ws && ws.error) || '未知原因') };
+  const running = await plugRuntimeStatus(plugin);
+  if (running.running) return { ok: true, already: true, runId: running.runId, state: 'running' };
+  if (rt.configFile) {
+    // R-005：把插件配置写成工作目录里的 runtime-config.json，入口脚本按需读取。
+    if (!(HAS_PERM && Perm.agentWorkspaceWrite)) return { ok: false, error: '当前环境不支持写入运行时工作区' };
+    const cfgText = JSON.stringify({
+      plugin: { id: plugin.id, name: plugin.name, version: plugin.version },
+      config: plugConfigGet(plugin),
+      startedAt: new Date().toISOString()
+    }, null, 2);
+    let cw = null;
+    try { cw = JSON.parse(Perm.agentWorkspaceWrite(taskWorkspacePath(t, 'working/runtime-config.json'), cfgText, true) || '{}'); } catch (e) { cw = null; }
+    if (!cw || cw.ok === false) return { ok: false, error: '无法写入运行配置：' + ((cw && cw.error) || '未知原因') };
+  }
+  if (rt.source) {
+    // 入口只写进插件自己的运行时工作区；TaskWorkspace 原生侧还会做 canonical 越界校验。
+    if (!(HAS_PERM && Perm.agentWorkspaceWrite)) return { ok: false, error: '当前环境不支持写入运行时工作区' };
+    let w = null;
+    try { w = JSON.parse(Perm.agentWorkspaceWrite(taskWorkspacePath(t, 'working/' + rt.entry), rt.source, true) || '{}'); } catch (e) { w = null; }
+    if (!w || w.ok === false) return { ok: false, error: '无法写入入口文件：' + ((w && w.error) || '未知原因') };
+  }
+  const r = await execTool('run_termux_job', {
+    executor: 'node', args: [rt.entry].concat(rt.args || []), cwd: 'working'
+  }, t);
+  if (!r || r.ok === false) return { ok: false, error: (r && (r.error || r.errorCode)) || '启动失败' };
+  const runId = String(r.runId || '');
+  plugRuntimeWriteState(plugin, {
+    runId, entry: rt.entry, startedAt: new Date().toISOString(), lastError: '',
+    lastState: 'running', logOffset: 0, nextRetryAt: 0, restarts: 0
+  });
+  plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 启动 node ' + rt.entry + '\n');
+  plugRuntimeLogLine(t, 'start', '插件运行时启动：' + rt.entry);
+  if (typeof persistBackoffReset === 'function') persistBackoffReset(t);
+  plugAudit('runtime_start', plugin, { tool: rt.entry });
+  return { ok: true, runId, taskId: t.id };
+}
+/** 停止托管进程。 */
+async function plugRuntimeStop(plugin) {
+  if (!plugin || !plugin.runtime) return { ok: false, error: '插件没有声明 runtime' };
+  const st = plugRuntimeStateOf(plugin);
+  if (!st.runId) {
+    // R-006：没有进程也要清掉退避与偏移，避免面板一直提示“该重启”。
+    if (st.lastState !== 'stopped') plugRuntimeWriteState(plugin, { lastState: 'stopped', nextRetryAt: 0, logOffset: 0 });
+    return { ok: true, already: true, state: 'stopped' };
+  }
+  const t = plugRuntimeTaskOf(plugin) || currentTask();
+  const r = await execTool('termux_job_cancel', { runId: st.runId }, t);
+  const ok = !!(r && r.ok !== false);
+  if (ok) {
+    plugRuntimeWriteState(plugin, {
+      runId: '', stoppedAt: new Date().toISOString(), lastState: 'stopped', nextRetryAt: 0, logOffset: 0
+    });
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 已停止\n');
+    plugRuntimeLogLine(t, 'stop', '用户停止插件运行时');
+    plugAudit('runtime_stop', plugin, { tool: String(st.runId) });
+  }
+  return { ok, state: ok ? 'stopped' : 'running', error: ok ? '' : ((r && (r.error || r.errorCode)) || '取消失败') };
+}
+/** 查询托管进程状态和最近日志；没有托管任务时视为未启动。 */
+async function plugRuntimeStatus(plugin) {
+  if (!plugin || !plugin.runtime) return { ok: false, error: '插件没有声明 runtime' };
+  const st = plugRuntimeStateOf(plugin);
+  if (!st.runId) {
+    return {
+      ok: true, state: st.lastState === 'failed' ? 'failed' : 'stopped', running: false, runId: '',
+      output: plugRuntimeLogText(plugin).slice(-2000), restartAt: Number(st.nextRetryAt) || 0,
+      lastError: String(st.lastError || ''), exitCode: null
+    };
+  }
+  const t = plugRuntimeTaskOf(plugin) || currentTask();
+  const r = await execTool('termux_job_status', { runId: st.runId }, t);
+  const state = String((r && r.status) || '') || (r && r.ok === false ? 'not_found' : 'unknown');
+  let output = String((r && r.output) || '');
+
+  // R-006：增量读取输出并写入有上限的本地日志（原生侧已把日志文件截到 200KB）。
+  if (state === 'running' || state === 'failed' || state === 'done') {
+    const off = Number(st.logOffset) || 0;
+    const outR = await execTool('termux_job_output', { runId: st.runId, offset: off }, t);
+    if (outR && outR.ok !== false) {
+      const chunk = String(outR.output || '');
+      if (chunk) plugRuntimeLogAppend(plugin, chunk);
+      const next = Number(outR.nextOffset);
+      if (Number.isFinite(next) && next > off) plugRuntimeWriteState(plugin, { logOffset: next });
+    }
+    if (!output) output = plugRuntimeLogText(plugin).slice(-2000);
+  }
+
+  if (state === 'running') {
+    plugRuntimeWriteState(plugin, {
+      lastState: 'running', lastSeenAt: new Date().toISOString(), nextRetryAt: 0, restarts: 0
+    });
+    plugRuntimeLogLine(t, 'heartbeat', '运行时心跳正常');
+    if (typeof persistBackoffReset === 'function') persistBackoffReset(t);
+  } else if (state === 'failed') {
+    const tail = output.slice(-500) || '进程异常退出（无输出）';
+    let delay = 0;
+    if (typeof persistBackoff === 'function') {
+      const bo = persistBackoff(t, tail);
+      delay = (bo && bo.delay) || 0;
+    }
+    // 按策略只做“报告 + 建议重试”，绝不静默拉起：run_termux_job 需要用户逐次确认。
+    plugRuntimeWriteState(plugin, {
+      runId: '', lastRunId: st.runId, lastState: 'failed', lastError: tail,
+      nextRetryAt: delay ? Date.now() + delay : 0
+    });
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 进程异常退出\n');
+    plugRuntimeLogLine(t, 'watchdog', '运行时异常退出：' + tail.slice(0, 160));
+  } else if (state === 'done') {
+    plugRuntimeWriteState(plugin, { runId: '', lastRunId: st.runId, lastState: 'done', lastError: '', nextRetryAt: 0 });
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 进程已退出\n');
+    plugRuntimeLogLine(t, 'stop', '运行时正常退出');
+  } else if (state === 'not_found') {
+    plugRuntimeWriteState(plugin, { runId: '', lastRunId: st.runId, lastState: 'not_found', lastError: '', nextRetryAt: 0 });
+    plugRuntimeLogLine(t, 'watchdog', '运行时进程已丢失');
+  }
+  const now = plugRuntimeStateOf(plugin);
+  return {
+    ok: true, state, running: state === 'running', runId: st.runId,
+    exitCode: r && r.exitCode !== undefined ? r.exitCode : null,
+    output: output.slice(-2000), restartAt: Number(now.nextRetryAt) || 0, lastError: String(now.lastError || '')
+  };
+}
+
+/* ==========================================================
+ *  R-005 / R-006：运行环境准备、状态面板、日志轮转与退避（0.13）
+ *
+ *  - 环境准备复用 E5 依赖闭环：Termux 包与 npm 仍走固定模板和逐项确认；
+ *  - Node 装不上时给出可在 Termux 里直接粘贴的命令；
+ *  - 心跳/异常只报告并给出退避建议，不静默重启（派发必须用户确认）；
+ *  - 输出日志在 JS 侧再做一层按 runtime.logMaxBytes 的轮转，避免撑爆存储。
+ * ========================================================== */
+const PLUG_RUNTIME_LOG_KEY = 'via_ai_plugin_runtime_log';
+const PLUG_RUNTIME_LOG_JS_MAX = 262144;
+function plugRuntimeClock() { return new Date().toISOString().slice(11, 19); }
+function plugRuntimeLogsAll() {
+  const all = sGet(PLUG_RUNTIME_LOG_KEY, {});
+  return plugPlainObject(all) ? all : {};
+}
+function plugRuntimeLogAppend(plugin, text) {
+  const key = String(plugin && plugin.id || '');
+  if (!key || !text) return;
+  const rt = plugin.runtime || {};
+  const cap = Math.min(PLUG_RUNTIME_LOG_JS_MAX, Math.max(65536, parseInt(rt.logMaxBytes, 10) || 65536));
+  const all = plugRuntimeLogsAll();
+  let cur = typeof all[key] === 'string' ? all[key] : '';
+  cur += String(text).slice(0, cap);
+  if (cur.length > cap) cur = cur.slice(cur.length - cap);
+  all[key] = cur;
+  sSet(PLUG_RUNTIME_LOG_KEY, all);
+}
+function plugRuntimeLogText(plugin) {
+  const v = plugRuntimeLogsAll()[String(plugin && plugin.id || '')];
+  return typeof v === 'string' ? v : '';
+}
+function plugRuntimeLogClear(plugin) {
+  const key = String(plugin && plugin.id || '');
+  if (!key) return;
+  const all = plugRuntimeLogsAll();
+  delete all[key];
+  sSet(PLUG_RUNTIME_LOG_KEY, all);
+}
+/** 同时写进 E6 的任务日志（自带条数与总量轮转）。 */
+function plugRuntimeLogLine(task, level, msg) {
+  try { if (task && typeof persistLog === 'function') persistLog(task.id, level, msg); } catch (e) {}
+}
+/** 读运行时工作目录里的文件文本；读不到返回空串。 */
+function plugRuntimeReadFile(plugin, name, maxChars) {
+  if (!plugin || !plugin.runtime) return '';
+  if (!(HAS_PERM && Perm.agentWorkspaceRead)) return '';
+  const t = plugRuntimeTaskOf(plugin);
+  if (!t) return '';
+  let raw = '';
+  try { raw = String(Perm.agentWorkspaceRead(taskWorkspacePath(t, 'working/' + String(name)), maxChars || 20000) || ''); } catch (e) { return ''; }
+  let r = {};
+  try { r = JSON.parse(raw || '{}'); } catch (e) { return ''; }
+  if (!r || r.ok === false || r.text == null) return '';
+  return String(r.text);
+}
+/** 引擎回报的 status.json（约定由入口脚本写入）。 */
+function plugRuntimeEngineStatus(plugin) {
+  const text = plugRuntimeReadFile(plugin, 'status.json', 20000);
+  if (!text) return null;
+  try { const o = JSON.parse(text); return plugPlainObject(o) ? o : null; } catch (e) { return null; }
+}
+/** 引擎回报的最近聊天。 */
+function plugRuntimeChatTail(plugin, maxChars) {
+  const text = plugRuntimeReadFile(plugin, 'chat.log', 40000);
+  if (!text) return '';
+  const cap = Math.min(4000, Math.max(200, Number(maxChars) || 1200));
+  return text.length > cap ? text.slice(text.length - cap) : text;
+}
+/** 运行环境快照：Termux、清单声明的 Node 包与 npm 依赖。 */
+function plugRuntimeEnvOf(plugin) {
+  const tx = typeof plugDepTermuxInfo === 'function' ? plugDepTermuxInfo() : { installed: false };
+  const deps = Array.isArray(plugin && plugin.dependencies) ? plugin.dependencies : [];
+  const node = deps.filter(d => d.kind === 'termux-pkg' && /node/i.test(String(d.source || '')))[0] || null;
+  const npmDeps = deps.filter(d => d.kind === 'npm');
+  const missing = typeof plugDepMissing === 'function' ? plugDepMissing(plugin) : [];
+  const npmInstalled = npmDeps.filter(d => typeof plugDepStateOf === 'function' && plugDepStateOf(plugin, d) === 'installed').length;
+  const nodeState = node && typeof plugDepStateOf === 'function' ? plugDepStateOf(plugin, node) : (node ? 'missing' : '');
+  return {
+    termux: !!(tx && tx.installed), node, nodeState, npmDeps, npmInstalled, missing,
+    ready: !!(tx && tx.installed) && !missing.length
+  };
+}
+/** 手动兜底命令：用户可直接粘贴到 Termux。 */
+function plugRuntimeEnvCommands(plugin) {
+  const env = plugRuntimeEnvOf(plugin);
+  const lines = [];
+  const pkg = env.node ? env.node.source : 'nodejs';
+  lines.push('pkg update -y && pkg install -y ' + pkg);
+  env.npmDeps.forEach(d => lines.push('npm install -g ' + d.source + (d.version ? '@' + d.version : '')));
+  if (!env.node && !env.npmDeps.length) lines.push('node -v');
+  return lines.join('\n');
+}
+/** 一键准备环境：安装清单里缺失的 Termux 包与 npm 依赖。 */
+async function plugRuntimePrepare(plugin) {
+  if (!plugin || !plugin.runtime) return { ok: false, error: '插件没有声明 runtime' };
+  const env = plugRuntimeEnvOf(plugin);
+  if (!env.termux) return { ok: false, error: 'Termux 未安装。\n' + (typeof plugDepTermuxGuide === 'function' ? plugDepTermuxGuide() : '') };
+  if (!env.missing.length) return { ok: true, already: true };
+  if (typeof plugDepInstallAll !== 'function') return { ok: false, error: '依赖运行时不可用' };
+  if (typeof plugDepAccess === 'function' && plugDepAccess(plugin)) return { ok: false, error: plugDepAccess(plugin) };
+  const r = await plugDepInstallAll(plugin);
+  if (r && r.ok) {
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 环境准备完成\n');
+    plugRuntimeLogLine(plugRuntimeTaskOf(plugin), 'start', '运行环境准备完成');
+  }
+  return r || { ok: false, error: '环境准备失败' };
+}
+/** 失败后的重试建议（只展示，不自动执行）。 */
+function plugRuntimeRetryHint(st) {
+  const at = Number(st && st.nextRetryAt) || 0;
+  const left = Math.max(0, Math.round((at - Date.now()) / 1000));
+  return left ? left + ' 秒' : '现在';
+}
+/** 设置页插件行里的运行时入口。 */
+function plugRuntimeRowHTML(p) {
+  if (!p || !p.runtime) return '';
+  const st = plugRuntimeStateOf(p);
+  const state = st.runId ? 'running' : String(st.lastState || 'stopped');
+  return '<div class="plug-market-meta"><b>长驻运行时：</b>' + esc(plugRuntimeStatusText(state)) +
+    ' <button type="button" class="plug-mini" data-plug-runtime="' + esc(p.id) + '">运行面板</button></div>';
+}
+/** 运行面板（plug-page 的 mode === 'runtime'）。 */
+function plugRuntimePanelHtml(plugin) {
+  if (!plugin) return '<div class="mini-note">插件已不存在。</div>';
+  const rt = plugin.runtime;
+  if (!rt) return '<div class="mini-note">这个插件没有声明长驻运行时。</div>';
+  const st = plugRuntimeStateOf(plugin);
+  const env = plugRuntimeEnvOf(plugin);
+  const guard = plugRuntimeGuard(plugin);
+  const running = !!st.runId;
+  const state = running ? 'running' : String(st.lastState || 'stopped');
+  const log = plugRuntimeLogText(plugin);
+  const canManage = typeof plugDepAccess === 'function' && !plugDepAccess(plugin);
+  const badge = '<span class="pc-badge' + (running ? ' pc-badge-ok' : '') + '">' + plugEsc(plugRuntimeStatusText(state)) + '</span>';
+  let html = '<div class="mini-note">长驻进程由宿主托管在隐藏任务里；每次启动仍会弹出 Termux 派发确认，宿主不会静默拉起。停止会取消进程并清空重试计划。</div>';
+  html += '<div class="pc pc-row-item"><div class="pc-row-main">' +
+    '<div class="pc-row-t">进程状态 ' + badge + '</div>' +
+    '<div class="pc-row-d">入口：' + plugEsc(rt.entry) + ' · 重启策略：' + plugEsc(rt.restart) +
+    ' · 心跳：' + Math.round((rt.healthcheckMs || 15000) / 1000) + ' 秒 · 日志上限：' + plugDepHumanSize(rt.logMaxBytes) + '</div>' +
+    (st.startedAt ? '<div class="pc-row-d pc-muted">启动于 ' + plugEsc(st.startedAt) + '</div>' : '') +
+    (st.lastError ? '<div class="pc-row-d">上次错误：' + plugEsc(String(st.lastError).slice(0, 300)) + '</div>' : '') +
+    (state === 'failed' && st.nextRetryAt ? '<div class="pc-row-d">建议 ' + plugEsc(plugRuntimeRetryHint(st)) + ' 后点「启动」重试；宿主不会自动重启。</div>' : '') +
+    '</div></div>';
+  const engine = plugRuntimeEngineStatus(plugin);
+  if (engine) {
+    const bits = [];
+    if (engine.username) bits.push('玩家 ' + engine.username);
+    if (engine.health != null) bits.push('血量 ' + engine.health);
+    if (engine.food != null) bits.push('饥饿 ' + engine.food);
+    if (engine.position) bits.push('坐标 ' + [engine.position.x, engine.position.y, engine.position.z].join(','));
+    if (engine.onGround != null) bits.push(engine.onGround ? '在地面' : '空中');
+    if (Array.isArray(engine.players) && engine.players.length) bits.push('同服 ' + engine.players.join('、'));
+    html += '<div class="pc pc-row-item"><div class="pc-row-main">' +
+      '<div class="pc-row-t">引擎回报 ' + (engine.connected ? '<span class="pc-badge pc-badge-ok">已连接</span>' : '<span class="pc-badge">未连接</span>') + '</div>' +
+      '<div class="pc-row-d">' + plugEsc(bits.join(' · ') || '还没有环境快照') + '</div>' +
+      (engine.event ? '<div class="pc-row-d pc-muted">最近事件：' + plugEsc(String(engine.event).slice(0, 120)) + '</div>' : '') +
+      '</div></div>';
+  }
+  html += '<div class="pc pc-row-item"><div class="pc-row-main">' +
+    '<div class="pc-row-t">运行环境 ' + (env.ready ? '<span class="pc-badge pc-badge-ok">就绪</span>' : '<span class="pc-badge">未就绪</span>') + '</div>' +
+    '<div class="pc-row-d">Termux：' + (env.termux ? '已安装' : '未检测到') +
+    (env.node ? ' · Node：' + plugEsc(plugin.dependencies.filter(d => d.id === env.node.id)[0].source) + '（' + (env.nodeState === 'installed' ? '已安装' : '未安装') + '）' : '') +
+    (env.npmDeps.length ? ' · npm：' + env.npmInstalled + '/' + env.npmDeps.length + ' 已安装' : '') + '</div>' +
+    (env.missing.length ? '<div class="pc-row-d">缺失：' + plugEsc(env.missing.map(d => d.id).join('、')) + '</div>' : '') +
+    '</div><div class="pc-actions">' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-env="1"' + (canManage && env.missing.length ? '' : ' disabled') + '>一键准备环境</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-copy="1">复制手动命令</button>' +
+    '</div></div>';
+  html += '<div class="pc-title" style="margin-top:12px">手动兜底（可在 Termux 里直接粘贴）</div>' +
+    '<pre class="dep-log">' + plugEsc(plugRuntimeEnvCommands(plugin)) + '</pre>';
+  html += '<div class="pc-actions" style="margin-top:12px">' +
+    '<button type="button" class="pc-btn pc-primary" data-rt-start="1"' + (!running && !guard ? '' : ' disabled') + '>启动</button>' +
+    '<button type="button" class="pc-btn" data-rt-stop="1"' + (running ? '' : ' disabled') + '>停止</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-refresh="1">刷新状态</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-clear="1"' + (log ? '' : ' disabled') + '>清空日志</button>' +
+    '</div>' + (guard ? '<div class="mini-note">启动条件未满足：' + plugEsc(guard) + '</div>' : '');
+  html += '<div class="pc-title" style="margin-top:12px">运行日志（按上限轮转）</div>' +
+    '<pre id="rt-log" class="dep-log">' + plugEsc(log || '（还没有输出）') + '</pre>';
+  const chat = plugRuntimeChatTail(plugin, 1200);
+  if (chat) {
+    html += '<div class="pc-title" style="margin-top:12px">最近聊天</div>' +
+      '<pre class="dep-log">' + plugEsc(chat) + '</pre>';
+  }
+  return html;
+}
+function plugRuntimeRefreshPanel() {
+  if (typeof plugRenderPage === 'function' && PLUG_PAGE_CTX.mode === 'runtime') { try { plugRenderPage(); } catch (e) {} }
+}
+function plugRuntimeOpen(pid) {
+  const plugin = USER_PLUGINS.filter(p => p.id === String(pid))[0];
+  if (!plugin) { toast('插件不存在'); return; }
+  if (!plugin.runtime) { toast('这个插件没有长驻运行时'); return; }
+  PLUG_PAGE_CTX = { pluginId: plugin.id, surfaceId: '', mode: 'runtime' };
+  if (typeof showView === 'function') showView(PLUG_PAGE_VIEW, { noStack: true });
+  if (typeof VIEW_STACK !== 'undefined' && VIEW_STACK[VIEW_STACK.length - 1] !== PLUG_PAGE_VIEW) VIEW_STACK.push(PLUG_PAGE_VIEW);
+  plugRenderPage();
+}
+async function plugRuntimeHandleUi(el) {
+  if (!el || !el.dataset) return false;
+  const plugin = USER_PLUGINS.filter(p => p.id === PLUG_PAGE_CTX.pluginId)[0];
+  if (!plugin) return false;
+  if (el.dataset.rtStart) {
+    const r = await plugRuntimeStart(plugin);
+    toast(r.ok ? (r.already ? '已经在运行' : '已启动') : (r.error || '启动失败'));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtStop) {
+    const r = await plugRuntimeStop(plugin);
+    toast(r.ok ? '已停止' : (r.error || '停止失败'));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtRefresh) {
+    const st = await plugRuntimeStatus(plugin);
+    toast('状态：' + plugRuntimeStatusText(st.state));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtEnv) {
+    const r = await plugRuntimePrepare(plugin);
+    toast(r && r.ok ? (r.already ? '环境已就绪' : '环境已准备') : ((r && r.error) || '准备失败'));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtCopy) {
+    const ok = typeof writeClipboard === 'function' && writeClipboard(plugRuntimeEnvCommands(plugin));
+    toast(ok ? '命令已复制到剪贴板' : '复制失败，请长按命令手动复制');
+    return true;
+  }
+  if (el.dataset.rtClear) {
+    plugRuntimeLogClear(plugin);
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  return false;
 }
 /* ==========================================================
  *  E5 插件依赖与运行时（0.12）
@@ -11381,6 +11852,7 @@ function plugCustomHtml() {
       ${p.desc ? '<div class="plug-group-desc">' + esc(p.desc) + '</div>' : ''}
       <div class="plug-market-meta"><b>类型：</b>${esc(({chat:'聊天插件',quick:'快捷任务插件',device:'手机插件',workspace:'工作插件'}[p.pluginType] || '聊天插件'))}</div>
       ${plugDepsRowHTML(p)}
+      ${plugRuntimeRowHTML(p)}
       ${plugPermissionsHTML(p)}
       ${rows}
     </div>`;
@@ -11501,9 +11973,14 @@ async function syncPlugMarket() {
 }
 function plugMarketEntries() {
   const out = PLUGIN_MARKET_INDEX.map(p => Object.assign({}, p, { marketSource: 'local', trust: p.trust || 'local-example' }));
-  const ids = {};
-  out.forEach(p => { ids[p.id] = true; });
-  PLUG_REMOTE_MARKET.forEach(p => { if (!ids[p.id]) out.push(p); });
+  const pos = {};
+  out.forEach((p, i) => { pos[p.id] = i; });
+  // 内置条目只在版本更高时让位给远程：否则 APK 自带版本会永远挡住远程更新。
+  PLUG_REMOTE_MARKET.forEach(p => {
+    const i = pos[p.id];
+    if (i == null) { out.push(p); return; }
+    if (cmpVer(verArr(String(p.version || '0')), verArr(String(out[i].version || '0'))) > 0) out[i] = p;
+  });
   return out;
 }
 function renderPlugMarket() {
@@ -13208,6 +13685,7 @@ function bindPluginsPage() {
     if (b.dataset.toolSw) { toggleTool(b.dataset.toolSw); return; }
     if (b.dataset.plugDel) { plugDelete(b.dataset.plugDel); return; }
     if (b.dataset.plugDeps) { if (typeof plugDepOpen === 'function') plugDepOpen(b.dataset.plugDeps); return; }
+    if (b.dataset.plugRuntime) { if (typeof plugRuntimeOpen === 'function') plugRuntimeOpen(b.dataset.plugRuntime); return; }
     if (b.dataset.depAllInstall) {
       const p = USER_PLUGINS.filter(x => x.id === b.dataset.depAllInstall)[0];
       if (p && typeof plugDepInstallAll === 'function') {
@@ -13226,6 +13704,8 @@ function bindPluginsPage() {
     pageBody.onclick = (e) => {
       const dep = e.target && e.target.closest ? e.target.closest('[data-dep-all],[data-dep-install],[data-dep-remove],[data-dep-verify]') : null;
       if (dep && typeof plugDepHandleUi === 'function') { plugDepHandleUi(dep); return; }
+      const rt = e.target && e.target.closest ? e.target.closest('[data-rt-start],[data-rt-stop],[data-rt-refresh],[data-rt-env],[data-rt-copy],[data-rt-clear]') : null;
+      if (rt && typeof plugRuntimeHandleUi === 'function') { plugRuntimeHandleUi(rt); return; }
       const el = e.target && e.target.closest ? e.target.closest('[data-plug-act],[data-plug-open],[data-plug-config]') : null;
       if (el) plugHandleUiAction(el);
     };

@@ -168,6 +168,7 @@ function bindPluginsPage() {
     if (b.dataset.toolSw) { toggleTool(b.dataset.toolSw); return; }
     if (b.dataset.plugDel) { plugDelete(b.dataset.plugDel); return; }
     if (b.dataset.plugDeps) { if (typeof plugDepOpen === 'function') plugDepOpen(b.dataset.plugDeps); return; }
+    if (b.dataset.plugRuntime) { if (typeof plugRuntimeOpen === 'function') plugRuntimeOpen(b.dataset.plugRuntime); return; }
     if (b.dataset.depAllInstall) {
       const p = USER_PLUGINS.filter(x => x.id === b.dataset.depAllInstall)[0];
       if (p && typeof plugDepInstallAll === 'function') {
@@ -186,6 +187,8 @@ function bindPluginsPage() {
     pageBody.onclick = (e) => {
       const dep = e.target && e.target.closest ? e.target.closest('[data-dep-all],[data-dep-install],[data-dep-remove],[data-dep-verify]') : null;
       if (dep && typeof plugDepHandleUi === 'function') { plugDepHandleUi(dep); return; }
+      const rt = e.target && e.target.closest ? e.target.closest('[data-rt-start],[data-rt-stop],[data-rt-refresh],[data-rt-env],[data-rt-copy],[data-rt-clear]') : null;
+      if (rt && typeof plugRuntimeHandleUi === 'function') { plugRuntimeHandleUi(rt); return; }
       const el = e.target && e.target.closest ? e.target.closest('[data-plug-act],[data-plug-open],[data-plug-config]') : null;
       if (el) plugHandleUiAction(el);
     };

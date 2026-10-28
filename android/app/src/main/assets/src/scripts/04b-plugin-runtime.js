@@ -173,6 +173,9 @@ function plugManifestV2Error(raw) {
   if (raw.dependencies !== undefined && !Array.isArray(raw.dependencies)) return 'dependencies 必须是数组';
   if (Array.isArray(raw.dependencies) && raw.dependencies.length > 40) return 'dependencies 最多 40 项';
   if (raw.models !== undefined && !plugPlainObject(raw.models)) return 'models 必须是对象';
+  // R-002：长驻运行时块；入口必须落在插件沙箱内，且必须申请 runtime.termux。
+  const runtimeErr = plugRuntimeError(raw.runtime, plugNormalizePermissions(raw.permissions));
+  if (runtimeErr) return runtimeErr;
   if (!Array.isArray(raw.surfaces) || !raw.surfaces.length) return 'v2 清单至少需要一个 surface';
   if (raw.surfaces.length > 80) return 'surfaces 最多 80 项';
   const declared = plugNormalizePermissions(raw.permissions);
@@ -1133,6 +1136,12 @@ function plugRenderPage() {
       ? plugDepPanelHtml(plugin) : '<div class="mini-note">依赖运行时不可用。</div>';
     return;
   }
+  if (PLUG_PAGE_CTX.mode === 'runtime') {
+    titleEl.textContent = '插件运行面板 · ' + plugin.name;
+    body.innerHTML = typeof plugRuntimePanelHtml === 'function'
+      ? plugRuntimePanelHtml(plugin) : '<div class="mini-note">运行时面板不可用。</div>';
+    return;
+  }
   const surface = plugPluginSurfaces(plugin, 'page').filter(s => s.id === PLUG_PAGE_CTX.surfaceId)[0];
   if (!surface) { titleEl.textContent = plugin.name; body.innerHTML = '<div class="mini-note">页面不存在。</div>'; return; }
   titleEl.textContent = (surface.icon ? surface.icon + ' ' : '') + surface.title + ' · ' + plugin.name;
@@ -1278,4 +1287,417 @@ async function plugCommandRun(hit, rawArgs) {
   const act = JSON.parse(JSON.stringify(action));
   if (act.type === 'message.send') act.text = String(act.text || '').replace(/\{\{\s*args\s*\}\}/g, args);
   return await plugRunAction(hit.plugin, act, { command: hit.surface.command, args });
+}
+
+/* ==========================================================
+ *  R-003：宿主托管的长驻运行时（0.13）
+ *
+ *  插件只在清单里声明 runtime 块，进程由宿主在自己的隐藏工作任务里启停：
+ *    - 任务 id 固定为 plug-<插件id>.runtime，不进任务抽屉，不抢用户的当前任务；
+ *    - 仍然走 run_termux_job 的全部门禁：runtime.termux 授权 + 高级运行时开关
+ *      + Agent L3/安全开关 + 每次派发的用户确认；宿主不提供任何静默启动通道；
+ *    - 进程只拿着插件在运行时工作区里的入口文件，不接触插件沙箱外的路径。
+ * ========================================================== */
+function plugRuntimeTaskIdOf(plugin) { return 'plug-' + String(plugin && plugin.id || 'x') + '.runtime'; }
+function plugRuntimeTaskOf(plugin) {
+  const id = plugRuntimeTaskIdOf(plugin);
+  const hit = TASKS.filter(t => t.id === id)[0];
+  if (hit) return hit;
+  const t = taskNormalize({
+    id, type: 'workspace', hidden: true, origin: 'plugin:' + plugin.id,
+    title: String(plugin.name || plugin.id) + ' · 运行时', goal: '插件长驻进程：' + plugin.id
+  });
+  if (!t) return null;
+  TASKS.unshift(t);
+  saveTasks();
+  return t;
+}
+function plugRuntimeStateOf(plugin) {
+  const data = plugStateGet(plugin);
+  return plugPlainObject(data.runtime) ? data.runtime : {};
+}
+function plugRuntimeWriteState(plugin, patch) {
+  const next = Object.assign({}, plugRuntimeStateOf(plugin), patch || {});
+  plugStateSet(plugin, 'runtime', next);
+  return next;
+}
+/** 启动前置条件；返回空串表示可以启动。 */
+function plugRuntimeGuard(plugin) {
+  if (!plugin || !plugin.runtime) return '插件没有声明 runtime';
+  if (plugStateOf(plugin) === 'disabled') return '插件已停用';
+  if (!plugPermissionGranted(plugin, 'runtime.termux')) return '未获准 runtime.termux';
+  if (!toolLive('run_termux_job')) return '高级运行时或 Agent 未开启';
+  return '';
+}
+function plugRuntimeStatusText(state) {
+  return ({ running: '运行中', done: '已退出', failed: '异常退出', stopped: '未启动', not_found: '未找到进程' })[state] || '未知';
+}
+/** 启动：写入入口文件（如果清单自带 source）后派发 node。仍会弹一次确认。 */
+async function plugRuntimeStart(plugin) {
+  const bad = plugRuntimeGuard(plugin);
+  if (bad) return { ok: false, error: bad };
+  const rt = plugin.runtime;
+  const t = plugRuntimeTaskOf(plugin);
+  if (!t) return { ok: false, error: '无法创建运行时任务' };
+  const ws = await ensureTaskWorkspace(t);
+  if (!ws || ws.ok === false) return { ok: false, error: '运行时工作区不可用：' + ((ws && ws.error) || '未知原因') };
+  const running = await plugRuntimeStatus(plugin);
+  if (running.running) return { ok: true, already: true, runId: running.runId, state: 'running' };
+  if (rt.configFile) {
+    // R-005：把插件配置写成工作目录里的 runtime-config.json，入口脚本按需读取。
+    if (!(HAS_PERM && Perm.agentWorkspaceWrite)) return { ok: false, error: '当前环境不支持写入运行时工作区' };
+    const cfgText = JSON.stringify({
+      plugin: { id: plugin.id, name: plugin.name, version: plugin.version },
+      config: plugConfigGet(plugin),
+      startedAt: new Date().toISOString()
+    }, null, 2);
+    let cw = null;
+    try { cw = JSON.parse(Perm.agentWorkspaceWrite(taskWorkspacePath(t, 'working/runtime-config.json'), cfgText, true) || '{}'); } catch (e) { cw = null; }
+    if (!cw || cw.ok === false) return { ok: false, error: '无法写入运行配置：' + ((cw && cw.error) || '未知原因') };
+  }
+  if (rt.source) {
+    // 入口只写进插件自己的运行时工作区；TaskWorkspace 原生侧还会做 canonical 越界校验。
+    if (!(HAS_PERM && Perm.agentWorkspaceWrite)) return { ok: false, error: '当前环境不支持写入运行时工作区' };
+    let w = null;
+    try { w = JSON.parse(Perm.agentWorkspaceWrite(taskWorkspacePath(t, 'working/' + rt.entry), rt.source, true) || '{}'); } catch (e) { w = null; }
+    if (!w || w.ok === false) return { ok: false, error: '无法写入入口文件：' + ((w && w.error) || '未知原因') };
+  }
+  const r = await execTool('run_termux_job', {
+    executor: 'node', args: [rt.entry].concat(rt.args || []), cwd: 'working'
+  }, t);
+  if (!r || r.ok === false) return { ok: false, error: (r && (r.error || r.errorCode)) || '启动失败' };
+  const runId = String(r.runId || '');
+  plugRuntimeWriteState(plugin, {
+    runId, entry: rt.entry, startedAt: new Date().toISOString(), lastError: '',
+    lastState: 'running', logOffset: 0, nextRetryAt: 0, restarts: 0
+  });
+  plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 启动 node ' + rt.entry + '\n');
+  plugRuntimeLogLine(t, 'start', '插件运行时启动：' + rt.entry);
+  if (typeof persistBackoffReset === 'function') persistBackoffReset(t);
+  plugAudit('runtime_start', plugin, { tool: rt.entry });
+  return { ok: true, runId, taskId: t.id };
+}
+/** 停止托管进程。 */
+async function plugRuntimeStop(plugin) {
+  if (!plugin || !plugin.runtime) return { ok: false, error: '插件没有声明 runtime' };
+  const st = plugRuntimeStateOf(plugin);
+  if (!st.runId) {
+    // R-006：没有进程也要清掉退避与偏移，避免面板一直提示“该重启”。
+    if (st.lastState !== 'stopped') plugRuntimeWriteState(plugin, { lastState: 'stopped', nextRetryAt: 0, logOffset: 0 });
+    return { ok: true, already: true, state: 'stopped' };
+  }
+  const t = plugRuntimeTaskOf(plugin) || currentTask();
+  const r = await execTool('termux_job_cancel', { runId: st.runId }, t);
+  const ok = !!(r && r.ok !== false);
+  if (ok) {
+    plugRuntimeWriteState(plugin, {
+      runId: '', stoppedAt: new Date().toISOString(), lastState: 'stopped', nextRetryAt: 0, logOffset: 0
+    });
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 已停止\n');
+    plugRuntimeLogLine(t, 'stop', '用户停止插件运行时');
+    plugAudit('runtime_stop', plugin, { tool: String(st.runId) });
+  }
+  return { ok, state: ok ? 'stopped' : 'running', error: ok ? '' : ((r && (r.error || r.errorCode)) || '取消失败') };
+}
+/** 查询托管进程状态和最近日志；没有托管任务时视为未启动。 */
+async function plugRuntimeStatus(plugin) {
+  if (!plugin || !plugin.runtime) return { ok: false, error: '插件没有声明 runtime' };
+  const st = plugRuntimeStateOf(plugin);
+  if (!st.runId) {
+    return {
+      ok: true, state: st.lastState === 'failed' ? 'failed' : 'stopped', running: false, runId: '',
+      output: plugRuntimeLogText(plugin).slice(-2000), restartAt: Number(st.nextRetryAt) || 0,
+      lastError: String(st.lastError || ''), exitCode: null
+    };
+  }
+  const t = plugRuntimeTaskOf(plugin) || currentTask();
+  const r = await execTool('termux_job_status', { runId: st.runId }, t);
+  const state = String((r && r.status) || '') || (r && r.ok === false ? 'not_found' : 'unknown');
+  let output = String((r && r.output) || '');
+
+  // R-006：增量读取输出并写入有上限的本地日志（原生侧已把日志文件截到 200KB）。
+  if (state === 'running' || state === 'failed' || state === 'done') {
+    const off = Number(st.logOffset) || 0;
+    const outR = await execTool('termux_job_output', { runId: st.runId, offset: off }, t);
+    if (outR && outR.ok !== false) {
+      const chunk = String(outR.output || '');
+      if (chunk) plugRuntimeLogAppend(plugin, chunk);
+      const next = Number(outR.nextOffset);
+      if (Number.isFinite(next) && next > off) plugRuntimeWriteState(plugin, { logOffset: next });
+    }
+    if (!output) output = plugRuntimeLogText(plugin).slice(-2000);
+  }
+
+  if (state === 'running') {
+    plugRuntimeWriteState(plugin, {
+      lastState: 'running', lastSeenAt: new Date().toISOString(), nextRetryAt: 0, restarts: 0
+    });
+    plugRuntimeLogLine(t, 'heartbeat', '运行时心跳正常');
+    if (typeof persistBackoffReset === 'function') persistBackoffReset(t);
+  } else if (state === 'failed') {
+    const tail = output.slice(-500) || '进程异常退出（无输出）';
+    let delay = 0;
+    if (typeof persistBackoff === 'function') {
+      const bo = persistBackoff(t, tail);
+      delay = (bo && bo.delay) || 0;
+    }
+    // 按策略只做“报告 + 建议重试”，绝不静默拉起：run_termux_job 需要用户逐次确认。
+    plugRuntimeWriteState(plugin, {
+      runId: '', lastRunId: st.runId, lastState: 'failed', lastError: tail,
+      nextRetryAt: delay ? Date.now() + delay : 0
+    });
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 进程异常退出\n');
+    plugRuntimeLogLine(t, 'watchdog', '运行时异常退出：' + tail.slice(0, 160));
+  } else if (state === 'done') {
+    plugRuntimeWriteState(plugin, { runId: '', lastRunId: st.runId, lastState: 'done', lastError: '', nextRetryAt: 0 });
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 进程已退出\n');
+    plugRuntimeLogLine(t, 'stop', '运行时正常退出');
+  } else if (state === 'not_found') {
+    plugRuntimeWriteState(plugin, { runId: '', lastRunId: st.runId, lastState: 'not_found', lastError: '', nextRetryAt: 0 });
+    plugRuntimeLogLine(t, 'watchdog', '运行时进程已丢失');
+  }
+  const now = plugRuntimeStateOf(plugin);
+  return {
+    ok: true, state, running: state === 'running', runId: st.runId,
+    exitCode: r && r.exitCode !== undefined ? r.exitCode : null,
+    output: output.slice(-2000), restartAt: Number(now.nextRetryAt) || 0, lastError: String(now.lastError || '')
+  };
+}
+
+/* ==========================================================
+ *  R-005 / R-006：运行环境准备、状态面板、日志轮转与退避（0.13）
+ *
+ *  - 环境准备复用 E5 依赖闭环：Termux 包与 npm 仍走固定模板和逐项确认；
+ *  - Node 装不上时给出可在 Termux 里直接粘贴的命令；
+ *  - 心跳/异常只报告并给出退避建议，不静默重启（派发必须用户确认）；
+ *  - 输出日志在 JS 侧再做一层按 runtime.logMaxBytes 的轮转，避免撑爆存储。
+ * ========================================================== */
+const PLUG_RUNTIME_LOG_KEY = 'via_ai_plugin_runtime_log';
+const PLUG_RUNTIME_LOG_JS_MAX = 262144;
+function plugRuntimeClock() { return new Date().toISOString().slice(11, 19); }
+function plugRuntimeLogsAll() {
+  const all = sGet(PLUG_RUNTIME_LOG_KEY, {});
+  return plugPlainObject(all) ? all : {};
+}
+function plugRuntimeLogAppend(plugin, text) {
+  const key = String(plugin && plugin.id || '');
+  if (!key || !text) return;
+  const rt = plugin.runtime || {};
+  const cap = Math.min(PLUG_RUNTIME_LOG_JS_MAX, Math.max(65536, parseInt(rt.logMaxBytes, 10) || 65536));
+  const all = plugRuntimeLogsAll();
+  let cur = typeof all[key] === 'string' ? all[key] : '';
+  cur += String(text).slice(0, cap);
+  if (cur.length > cap) cur = cur.slice(cur.length - cap);
+  all[key] = cur;
+  sSet(PLUG_RUNTIME_LOG_KEY, all);
+}
+function plugRuntimeLogText(plugin) {
+  const v = plugRuntimeLogsAll()[String(plugin && plugin.id || '')];
+  return typeof v === 'string' ? v : '';
+}
+function plugRuntimeLogClear(plugin) {
+  const key = String(plugin && plugin.id || '');
+  if (!key) return;
+  const all = plugRuntimeLogsAll();
+  delete all[key];
+  sSet(PLUG_RUNTIME_LOG_KEY, all);
+}
+/** 同时写进 E6 的任务日志（自带条数与总量轮转）。 */
+function plugRuntimeLogLine(task, level, msg) {
+  try { if (task && typeof persistLog === 'function') persistLog(task.id, level, msg); } catch (e) {}
+}
+/** 读运行时工作目录里的文件文本；读不到返回空串。 */
+function plugRuntimeReadFile(plugin, name, maxChars) {
+  if (!plugin || !plugin.runtime) return '';
+  if (!(HAS_PERM && Perm.agentWorkspaceRead)) return '';
+  const t = plugRuntimeTaskOf(plugin);
+  if (!t) return '';
+  let raw = '';
+  try { raw = String(Perm.agentWorkspaceRead(taskWorkspacePath(t, 'working/' + String(name)), maxChars || 20000) || ''); } catch (e) { return ''; }
+  let r = {};
+  try { r = JSON.parse(raw || '{}'); } catch (e) { return ''; }
+  if (!r || r.ok === false || r.text == null) return '';
+  return String(r.text);
+}
+/** 引擎回报的 status.json（约定由入口脚本写入）。 */
+function plugRuntimeEngineStatus(plugin) {
+  const text = plugRuntimeReadFile(plugin, 'status.json', 20000);
+  if (!text) return null;
+  try { const o = JSON.parse(text); return plugPlainObject(o) ? o : null; } catch (e) { return null; }
+}
+/** 引擎回报的最近聊天。 */
+function plugRuntimeChatTail(plugin, maxChars) {
+  const text = plugRuntimeReadFile(plugin, 'chat.log', 40000);
+  if (!text) return '';
+  const cap = Math.min(4000, Math.max(200, Number(maxChars) || 1200));
+  return text.length > cap ? text.slice(text.length - cap) : text;
+}
+/** 运行环境快照：Termux、清单声明的 Node 包与 npm 依赖。 */
+function plugRuntimeEnvOf(plugin) {
+  const tx = typeof plugDepTermuxInfo === 'function' ? plugDepTermuxInfo() : { installed: false };
+  const deps = Array.isArray(plugin && plugin.dependencies) ? plugin.dependencies : [];
+  const node = deps.filter(d => d.kind === 'termux-pkg' && /node/i.test(String(d.source || '')))[0] || null;
+  const npmDeps = deps.filter(d => d.kind === 'npm');
+  const missing = typeof plugDepMissing === 'function' ? plugDepMissing(plugin) : [];
+  const npmInstalled = npmDeps.filter(d => typeof plugDepStateOf === 'function' && plugDepStateOf(plugin, d) === 'installed').length;
+  const nodeState = node && typeof plugDepStateOf === 'function' ? plugDepStateOf(plugin, node) : (node ? 'missing' : '');
+  return {
+    termux: !!(tx && tx.installed), node, nodeState, npmDeps, npmInstalled, missing,
+    ready: !!(tx && tx.installed) && !missing.length
+  };
+}
+/** 手动兜底命令：用户可直接粘贴到 Termux。 */
+function plugRuntimeEnvCommands(plugin) {
+  const env = plugRuntimeEnvOf(plugin);
+  const lines = [];
+  const pkg = env.node ? env.node.source : 'nodejs';
+  lines.push('pkg update -y && pkg install -y ' + pkg);
+  env.npmDeps.forEach(d => lines.push('npm install -g ' + d.source + (d.version ? '@' + d.version : '')));
+  if (!env.node && !env.npmDeps.length) lines.push('node -v');
+  return lines.join('\n');
+}
+/** 一键准备环境：安装清单里缺失的 Termux 包与 npm 依赖。 */
+async function plugRuntimePrepare(plugin) {
+  if (!plugin || !plugin.runtime) return { ok: false, error: '插件没有声明 runtime' };
+  const env = plugRuntimeEnvOf(plugin);
+  if (!env.termux) return { ok: false, error: 'Termux 未安装。\n' + (typeof plugDepTermuxGuide === 'function' ? plugDepTermuxGuide() : '') };
+  if (!env.missing.length) return { ok: true, already: true };
+  if (typeof plugDepInstallAll !== 'function') return { ok: false, error: '依赖运行时不可用' };
+  if (typeof plugDepAccess === 'function' && plugDepAccess(plugin)) return { ok: false, error: plugDepAccess(plugin) };
+  const r = await plugDepInstallAll(plugin);
+  if (r && r.ok) {
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 环境准备完成\n');
+    plugRuntimeLogLine(plugRuntimeTaskOf(plugin), 'start', '运行环境准备完成');
+  }
+  return r || { ok: false, error: '环境准备失败' };
+}
+/** 失败后的重试建议（只展示，不自动执行）。 */
+function plugRuntimeRetryHint(st) {
+  const at = Number(st && st.nextRetryAt) || 0;
+  const left = Math.max(0, Math.round((at - Date.now()) / 1000));
+  return left ? left + ' 秒' : '现在';
+}
+/** 设置页插件行里的运行时入口。 */
+function plugRuntimeRowHTML(p) {
+  if (!p || !p.runtime) return '';
+  const st = plugRuntimeStateOf(p);
+  const state = st.runId ? 'running' : String(st.lastState || 'stopped');
+  return '<div class="plug-market-meta"><b>长驻运行时：</b>' + esc(plugRuntimeStatusText(state)) +
+    ' <button type="button" class="plug-mini" data-plug-runtime="' + esc(p.id) + '">运行面板</button></div>';
+}
+/** 运行面板（plug-page 的 mode === 'runtime'）。 */
+function plugRuntimePanelHtml(plugin) {
+  if (!plugin) return '<div class="mini-note">插件已不存在。</div>';
+  const rt = plugin.runtime;
+  if (!rt) return '<div class="mini-note">这个插件没有声明长驻运行时。</div>';
+  const st = plugRuntimeStateOf(plugin);
+  const env = plugRuntimeEnvOf(plugin);
+  const guard = plugRuntimeGuard(plugin);
+  const running = !!st.runId;
+  const state = running ? 'running' : String(st.lastState || 'stopped');
+  const log = plugRuntimeLogText(plugin);
+  const canManage = typeof plugDepAccess === 'function' && !plugDepAccess(plugin);
+  const badge = '<span class="pc-badge' + (running ? ' pc-badge-ok' : '') + '">' + plugEsc(plugRuntimeStatusText(state)) + '</span>';
+  let html = '<div class="mini-note">长驻进程由宿主托管在隐藏任务里；每次启动仍会弹出 Termux 派发确认，宿主不会静默拉起。停止会取消进程并清空重试计划。</div>';
+  html += '<div class="pc pc-row-item"><div class="pc-row-main">' +
+    '<div class="pc-row-t">进程状态 ' + badge + '</div>' +
+    '<div class="pc-row-d">入口：' + plugEsc(rt.entry) + ' · 重启策略：' + plugEsc(rt.restart) +
+    ' · 心跳：' + Math.round((rt.healthcheckMs || 15000) / 1000) + ' 秒 · 日志上限：' + plugDepHumanSize(rt.logMaxBytes) + '</div>' +
+    (st.startedAt ? '<div class="pc-row-d pc-muted">启动于 ' + plugEsc(st.startedAt) + '</div>' : '') +
+    (st.lastError ? '<div class="pc-row-d">上次错误：' + plugEsc(String(st.lastError).slice(0, 300)) + '</div>' : '') +
+    (state === 'failed' && st.nextRetryAt ? '<div class="pc-row-d">建议 ' + plugEsc(plugRuntimeRetryHint(st)) + ' 后点「启动」重试；宿主不会自动重启。</div>' : '') +
+    '</div></div>';
+  const engine = plugRuntimeEngineStatus(plugin);
+  if (engine) {
+    const bits = [];
+    if (engine.username) bits.push('玩家 ' + engine.username);
+    if (engine.health != null) bits.push('血量 ' + engine.health);
+    if (engine.food != null) bits.push('饥饿 ' + engine.food);
+    if (engine.position) bits.push('坐标 ' + [engine.position.x, engine.position.y, engine.position.z].join(','));
+    if (engine.onGround != null) bits.push(engine.onGround ? '在地面' : '空中');
+    if (Array.isArray(engine.players) && engine.players.length) bits.push('同服 ' + engine.players.join('、'));
+    html += '<div class="pc pc-row-item"><div class="pc-row-main">' +
+      '<div class="pc-row-t">引擎回报 ' + (engine.connected ? '<span class="pc-badge pc-badge-ok">已连接</span>' : '<span class="pc-badge">未连接</span>') + '</div>' +
+      '<div class="pc-row-d">' + plugEsc(bits.join(' · ') || '还没有环境快照') + '</div>' +
+      (engine.event ? '<div class="pc-row-d pc-muted">最近事件：' + plugEsc(String(engine.event).slice(0, 120)) + '</div>' : '') +
+      '</div></div>';
+  }
+  html += '<div class="pc pc-row-item"><div class="pc-row-main">' +
+    '<div class="pc-row-t">运行环境 ' + (env.ready ? '<span class="pc-badge pc-badge-ok">就绪</span>' : '<span class="pc-badge">未就绪</span>') + '</div>' +
+    '<div class="pc-row-d">Termux：' + (env.termux ? '已安装' : '未检测到') +
+    (env.node ? ' · Node：' + plugEsc(plugin.dependencies.filter(d => d.id === env.node.id)[0].source) + '（' + (env.nodeState === 'installed' ? '已安装' : '未安装') + '）' : '') +
+    (env.npmDeps.length ? ' · npm：' + env.npmInstalled + '/' + env.npmDeps.length + ' 已安装' : '') + '</div>' +
+    (env.missing.length ? '<div class="pc-row-d">缺失：' + plugEsc(env.missing.map(d => d.id).join('、')) + '</div>' : '') +
+    '</div><div class="pc-actions">' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-env="1"' + (canManage && env.missing.length ? '' : ' disabled') + '>一键准备环境</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-copy="1">复制手动命令</button>' +
+    '</div></div>';
+  html += '<div class="pc-title" style="margin-top:12px">手动兜底（可在 Termux 里直接粘贴）</div>' +
+    '<pre class="dep-log">' + plugEsc(plugRuntimeEnvCommands(plugin)) + '</pre>';
+  html += '<div class="pc-actions" style="margin-top:12px">' +
+    '<button type="button" class="pc-btn pc-primary" data-rt-start="1"' + (!running && !guard ? '' : ' disabled') + '>启动</button>' +
+    '<button type="button" class="pc-btn" data-rt-stop="1"' + (running ? '' : ' disabled') + '>停止</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-refresh="1">刷新状态</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-rt-clear="1"' + (log ? '' : ' disabled') + '>清空日志</button>' +
+    '</div>' + (guard ? '<div class="mini-note">启动条件未满足：' + plugEsc(guard) + '</div>' : '');
+  html += '<div class="pc-title" style="margin-top:12px">运行日志（按上限轮转）</div>' +
+    '<pre id="rt-log" class="dep-log">' + plugEsc(log || '（还没有输出）') + '</pre>';
+  const chat = plugRuntimeChatTail(plugin, 1200);
+  if (chat) {
+    html += '<div class="pc-title" style="margin-top:12px">最近聊天</div>' +
+      '<pre class="dep-log">' + plugEsc(chat) + '</pre>';
+  }
+  return html;
+}
+function plugRuntimeRefreshPanel() {
+  if (typeof plugRenderPage === 'function' && PLUG_PAGE_CTX.mode === 'runtime') { try { plugRenderPage(); } catch (e) {} }
+}
+function plugRuntimeOpen(pid) {
+  const plugin = USER_PLUGINS.filter(p => p.id === String(pid))[0];
+  if (!plugin) { toast('插件不存在'); return; }
+  if (!plugin.runtime) { toast('这个插件没有长驻运行时'); return; }
+  PLUG_PAGE_CTX = { pluginId: plugin.id, surfaceId: '', mode: 'runtime' };
+  if (typeof showView === 'function') showView(PLUG_PAGE_VIEW, { noStack: true });
+  if (typeof VIEW_STACK !== 'undefined' && VIEW_STACK[VIEW_STACK.length - 1] !== PLUG_PAGE_VIEW) VIEW_STACK.push(PLUG_PAGE_VIEW);
+  plugRenderPage();
+}
+async function plugRuntimeHandleUi(el) {
+  if (!el || !el.dataset) return false;
+  const plugin = USER_PLUGINS.filter(p => p.id === PLUG_PAGE_CTX.pluginId)[0];
+  if (!plugin) return false;
+  if (el.dataset.rtStart) {
+    const r = await plugRuntimeStart(plugin);
+    toast(r.ok ? (r.already ? '已经在运行' : '已启动') : (r.error || '启动失败'));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtStop) {
+    const r = await plugRuntimeStop(plugin);
+    toast(r.ok ? '已停止' : (r.error || '停止失败'));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtRefresh) {
+    const st = await plugRuntimeStatus(plugin);
+    toast('状态：' + plugRuntimeStatusText(st.state));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtEnv) {
+    const r = await plugRuntimePrepare(plugin);
+    toast(r && r.ok ? (r.already ? '环境已就绪' : '环境已准备') : ((r && r.error) || '准备失败'));
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  if (el.dataset.rtCopy) {
+    const ok = typeof writeClipboard === 'function' && writeClipboard(plugRuntimeEnvCommands(plugin));
+    toast(ok ? '命令已复制到剪贴板' : '复制失败，请长按命令手动复制');
+    return true;
+  }
+  if (el.dataset.rtClear) {
+    plugRuntimeLogClear(plugin);
+    plugRuntimeRefreshPanel();
+    return true;
+  }
+  return false;
 }

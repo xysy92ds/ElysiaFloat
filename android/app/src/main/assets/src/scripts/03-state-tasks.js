@@ -512,7 +512,7 @@ async function runChatTask(task, runner) { return await runner(task); }
 async function runQuickTask(task, runner) { return await runner(task); }
 async function runDeviceTask(task, runner) { return await runner(task); }
 async function runWorkspaceTask(task, runner) { return await runner(task); }
-function renderTaskDrawer() { const box = $('#task-list'); if (!box) return; const list = TASKS.filter(t => t.state !== 'archived').slice(0, 12); const cur = currentTask();
+function renderTaskDrawer() { const box = $('#task-list'); if (!box) return; const list = TASKS.filter(t => t.state !== 'archived' && !t.hidden).slice(0, 12); const cur = currentTask();
   const detail = (cur && cur.type === 'workspace' && cur.workspaceReady) ? (function () {
     const idx = taskIndex(cur); const snaps = taskSnapshots(cur);
     const files = idx && Array.isArray(idx.files) ? idx.files.slice(0, 6) : [];
@@ -677,7 +677,9 @@ function toolLive(name) {
     // 工作区外仍然要求 L3 + 安全开关 + 所有文件访问
     return plugOn('files') && hasAllFilesAccess() && agentLevelAtLeast('L3');
   }
-  if (name === 'run_termux_job' || name === 'root_operation') return plugOn('runtime') && agentActionsOn();
+  if (name === 'run_termux_job' || name === 'root_operation'
+    || name === 'termux_job_status' || name === 'termux_job_output'
+    || name === 'termux_job_cancel' || name === 'termux_jobs_list') return plugOn('runtime') && agentActionsOn();
   if (name === 'open_url' || name === 'set_clipboard') return plugOn('system');
   if (name === 'fetch_url' || name === 'web_search') return plugOn('web');
   if (name === 'search_and_play_music' || name === 'music_control') return plugOn('music') && !!CONFIG.musicEnabled && !(CONFIG.toolOff && CONFIG.toolOff[name]);

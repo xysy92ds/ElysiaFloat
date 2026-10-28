@@ -571,7 +571,7 @@ INVALID_ARGUMENT
 → 0.10.0 Beta 开放式插件运行时（E3：surface/组件/动作/事件/配置/生命周期）
 → 0.11.0 Beta 插件 UI 运行时（E4：挂载点/会话引擎/主题包/渲染模板/开发者包）
 → 0.12.0 Beta 依赖管理 + 持久会话（E5 + E6 + G8-001 Termux）
-→ 0.13.0 Beta MC 插件（E7，Java + Mineflayer，无面板）
+→ 0.13.0 Beta 插件长任务运行时（R-001~R-007）→ 0.13.1 MC 插件（E7，Java + Mineflayer，无面板）
 → 0.14.0 Beta QQ 插件（E8，OneBot + NapCat，微型面板）
 → 0.15.0 Beta 沙箱 HTML + 适配器生态 + 工作能力工程化 + 治理（E9 + E10）
 ```

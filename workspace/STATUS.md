@@ -5,6 +5,7 @@
 
 > 本文件是工作区导航，不替代技术文档。项目当前真正的执行入口是：
 > - `plans/MASTER-EXECUTION-PLAN.md`：唯一任务链和阶段出口；
+> - `plans/0.13.0-runtime-and-mc.md`：0.13 插件长任务运行时 + MC 插件（E7）实施计划；
 > - `issues/ISSUE-REGISTER.md`：唯一问题总表；
 > - `plans/current.md`：原有详细方案和历史上下文；
 > - `work-logs/`：已实际执行的工作证据。
@@ -30,8 +31,16 @@
 - 0.12.3 体验补丁候选包 SHA-256：`e6c310ba24e3061aa85f0306b48799f8a1ec2c0460dd479529539d6375264135`（2,695,081 字节）；恢复设置折叠（箭头 + 记住状态）、原生 select 改 chips、运行秒数移到输入框下方。
 - 0.12.4 体验补丁候选包 SHA-256：`2fac488ef664a4cca2279b51b16b8c156cc94d26e6a92860c94207fbe5982d4b`（2,695,168 字节）；修复空插件 composer 插槽占满整行导致聊天输入框被挤成一条缝（I-071）。
 - 0.12.5 体验/模型配置候选包 SHA-256：`5c8ce93046bac6975e2a34a242ed8180e3bff8157e9799c54e19471a849c7faa`（2,699,067 字节）；用途绑定点击反馈、顶栏整块可拖、输入区/设置底部条留白收紧、Provider 表单一键检测模型 + 能力标注、识图/向量 Provider 快捷选择、快捷服务商扩到 21 个、删除 EveryAPI、剪贴板读取增加 WebView 兜底（I-072/I-073）。
+- 下一步执行计划：`plans/0.13.0-runtime-and-mc.md`；0.13 拆为 0.13.0 插件长任务运行时（R-001~R-007）+ 0.13.1 MC 插件（M-001~M-010）。用户已确认：MC 先只做离线登录；设备 Termux 已装、Node 未装，先补“一键准备环境”。
+- 0.13 路线决策（2026-10-29，用户选定 B「桥接」）：不自研 MC 决策循环，Termux 里跑现成引擎（Mindcraft-CE / MCP server），我们只做配置页 + 启停 + 状态/日志桥。因此 R-004 不再新造 token RPC，插件走已有的 `network.local` 本机 HTTP；0.13.1 的 M-004~M-011 相应改为“引擎适配层”。
+- 0.13.0 进度（2026-10-29）：R-001 `runtime.termux` 权限 + 五个 Termux 工具能力映射（`root_operation` 不开放给插件）、R-002 清单 v2 `runtime` 块（kind/entry/source/args/autostart/restart/healthcheckMs/logMaxBytes/configFile，入口必须相对且不许 `..`）、R-003 宿主托管隐藏工作任务 `plug-<id>.runtime`（start/stop/status，仍走逐次确认）、R-005 一键准备环境（复用 E5，Termux 未装/Node 未装都有手动命令兜底）、R-006 心跳/退避/双层日志轮转/停止清理（失败只报告，不静默拉起）、R-007 node-hello 回归夹具。`smoke.js` 新增三条回归，`build-html --check` / `smoke` / `behavior.test` / `scan-secrets` 全通过。
+- 0.13.1 进度（2026-10-29，路线 B）：`marketplace/plugins/com.elly.market.minecraft` 整体重写为 Manifest v2 + `runtime`（entry `bot.js`、`configFile`、`restart:on-failure`、`logMaxBytes:2MB`）。配置页 `mc-config`（host/port/username/version/allowActions/autoReconnect/allowedHosts，支持粘贴「Local game hosted on port xxxxx」自动解析）与说明页 `mc-guide`；依赖 Node + mineflayer/pathfinder/minecraft-data/vec3 走 R-005；新 `bot.js` 离线登录、断线退避重连、`status.json`/`chat.log`、只监听 `127.0.0.1:39271` 的 `/cmd` `/status`、17 个动作、安全模式与玩家保护；AI 侧三个本机工具 `minecraft_bot` / `minecraft_bot_status` / `minecraft_chat_read`。清单由 `tools/build-mc-manifest.js` 从 `bot.js` 生成并同步 `marketplace/index.json`（v0.3.1，SHA-256 `3de5f7dd…`）。
+- 0.13.1 补完（2026-10-29）：M-009 动作审计 `audit.log`（256KB 截半）+ 每分钟 30 个动作限频；M-007 只读聊天桥 `GET /chat?since=&limit=` + `minecraft_chat_read`（游戏内聊天不回令，仍是路线 B）；修掉「未进世界时 `bot.inventory` 未初始化导致取快照崩溃」的真 bug，smoke 已加回归。
+- 0.13.1 本地离线验证：用 stub 的 mineflayer/pathfinder/minecraft-data/vec3 跑真 `bot.js`，验证 `/status`、`/chat` 的 since 过滤、第 31 条指令起限频、`audit.log` 32 行、SIGTERM 收尾。真机联调（Termux 装 Node、开房间端口、实际进世界）尚未做。
+- 0.13 候选包 SHA-256：`c1902d72d5fcca68c8a8c2797612edb9027be036025c90b42324cf701f3795fe`（2,707,413 字节），`apk/ElysiaFloat-v0.7.2-0.13dev-debug.apk`；内置 `index.html` 已含 R-005/R-006。
+- 0.13.1 候选包 SHA-256：`9252214966179cbbabd346fedabcd8f515a78a45ac71f699857cb5da89b2bfd3`（2,722,494 字节），`apk/ElysiaFloat-v0.7.2-0.13.1dev-debug.apk`（内置 `index.html` = `6cec6892…`）。APK 内置市场新增 Minecraft 条目（由 `tools/build-mc-manifest.js` 从清单生成 `src/scripts/04a-mc-market.js`），远程索引未推送也能在「插件市场」直接安装；`plugMarketEntries` 改为「远程版本更高时才覆盖内置条目」，避免内置版本挡住后续更新。
 - 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
-- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`assembleDebug` 全通过（2026-10-28 复跑，含 0.12.5 体验/模型配置修正）；I-055~I-073 仍待真机复测。
+- 当前质量门：`build-html.js --check`、`smoke.js`（含 MC-001/MC-002）、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`plugin-validate.js`、`assembleDebug` 全通过（2026-10-29 复跑，含 0.13.1 内置市场条目）；I-055~I-073 仍待真机复测。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。
 - 更新链路：应用内更新检查读取公开仓库 `release/latest.json`，当前已指向 v0.7.2（私有归档副本已同步为公开 URL）。
 - 平台化路线：全部 0.x Beta 小步走——0.9 核心体验+模型中心 → 0.10 开放式插件运行时 →

@@ -188,6 +188,7 @@ function plugCustomHtml() {
       ${p.desc ? '<div class="plug-group-desc">' + esc(p.desc) + '</div>' : ''}
       <div class="plug-market-meta"><b>类型：</b>${esc(({chat:'聊天插件',quick:'快捷任务插件',device:'手机插件',workspace:'工作插件'}[p.pluginType] || '聊天插件'))}</div>
       ${plugDepsRowHTML(p)}
+      ${plugRuntimeRowHTML(p)}
       ${plugPermissionsHTML(p)}
       ${rows}
     </div>`;
@@ -308,9 +309,14 @@ async function syncPlugMarket() {
 }
 function plugMarketEntries() {
   const out = PLUGIN_MARKET_INDEX.map(p => Object.assign({}, p, { marketSource: 'local', trust: p.trust || 'local-example' }));
-  const ids = {};
-  out.forEach(p => { ids[p.id] = true; });
-  PLUG_REMOTE_MARKET.forEach(p => { if (!ids[p.id]) out.push(p); });
+  const pos = {};
+  out.forEach((p, i) => { pos[p.id] = i; });
+  // 内置条目只在版本更高时让位给远程：否则 APK 自带版本会永远挡住远程更新。
+  PLUG_REMOTE_MARKET.forEach(p => {
+    const i = pos[p.id];
+    if (i == null) { out.push(p); return; }
+    if (cmpVer(verArr(String(p.version || '0')), verArr(String(out[i].version || '0'))) > 0) out[i] = p;
+  });
   return out;
 }
 function renderPlugMarket() {

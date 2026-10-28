@@ -68,12 +68,15 @@ step('源码里不再有未加保护的全局历史写入（N4-002 回归）', (
   if (bad.length) throw new Error('仍有未保护的全局历史写入：' + bad.join(', '));
 });
 
-step('插件市场索引只剩 text-tools（N4-001 回归）', () => {
+step('插件市场索引：text-tools 示例 + Minecraft 运行时插件（N4-001 回归更新）', () => {
   const index = T.PLUGIN_MARKET_INDEX;
-  if (!Array.isArray(index) || index.length !== 1) throw new Error('市场索引条目数应为 1，实际 ' + (index && index.length));
-  if (index[0].id !== 'com.elly.market.text-tools') throw new Error('唯一示例不是 text-tools');
-  const raw = JSON.stringify(index);
-  if (/minecraft|termux/i.test(raw)) throw new Error('市场索引仍含 Minecraft / Termux 条目');
+  if (!Array.isArray(index)) throw new Error('市场索引不是数组');
+  const text = index.filter(p => p.id === 'com.elly.market.text-tools')[0];
+  if (!text) throw new Error('内置市场缺 text-tools 示例');
+  const mc = index.filter(p => p.id === 'com.elly.market.minecraft')[0];
+  if (!mc) throw new Error('内置市场缺 Minecraft 插件');
+  if (!mc.runtime || mc.runtime.kind !== 'termux-node') throw new Error('Minecraft 条目不是 termux-node 运行时插件');
+  if (index.length !== 2) throw new Error('内置市场条目数应为 2，实际 ' + index.length);
 });
 
 step('迁移基线已删除，且构建工具不再支持 --verify-migration', () => {

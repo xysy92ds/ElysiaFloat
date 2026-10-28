@@ -1,84 +1,101 @@
-# Minecraft 联机助手
+# Minecraft 联机助手（Java 版）
 
-让 AI 和你在同一个 Minecraft 世界里联机。AI 通过 Mineflayer bot 控制角色，你通过悬浮窗给 AI 发指令。
+让 AI 和你在同一个 Java 版 Minecraft 世界里联机。bot 是 Termux 里的一个常驻 Node 进程（Mineflayer），App 只负责配置、启停、状态和日志；AI 通过三个受控工具给它下指令。
 
 ## 架构
 
 ```
-你的手机
-├── Minecraft PE（你玩）─── 连接到本地服务器
-├── ElysiaFloat 悬浮窗（你给 AI 发指令）
+同一台手机
+├── Minecraft Java 版（PojavLauncher 等，你玩）
+│   └── 单人游戏 → 对局域网开放 → 聊天栏给出「Local game hosted on port xxxxx」
+├── ElysiaFloat（配置 / 启停 / 状态 / 日志）
+│   └── 插件工具 minecraft_bot → http://127.0.0.1:39271/cmd
 └── Termux
-    ├── Minecraft Bedrock Server（19132）
-    └── Mineflayer Bot（AI 控制）
-        ├── cmd.json    ← AI 写指令
-        ├── status.json ← bot 写状态（位置、血量、背包、附近玩家）
-        └── chat.log    ← bot 记录聊天
+    └── node bot.js（本插件常驻进程）
+        ├── 连 127.0.0.1:端口（离线登录）
+        ├── 写 status.json / chat.log / audit.log
+        └── 只在本机监听控制接口
 ```
+
+宿主启动前会把插件配置写成工作目录里的 `runtime-config.json`，bot 从里面读取服务器地址、用户名、版本和行为边界。
 
 ## 前置条件
 
-1. 安装 [Termux](https://f-droid.org/packages/com.termux/)
-2. 在 ElysiaFloat 中开启「高级运行时」权限
-3. 手机至少 6GB RAM
+1. Termux（已装 `termux-am` 并开启 `allow-external-apps`）
+2. 在插件运行面板点「一键准备环境」，装好 `nodejs` 与 4 个 npm 包；也可以在 Termux 里手动执行面板给出的命令
+3. 手机内存建议 8GB 起，联调时降低渲染距离、关闭光影
 
 ## 使用步骤
 
-1. **环境搭建**：`minecraft_setup` — 装 Java 17 + Node.js
-2. **装依赖**：`minecraft_install_deps` — 装 mineflayer 等 npm 包
-3. **部署 bot**：`minecraft_deploy_bot` — 写 bot.js + bot.env
-4. **下服务器**：`minecraft_download_server` — 下载 Bedrock Server
-5. **开服务器**：`minecraft_start_server` — 记下 runId
-6. **开 bot**：`minecraft_start_bot` — 记下 runId
-7. **打开 MC PE**：连接 `127.0.0.1:19132`
-8. **开始联机**：用 `minecraft_bot_command` 指挥 AI，用 `minecraft_bot_status` 看状态
+1. 插件设置 → 「连接与行为」：服务器地址填 `127.0.0.1`（或把「Local game hosted on port xxxxx」整段粘进去）、端口、离线用户名
+2. 插件设置 → 「运行面板」→ 启动，首次会弹一次 Termux 派发确认
+3. 进入世界后，运行面板会显示坐标、血量、饥饿和同服玩家
+4. 直接对 AI 说「让 bot 跟着我」「挖掉脚下三格」，它调用 `minecraft_bot`；想知道局势就调 `minecraft_bot_status`
 
-## Bot 支持的动作
+## 行为边界
 
-| action | 说明 | 参数 |
-|---|---|---|
-| `say` | 发聊天消息 | text |
-| `move` | 移动 N tick | direction, ticks |
-| `look` | 转头 | yaw, pitch |
-| `lookAt` | 看向坐标 | x, y, z |
-| `dig` | 挖眼前方块 | - |
-| `digAt` | 挖指定坐标 | x, y, z |
-| `place` | 放置方块 | - |
-| `attack` | 攻击最近实体 | - |
-| `attackNearest` | 攻击指定类型 | filter |
-| `activate` | 使用手中物品 | - |
-| `equip` | 装备物品 | item |
-| `toss` | 丢物品 | item, count |
-| `pathfind` | 寻路到坐标 | x, y, z |
-| `pathfindToPlayer` | 跟随玩家 | player |
-| `stop` | 停止所有动作 | - |
-| `jump` | 跳跃 | - |
+- **完整模式**：移动、挖掘、放置、攻击敌对生物、逃避、寻路、跟随、装备、丢弃、聊天
+- **安全模式**：只允许移动、跳跃、看向、寻路、跟随、逃避、聊天和查看；挖掘/放置/攻击/丢弃一律拒绝
+- 寻路不会挖方块、不会自动垫柱子，避免破坏你的建筑
+- 目标坐标超过 128 格直接拒绝；`attackNearest` 只打敌对生物，永远不攻击玩家
+- 只支持 Java 版离线登录；不绕过反作弊、不自动交易、不群发
 
-## 工具列表
+## AI 工具
 
 | 工具 | 说明 |
 |---|---|
-| `minecraft_setup` | 安装 Java + Node.js |
-| `minecraft_install_deps` | 安装 mineflayer 依赖 |
-| `minecraft_deploy_bot` | 部署 bot.js + 配置 |
-| `minecraft_download_server` | 下载 MC 服务器 |
-| `minecraft_start_server` | 启动服务器 |
-| `minecraft_server_status` | 查服务器状态/日志 |
-| `minecraft_stop_server` | 停服务器 |
-| `minecraft_start_bot` | 启动 bot |
-| `minecraft_bot_command` | 给 bot 发指令 |
-| `minecraft_bot_status` | 读 bot 状态 |
-| `minecraft_bot_chat` | 读最近聊天 |
-| `minecraft_bot_stop` | 停 bot |
+| `minecraft_bot` | 单个动作：`action` + 参数（`say/move/jump/look/lookAt/dig/digAt/place/placeAt/attack/attackNearest/flee/pathfind/follow/equip/toss/stop/status`） |
+| `minecraft_bot_status` | 状态快照：连接、坐标、血量、饥饿、背包、同服玩家、上次结果 |
+| `minecraft_chat_read` | 读游戏内聊天（只读）：`since` 毫秒时间戳 + `limit`，用返回的 `lastTs` 作为下次 `since` |
 
-## 注意
+三个工具都只访问 `127.0.0.1:39271`，需要插件获得 `network.local` 授权，并且宿主的安全开关打开；bot 未启动时返回明确错误。
 
-- 服务器和 bot 都在 Termux 后台运行，关闭 ElysiaFloat 不影响
-- 用 `minecraft_stop_server` 和 `minecraft_bot_stop` 停止
-- bot 断线会自动重连（5 秒后）
-- 状态文件每 500ms 更新一次
+## 动作参数
+
+| action | 参数 | 说明 |
+|---|---|---|
+| `say` | text | 聊天，最长 240 字 |
+| `move` | direction, ticks | 方向：forward/back/left/right/jump/sprint/sneak；1–200 tick |
+| `jump` | - | 跳一下 |
+| `look` | yaw, pitch | 弧度 |
+| `lookAt` | x, y, z | 看向坐标 |
+| `dig` | - | 挖视线 4 格内的方块 |
+| `digAt` | x, y, z | 挖指定方块 |
+| `place` | item | 在视线方块上方放置 |
+| `placeAt` | x, y, z, item | 在指定空气格放置，自动找依附面 |
+| `attack` | - | 打 4 格内的生物 |
+| `attackNearest` | filter=mob | 打 16 格内最近的敌对生物 |
+| `flee` | - | 远离 16 格内的敌对生物 3 秒 |
+| `pathfind` | x, y, z, timeoutMs | 寻路到坐标，默认 25 秒超时 |
+| `follow` | player, distance | 持续跟随到 `stop`，默认距离 2 |
+| `equip` | item, hand | 拿在手上 |
+| `toss` | item, count | 丢弃 |
+| `stop` | - | 停寻路、清移动、停止挖掘 |
+| `status` | - | 返回快照 |
+
+## 依赖
+
+| 依赖 | 类型 | 用途 |
+|---|---|---|
+| `nodejs` | termux-pkg | 运行桥接进程 |
+| `mineflayer` | npm | Java 版协议客户端 |
+| `mineflayer-pathfinder` | npm | 寻路、跟随、躲避 |
+| `minecraft-data` | npm | 方块与实体数据 |
+| `vec3` | npm | 坐标向量 |
+
+npm 包装在 Termux 的全局目录；bot 启动时会把 `$PREFIX/lib/node_modules` 加进 `NODE_PATH`，不需要你在工作目录里再 `npm install`。
+
+## 文件与限频
+
+- `status.json`：2 秒一次的状态快照（`connected`、`position`、`health`、`food`、`players`、`lastResult`）
+- `chat.log`：聊天尾部，超过 64KB 自动截半
+- `audit.log`：每个动作一行 JSON（时间、动作、成功/失败、耗时、关键参数），超过 256KB 自动截半
+- 控制接口 `GET /status`、`GET /chat`、`POST /cmd` 按顺序执行指令，队列最多 8 条；日志由宿主按 `runtime.logMaxBytes` 再轮转
+- 动作限频每分钟 30 个（`status` 不计），超了直接返回拒绝原因，避免把服务器刷到踢人
+- 断线在进程内自动重连，退避 3→6→12→24→48→60 秒；异常退出宿主只报告不静默拉起
 
 ## 版本
 
-- 0.2.0：完整 bot 控制层（JSON 指令 + 状态回传 + 寻路 + 16 种动作）
-- 0.1.0：初版骨架
+- 0.3.1：新增动作审计 `audit.log`、每分钟 30 个动作的限频，以及只读的聊天桥 `minecraft_chat_read` / `GET /chat`
+- 0.3.0：重写为 Manifest v2 + 长驻运行时；配置页、一键环境、本机控制接口、17 个动作与状态快照
+- 0.2.0：旧的基岩版工具集（已废弃）
