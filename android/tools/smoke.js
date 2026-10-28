@@ -499,6 +499,15 @@ function step(name, fn) {
     if (!/data-bind-pick=/.test(js)) throw new Error('用途绑定缺少可点击的 chips');
     if (/<select id="prov-kind">/.test(js)) throw new Error('Provider 类型不应使用原生 select');
     if (!/data-prov-kind=/.test(js)) throw new Error('Provider 类型缺少可点击的 chips');
+    // 0.12.5：快捷服务商、测试后选模型、旧识图/向量配置快捷选择；清除 EveryAPI 残留。
+    if (/everyapi/i.test(js)) throw new Error('仍残留 EveryAPI 中转站预设');
+    if (!/const PROVIDER_PRESETS = \[/.test(js)) throw new Error('缺少快捷服务商预设');
+    if (!/data-prov-preset=/.test(js)) throw new Error('添加表单缺少快捷服务商 chips');
+    if (!/data-model-pick=/.test(js)) throw new Error('测试连接后缺少可直接选择的模型');
+    if (!/btn-prov-model-detect/.test(js) || !/data-form-model=/.test(js)) throw new Error('添加 Provider 表单缺少一键检测模型');
+    if (!/function providerProbe\(/.test(js)) throw new Error('缺少可复用的模型探测函数');
+    if ((js.match(/\{ id: '[a-z0-9]+', label:/g) || []).length < 15) throw new Error('快捷服务商数量不足');
+    if (!/data-legacy-models=/.test(js) || !/legacyModelsRefresh/.test(js)) throw new Error('识图/向量配置缺少从 Provider 快捷选择');
     if (!/url\.indexOf\('\/models'\) < 0\) url \+= '\/models'/.test(js)) throw new Error('连接测试没有固定探测 /models');
     for (const id of ['usage-box', 'set-usage-calls', 'set-usage-tokens', 'btn-usage-reset']) {
       if (!html.includes('id="' + id + '"')) throw new Error('模型中心缺少用量控件：#' + id);

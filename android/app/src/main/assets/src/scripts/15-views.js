@@ -36,7 +36,11 @@ function showView(v, opts) {
     // 0.11：回到聊天时刷新挂载点，并按当前任务恢复主题。
     try { if (typeof plugMountRefresh === 'function') plugMountRefresh(); } catch (e) {}
     try { if (typeof plugThemeRestore === 'function') plugThemeRestore(); } catch (e) {}
-  } else if (v === 'settings') settings.classList.add('open');
+  } else if (v === 'settings') {
+    settings.classList.add('open');
+    // 模型提供商可能在别处新增/删除，回到设置时刷新快捷选择。
+    try { if (typeof legacyModelsRefresh === 'function') legacyModelsRefresh(); } catch (e) {}
+  }
   else if (v === 'providers' && providers) providers.classList.add('open');
   else if (v === 'plugins' && plugins) { plugins.classList.add('open'); renderPlugins(); }
   else if (v === 'plug-market' && plugMarketPage) { plugMarketPage.classList.add('open'); renderPlugMarket(); }
@@ -420,6 +424,9 @@ function bindInput() {
 function bindDrag() {
   const headEl = $('#head');
   let lastX = 0, lastY = 0, isDown = false;
+  // 整个深粉色标题区都可拖；只放过真正的交互控件，保证按钮照常点击。
+  const isControl = (el) => !!(el && el.closest &&
+    el.closest('button,input,textarea,select,a,label,[contenteditable],[data-no-drag]'));
 
   const start = (x, y) => {
     if (!HAS_PERM || !Perm.moveWindow) return;
@@ -437,7 +444,7 @@ function bindDrag() {
   const end = () => { isDown = false; };
 
   headEl.addEventListener('touchstart', e => {
-    if (e.target.closest('button')) return;
+    if (isControl(e.target)) return;
     const t = e.touches[0];
     start(t.screenX, t.screenY);
   }, { passive: true });
@@ -451,7 +458,7 @@ function bindDrag() {
   headEl.addEventListener('touchcancel', end);
 
   headEl.addEventListener('mousedown', e => {
-    if (e.button !== 0 || e.target.closest('button')) return;
+    if (e.button !== 0 || isControl(e.target)) return;
     start(e.screenX, e.screenY);
     e.preventDefault();
   });

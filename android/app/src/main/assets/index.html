@@ -16,12 +16,15 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   transform-origin:top left;overflow:hidden;
   display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(255,182,193,.35);
   border:1px solid rgba(255,154,158,.25)}
-#head{display:flex;flex-direction:column;gap:6px;padding:7px 10px;
+#head{display:flex;flex-direction:column;gap:7px;padding:9px 10px 10px;
   position:relative;background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
-  font-size:14px;font-weight:600;flex-shrink:0;cursor:move;touch-action:none}
+  font-size:14px;font-weight:600;flex-shrink:0;cursor:move;touch-action:none;
+  -webkit-user-select:none;user-select:none}
+/* 整个深粉色区域都能拖动窗口；按钮/输入等交互控件由脚本排除，不影响点击 */
+#head .head-main,#head .head-actions,#head .head-main *,#head .head-actions *{touch-action:none}
 .head-main{display:flex;align-items:center;gap:5px;min-width:0;width:100%}
-.head-actions{display:flex;align-items:center;gap:6px;min-width:0;width:100%;overflow:visible;position:relative}
-.head-main{min-height:28px}
+.head-actions{display:flex;align-items:center;gap:8px;min-width:0;width:100%;min-height:28px;overflow:visible;position:relative}
+.head-main{min-height:32px}
 #head img{width:28px;height:28px;border-radius:50%;background:#fff;
   border:2px solid rgba(255,255,255,.6);object-fit:cover;pointer-events:none;flex-shrink:0}
 #head .sp{flex:1 1 0;min-width:6px}
@@ -102,21 +105,22 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   color:var(--accent);font-size:11px;cursor:pointer;
   border:1px solid rgba(255,154,158,.3)}
 .tts-btn:active{background:rgba(255,154,158,.25)}
-#foot{display:flex;gap:8px;padding:10px 12px;background:#fff5f7;
+#foot{display:flex;gap:6px;padding:6px 8px;background:#fff5f7;
   border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;
-  /* 抬高按钮，避开右下/左下 22px 的窗口缩放热区(.rz)，否则「发送」会被 .rz-se 抢走点击 */
-  padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))}
-#input{flex:1;border:1.5px solid rgba(255,154,158,.25);border-radius:18px;
-  padding:10px 16px;font-size:14px;outline:none;resize:none;
+  /* 底部留白收到 8px；按钮自带 z-index 高于缩放热区(.rz z-index:60)，不会被抢点击 */
+  padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+#input{flex:1;border:1.5px solid rgba(255,154,158,.25);border-radius:16px;
+  padding:9px 14px;font-size:14px;outline:none;resize:none;
   background:var(--card);color:var(--text);max-height:100px;
   font-family:inherit;user-select:text;line-height:1.4}
 #run-sec{flex:0 0 auto;height:14px;padding:0 14px 2px;text-align:right;
   font-size:10px;color:var(--muted);pointer-events:none}
 #run-sec[hidden]{display:none!important}
 #input:focus{border-color:var(--c1)}
-#btn-plus{width:38px;height:38px;flex:0 0 auto;align-self:flex-end;border-radius:50%;
+#btn-plus{width:36px;height:36px;flex:0 0 auto;align-self:flex-end;border-radius:50%;
   border:1.5px solid rgba(255,154,158,.35);background:var(--card);color:var(--c1);
-  font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+  font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;
+  position:relative;z-index:80}
 #btn-plus:active{opacity:.7}
 #attach-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff5f7;
   border-top:1px solid rgba(255,154,158,.2);flex-shrink:0}
@@ -132,7 +136,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   margin-top:6px;border:1px solid rgba(255,154,158,.3)}
 /* 发送键：底端对齐、给足最小高度，并抬到窗口缩放热区(.rz, z-index:60)之上。
    即使某些机型安全区/布局让按钮落得更低，也不会被 .rz-se/.rz-s 抢走这一下点击。 */
-#send{width:60px;min-height:38px;align-self:flex-end;border-radius:18px;border:none;
+#send{width:56px;min-height:36px;align-self:flex-end;border-radius:16px;border:none;
   background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
   font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex-shrink:0;
   position:relative;z-index:80}
@@ -172,7 +176,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
 .set-fold-body{box-sizing:border-box;min-width:0;padding:0 12px 10px}
 .set-fold.closed .set-fold-body{display:none}
 
-.settings-bottom{display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:sticky;bottom:0;z-index:5;margin-top:18px;padding:10px 12px 24px;border:1px solid rgba(214,51,108,.28);border-radius:14px;background:var(--bg);box-shadow:0 -4px 14px rgba(214,51,108,.10)}
+.settings-bottom{display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:sticky;bottom:0;z-index:5;margin-top:8px;padding:6px 10px 24px;border:1px solid rgba(214,51,108,.28);border-radius:14px;background:var(--bg);box-shadow:0 -4px 14px rgba(214,51,108,.10)}
 .settings-bottom .mini-note{text-align:center;margin:0 0 8px;flex:1 0 100%}
 .settings-inline-save{flex:1 1 auto}
 .settings-return,.settings-inline-save{display:block;flex:1;margin:0;padding:9px 12px;border:0;border-radius:12px;font:12px inherit;cursor:pointer}
@@ -473,6 +477,11 @@ input.secret.reveal{-webkit-text-security:none}
   font-family:inherit;cursor:pointer;transition:all .15s}
 .chips button.on{background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;
   border-color:transparent;font-weight:600}
+/* 测试连接后返回的模型列表：模型名 + 推断用途 */
+.model-list{max-height:190px;overflow-y:auto;padding-top:4px}
+.model-chip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;max-width:100%}
+.model-chip b{font-size:11px;font-weight:600;line-height:1.25;word-break:break-all}
+.model-chip span{font-size:9px;opacity:.72;line-height:1.2}
 .swatches{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.swatch{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.85);
   box-shadow:0 0 0 1px rgba(74,44,58,.15);cursor:pointer;padding:0;flex-shrink:0}
 .swatch.on{box-shadow:0 0 0 3px var(--accent)}
@@ -2661,9 +2670,9 @@ const TTS_VOICES = [
 ];
 
 const DC = {
-  apiBase: 'https://app.everyapi.ai/v1',
+  apiBase: '',
   apiKey: '',
-  model: 'gpt-5.6-luna',
+  model: 'gpt-4o-mini',
   assistantName: '爱莉希雅',
   avatarUrl: 'https://pic.rmb.bdstatic.com/bjh/250418/beautify/dd8fae8238e68e365619e0537dce3698.jpeg@c_1,w_1977,h_2636,x_0,y_0?for=bg',
   avatarFit: 'top',
@@ -2792,7 +2801,6 @@ const UPDATE_API = 'https://raw.githubusercontent.com/' + UPDATE_REPO + '/main/r
 const UPDATE_RELEASES = 'https://github.com/' + UPDATE_REPO + '/releases';
 
 const PRESETS = {
-  everyapi: { label: 'EveryAPI', base: 'https://app.everyapi.ai/v1', model: 'gpt-5.6-luna' },
   openai: { label: 'OpenAI', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   deepseek: { label: 'DeepSeek', base: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   zhipu: { label: '智谱 GLM', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
@@ -2839,6 +2847,31 @@ const PROVIDER_PURPOSE_LABEL = {
   chat: '聊天', vision: '识图', image: '生图', video: '视频',
   embedding: '向量', tts: '语音', asr: '语音识别', search: '网页搜索'
 };
+/** 添加 Provider 时的快捷服务商；只填默认地址与常用模型，Key 仍由用户自己填。 */
+const PROVIDER_PRESETS = [
+  { id: 'openai', label: 'OpenAI', kind: 'openai', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini', caps: ['chat', 'vision', 'image', 'tts', 'asr', 'embedding'] },
+  { id: 'anthropic', label: 'Anthropic', kind: 'anthropic', base: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-latest', caps: ['chat', 'vision', 'code'] },
+  { id: 'gemini', label: 'Gemini', kind: 'gemini', base: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.0-flash', caps: ['chat', 'vision', 'embedding'] },
+  { id: 'deepseek', label: 'DeepSeek', kind: 'openai', base: 'https://api.deepseek.com/v1', model: 'deepseek-chat', caps: ['chat', 'code'] },
+  { id: 'qwen', label: '通义千问', kind: 'openai', base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', caps: ['chat', 'vision', 'image', 'embedding'] },
+  { id: 'zhipu', label: '智谱 GLM', kind: 'openai', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', caps: ['chat', 'vision', 'image', 'embedding'] },
+  { id: 'kimi', label: 'Kimi', kind: 'openai', base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', caps: ['chat', 'vision'] },
+  { id: 'siliconflow', label: '硅基流动', kind: 'openai', base: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct', caps: ['chat', 'vision', 'image', 'embedding', 'asr'] },
+  { id: 'openrouter', label: 'OpenRouter', kind: 'openai', base: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini', caps: ['chat', 'vision', 'code'] },
+  { id: 'groq', label: 'Groq', kind: 'openai', base: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', caps: ['chat', 'asr'] },
+  { id: 'xai', label: 'xAI Grok', kind: 'openai', base: 'https://api.x.ai/v1', model: 'grok-2-latest', caps: ['chat', 'vision', 'code'] },
+  { id: 'mistral', label: 'Mistral', kind: 'openai', base: 'https://api.mistral.ai/v1', model: 'mistral-large-latest', caps: ['chat', 'code', 'embedding'] },
+  { id: 'baidu', label: '百度千帆', kind: 'openai', base: 'https://qianfan.baidubce.com/v2', model: 'ernie-4.5-turbo-128k', caps: ['chat', 'vision', 'embedding'] },
+  { id: 'xfyun', label: '讯飞星火', kind: 'openai', base: 'https://spark-api-open.xf-yun.com/v1', model: 'generalv3.5', caps: ['chat', 'vision'] },
+  { id: 'hunyuan', label: '腾讯混元', kind: 'openai', base: 'https://api.hunyuan.cloud.tencent.com/v1', model: 'hunyuan-turbos-latest', caps: ['chat', 'vision'] },
+  { id: 'minimax', label: 'MiniMax', kind: 'openai', base: 'https://api.minimax.chat/v1', model: 'abab6.5s-chat', caps: ['chat'] },
+  { id: 'stepfun', label: '阶跃星辰', kind: 'openai', base: 'https://api.stepfun.com/v1', model: 'step-1v-8k', caps: ['chat', 'vision'] },
+  { id: 'together', label: 'Together', kind: 'openai', base: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', caps: ['chat', 'code'] },
+  { id: 'ai302', label: '302.AI', kind: 'openai', base: 'https://api.302.ai/v1', model: 'gpt-4o-mini', caps: ['chat', 'vision', 'image', 'embedding'] },
+  { id: 'ollama', label: 'Ollama 本地', kind: 'openai', base: 'http://127.0.0.1:11434/v1', model: 'llama3.2', caps: ['chat', 'embedding'] },
+  { id: 'lmstudio', label: 'LM Studio', kind: 'openai', base: 'http://127.0.0.1:1234/v1', model: 'local-model', caps: ['chat', 'embedding'] },
+  { id: 'searxng', label: 'SearXNG', kind: 'custom', base: '', model: '', caps: ['search'] }
+];
 
 function providerId(prefix) {
   return (prefix || 'p') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5);
@@ -3073,14 +3106,11 @@ function providerTestHeaders(p, key) {
 }
 
 /**
- * E2-005：连接测试 + 能力探测。只 GET /models，不发起付费推理。
- * 返回 Promise<{ ok, latencyMs, status, error, models, capabilities }>。
+ * 用一份临时 Provider 配置探测 /models，不保存、不发起付费推理。
+ * 返回 { ok, latencyMs, status, error, models, capabilities }，失败也 resolve。
  */
-function providerTest(cfg, id) {
-  const p = providerFind(cfg, id);
-  if (!p) return Promise.reject(new Error('Provider 不存在'));
-  if (!String(p.base || '').trim()) return Promise.reject(new Error('还没填接口地址'));
-  const key = providerKeyOf(p);
+function providerProbe(p, key) {
+  if (!p || !String(p.base || '').trim()) return Promise.resolve({ ok: false, latencyMs: 0, status: 0, error: '还没填接口地址', models: [], capabilities: [] });
   let url = String(p.base).replace(/\/+$/, '');
   if (url.indexOf('/models') < 0) url += '/models';
   if (p.kind === 'gemini' && key) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(key);
@@ -3109,6 +3139,17 @@ function providerTest(cfg, id) {
     models: [],
     capabilities: []
   }));
+}
+
+/**
+ * E2-005：连接测试 + 能力探测。只 GET /models，不发起付费推理。
+ * 返回 Promise<{ ok, latencyMs, status, error, models, capabilities }>。
+ */
+function providerTest(cfg, id) {
+  const p = providerFind(cfg, id);
+  if (!p) return Promise.reject(new Error('Provider 不存在'));
+  if (!String(p.base || '').trim()) return Promise.reject(new Error('还没填接口地址'));
+  return providerProbe(p, providerKeyOf(p));
 }
 /* ==========================================================
  *  用量与限额骨架（0.9 / E2-008）
@@ -12044,6 +12085,73 @@ function provKindSync() {
     if (b && b.classList) b.classList.toggle('on', b.dataset.provKind === v);
   });
 }
+function providerApplyPreset(pid) {
+  const pr = PROVIDER_PRESETS.filter(x => x.id === pid)[0];
+  if (!pr) return;
+  const name = $('#prov-name'); if (name && !String(name.value || '').trim()) name.value = pr.label;
+  const kind = $('#prov-kind'); if (kind) kind.value = pr.kind;
+  provKindSync();
+  const base = $('#prov-base'); if (base) base.value = pr.base || '';
+  const model = $('#prov-model'); if (model) model.value = pr.model || '';
+  const list = $('#prov-model-list'); if (list) list.innerHTML = '';
+  $$('#prov-caps input[type=checkbox]').forEach(cb => {
+    cb.checked = (pr.caps || []).indexOf(cb.value) >= 0;
+  });
+  toast('已填入「' + pr.label + '」的默认配置');
+}
+function providerFormModelHtml(models, current) {
+  return models.map(m => {
+    const caps = providerInferCaps([m]).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未识别用途';
+    return '<button type="button" class="model-chip' + (m === current ? ' on' : '') + '" data-form-model="' + esc(m) + '">'
+      + '<b>' + esc(m) + '</b><span>' + esc(caps) + '</span></button>';
+  }).join('');
+}
+/** 添加/编辑表单里的一键检测：用当前填的地址+Key 拉取模型列表，点一下填入默认模型。 */
+function providerFormDetect() {
+  const box = $('#prov-model-list');
+  if (!box) return;
+  const base = String((($('#prov-base') || {}).value) || '').trim();
+  if (!base) { toast('先填接口地址，再检测模型'); return; }
+  const key = String((($('#prov-key') || {}).value) || '').trim();
+  const kind = String((($('#prov-kind') || {}).value) || 'openai');
+  box.innerHTML = '<div class="mini-note">正在检测模型…</div>';
+  providerProbe({ kind: kind, base: base }, key).then(r => {
+    if (!r.ok) {
+      box.innerHTML = '<div class="mini-note">检测失败：' + esc(r.error || ('HTTP ' + r.status)) + '</div>';
+      return;
+    }
+    const models = (r.models || []).slice(0, 80);
+    if (!models.length) {
+      box.innerHTML = '<div class="mini-note">接口正常（' + r.latencyMs + 'ms），但没有返回模型列表，可以直接手填模型名。</div>';
+      return;
+    }
+    const cur = String((($('#prov-model') || {}).value) || '').trim();
+    box.innerHTML = '<div class="mini-note">' + models.length + ' 个模型 · ' + r.latencyMs + 'ms，点一下填入「默认模型」：</div>'
+      + providerFormModelHtml(models, cur);
+  });
+}
+function providerFormPickModel(model) {
+  const el = $('#prov-model'); if (el) el.value = model;
+  $$('#prov-model-list [data-form-model]').forEach(b => {
+    if (b && b.classList) b.classList.toggle('on', b.dataset.formModel === model);
+  });
+  toast('已填入模型 ' + model);
+}
+function providerPickModel(id, model) {
+  const p = providerFind(CONFIG, id);
+  if (!p || !model) return;
+  p.model = model;
+  PROVIDER_PURPOSES.forEach(k => {
+    const b = CONFIG.bindings && CONFIG.bindings[k];
+    if (b && b.provider === id) b.model = model;
+  });
+  sSet('via_ai_config', CONFIG);
+  renderProviderCenter();
+  $$('[data-model-prov="' + id + '"]').forEach(x => {
+    if (x && x.classList) x.classList.toggle('on', x.dataset.modelPick === model);
+  });
+  toast('默认模型已设为 ' + model);
+}
 function bindPurposeChange(purpose, id) {
   if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
   if (!id) {
@@ -12055,6 +12163,10 @@ function bindPurposeChange(purpose, id) {
   }
   providerApply(CONFIG, purpose);
   sSet('via_ai_config', CONFIG);
+  // 立即更新当前分组的选中态；不依赖整页重绘，避免点了没反应。
+  $$('[data-bind-purpose="' + purpose + '"]').forEach(x => {
+    if (x && x.classList) x.classList.toggle('on', (x.dataset.bindPick || '') === id);
+  });
   renderProviderCenter();
   toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
 }
@@ -12069,6 +12181,7 @@ function providerOpenForm(id) {
   provKindSync();
   set('#prov-base', p ? p.base : '');
   set('#prov-model', p ? p.model : '');
+  const modelList = $('#prov-model-list'); if (modelList) modelList.innerHTML = '';
   const key = $('#prov-key');
   if (key) {
     key.value = '';
@@ -12122,7 +12235,16 @@ async function providerRunTest(id) {
     return;
   }
   const capText = (r.capabilities || []).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未从模型名推断出';
-  el.textContent = '连接正常 · ' + r.latencyMs + 'ms · ' + r.models.length + ' 个模型 · 可用能力：' + capText;
+  const curProv = providerFind(CONFIG, id);
+  const models = (r.models || []).slice(0, 60);
+  const chips = models.map(m => {
+    const caps = providerInferCaps([m]).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未识别用途';
+    const on = curProv && curProv.model === m ? ' on' : '';
+    return '<button type="button" class="model-chip' + on + '" data-model-pick="' + esc(m) + '" data-model-prov="' + esc(id) + '">'
+      + '<b>' + esc(m) + '</b><span>' + esc(caps) + '</span></button>';
+  }).join('');
+  el.innerHTML = '<div>连接正常 · ' + r.latencyMs + 'ms · ' + models.length + ' 个模型 · 可用能力：' + esc(capText) + '</div>'
+    + (chips ? '<div class="mini-note">点一个模型直接设为默认：</div><div class="chips model-list">' + chips + '</div>' : '');
 }
 function renderProviderCenter() {
   const bindBox = $('#provider-bind-box');
@@ -12135,8 +12257,8 @@ function renderProviderCenter() {
       const cur = (CONFIG.bindings && CONFIG.bindings[purpose] && CONFIG.bindings[purpose].provider) || '';
       return '<div class="sg"><label>' + esc(PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '</label>'
         + '<div class="chips">'
-        + '<button type="button" class="' + (cur ? '' : 'on') + '" data-bind-pick="" data-bind-purpose="' + purpose + '">自动选择</button>'
-        + usable.map(p => '<button type="button" class="' + (p.id === cur ? 'on' : '') + '" data-bind-pick="' + esc(p.id) + '" data-bind-purpose="' + purpose + '">' + esc(p.name) + '</button>').join('')
+        + '<button type="button" class="' + (cur ? '' : 'on') + '" data-bind-pick="" data-bind-purpose="' + purpose + '">' + (cur ? '自动选择' : '✓ 自动选择') + '</button>'
+        + usable.map(p => '<button type="button" class="' + (p.id === cur ? 'on' : '') + '" data-bind-pick="' + esc(p.id) + '" data-bind-purpose="' + purpose + '">' + (p.id === cur ? '✓ ' : '') + esc(p.name) + '</button>').join('')
         + '</div></div>';
     }).join('');
   }
@@ -12183,12 +12305,21 @@ function renderProvidersPage() {
 <div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-p">＋ 添加 Provider</button></div>
 <div id="provider-form" hidden>
   <div class="sub-title" id="provider-form-title">添加 Provider</div>
+  <div class="sg" style="margin-top:8px"><label>快捷服务商</label><div class="chips" id="prov-preset-chips">
+    ${PROVIDER_PRESETS.map(p => '<button type="button" data-prov-preset="' + esc(p.id) + '">' + esc(p.label) + '</button>').join('')}
+  </div><div class="mini-note">点一个服务商会自动填好类型、接口地址和常用模型；Key 仍需自己填。</div></div>
   <div class="sg" style="margin-top:8px"><label>名称</label><input id="prov-name" placeholder="例如 主模型 / 识图 / 备用"></div>
   <div class="sg"><label>类型</label><div class="chips" id="prov-kind-chips">
     ${Object.keys(PROVIDER_KINDS).map(k => '<button type="button" data-prov-kind="' + esc(k) + '"' + (k === 'openai' ? ' class="on"' : '') + '>' + esc(PROVIDER_KINDS[k].label) + '</button>').join('')}
   </div><input id="prov-kind" type="hidden" value="openai"></div>
   <div class="sg"><label>接口地址</label><input id="prov-base" placeholder="https://.../v1"></div>
-  <div class="sg"><label>默认模型</label><input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet"></div>
+  <div class="sg"><label>默认模型</label>
+    <div class="pin-row">
+      <input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet">
+      <button type="button" id="btn-prov-model-detect" class="btn-paste">检测模型</button>
+    </div>
+    <div class="chips model-list" id="prov-model-list"></div>
+  </div>
   <div class="sg"><label>API Key</label>
     <div class="pin-row">
       <input id="prov-key" type="password" autocomplete="off" placeholder="sk-...">
@@ -12210,7 +12341,12 @@ function renderProvidersPage() {
     if (b.id === 'btn-provider-add') { providerOpenForm(''); return; }
     if (b.id === 'btn-provider-save') { providerSaveForm(); providersCountRefresh(); return; }
     if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
+    if (b.id === 'btn-prov-model-detect') { providerFormDetect(); return; }
+    if (b.dataset && b.dataset.formModel) { providerFormPickModel(b.dataset.formModel); return; }
     if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    if (b.dataset && b.dataset.provPreset) { providerApplyPreset(b.dataset.provPreset); return; }
+    const mp = b.closest('[data-model-pick]');
+    if (mp) { providerPickModel(mp.dataset.modelProv, mp.dataset.modelPick); return; }
     const pa = b.closest('[data-provider-action]');
     if (pa) {
       const pid = pa.dataset.providerId || '';
@@ -12263,6 +12399,31 @@ function renderUsageBox() {
   box.innerHTML = s;
 }
 
+function legacyProviderChips(cap) {
+  const list = (CONFIG.providers || []).filter(p => p && p.enabled !== false && (p.capabilities || []).indexOf(cap) >= 0);
+  if (!list.length) return '<span class="mini-note">还没有支持「' + (PROVIDER_CAP_LABEL[cap] || cap) + '」的 Provider，先去模型提供商添加。</span>';
+  return list.map(p => '<button type="button" data-legacy-models="' + cap + '" data-provider-id="' + esc(p.id) + '">'
+    + esc(p.name) + (p.model ? ' · ' + esc(p.model) : '') + '</button>').join('');
+}
+function legacyModelsRefresh() {
+  const v = $('#vision-prov-chips'); if (v) v.innerHTML = legacyProviderChips('vision');
+  const e = $('#vec-prov-chips'); if (e) e.innerHTML = legacyProviderChips('embedding');
+}
+function legacyModelApply(cap, id) {
+  const p = providerFind(CONFIG, id);
+  if (!p) return;
+  const key = providerKeyOf(p);
+  const fill = (baseSel, modelSel, keySel) => {
+    const b = $(baseSel), m = $(modelSel), k = $(keySel);
+    if (b) b.value = p.base || '';
+    if (m) m.value = p.model || '';
+    if (k && key) k.value = key;
+  };
+  if (cap === 'vision') fill('#set-vision-base', '#set-vision-model', '#set-vision-key');
+  else fill('#set-vec-base', '#set-vec-model', '#set-vec-key');
+  toast('已填入「' + p.name + '」的地址与模型，记得保存设置');
+}
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
@@ -12288,6 +12449,7 @@ function renderSettings() {
 <div class="sg" style="margin-top:8px"><label>识图 API 地址</label><input id="set-vision-base" value="${esc(CONFIG.visionBase || '')}" placeholder="https://.../v1"></div>
 <div class="sg"><label>识图 API Key</label><div class="pin-row"><input id="set-vision-key" class="secret" type="text" autocomplete="off" value="${esc(CONFIG.visionKey || '')}"><button type="button" id="btn-paste-vkey" class="btn-paste">粘贴</button></div></div>
 <div class="sg"><label>识图模型</label><input id="set-vision-model" value="${esc(CONFIG.visionModel || '')}" placeholder="如 gpt-4o / qwen-vl-max"></div>
+<div class="sg"><label>从模型提供商快捷选择（识图）</label><div class="chips" id="vision-prov-chips"></div><div class="mini-note">点一下就把地址、模型和 Key 填进来；也可以继续手填。</div></div>
 <div class="acts" style="margin-top:10px"><button type="button" id="btn-models-page" class="btn-p">模型提供商 ›</button></div>
 <div class="mini-note">管理多个模型接口与用途绑定：对话、识图、生图、视频、向量、语音、语音识别、网页搜索可分别指定 Provider。插件申请 AI 能力时也从这些绑定里选。</div>
 
@@ -12432,6 +12594,7 @@ function renderSettings() {
     <button type="button" id="btn-paste-vkey2" class="btn-paste">粘贴</button>
   </div></div>
 <div class="sg"><label>向量模型</label><input id="set-vec-model" value="${esc(MEMCFG.vecModel || '')}" placeholder="如 text-embedding-3-small / bge-m3"></div>
+<div class="sg"><label>从模型提供商快捷选择（向量）</label><div class="chips" id="vec-prov-chips"></div><div class="mini-note">点一下就把地址、模型和 Key 填进来；也可以继续手填。</div></div>
 
 <div class="sec-title">屏幕翻译</div>
 <div class="mini-note" style="margin-top:8px">点「翻译屏幕」后，浮窗会先收成小胶囊以免遮挡，读取屏幕文字后再翻译。文字与位置直接来自无障碍节点，无需额外 OCR。</div>
@@ -12487,10 +12650,13 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
   <button id="set-back" type="button" class="settings-return" data-action="settings-back">← 返回对话</button>
   <button id="set-save" type="button" class="settings-inline-save" data-action="save-settings">保存设置</button>
 </div>
-<div id="settings-bottom-spacer" style="height:96px"></div>`;
+<div id="settings-bottom-spacer" style="height:64px"></div>`;
 
   organizeSettingsSections();
+  legacyModelsRefresh();
   $('#settings').onclick = (e) => {
+    const legacy = e.target && e.target.closest ? e.target.closest('[data-legacy-models]') : null;
+    if (legacy) { legacyModelApply(legacy.dataset.legacyModels, legacy.dataset.providerId); return; }
     const actionEl = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
     if (actionEl && actionEl.dataset.action === 'save-settings') {
       e.preventDefault(); e.stopPropagation(); saveSettings(); return false;
@@ -12897,7 +13063,11 @@ function showView(v, opts) {
     // 0.11：回到聊天时刷新挂载点，并按当前任务恢复主题。
     try { if (typeof plugMountRefresh === 'function') plugMountRefresh(); } catch (e) {}
     try { if (typeof plugThemeRestore === 'function') plugThemeRestore(); } catch (e) {}
-  } else if (v === 'settings') settings.classList.add('open');
+  } else if (v === 'settings') {
+    settings.classList.add('open');
+    // 模型提供商可能在别处新增/删除，回到设置时刷新快捷选择。
+    try { if (typeof legacyModelsRefresh === 'function') legacyModelsRefresh(); } catch (e) {}
+  }
   else if (v === 'providers' && providers) providers.classList.add('open');
   else if (v === 'plugins' && plugins) { plugins.classList.add('open'); renderPlugins(); }
   else if (v === 'plug-market' && plugMarketPage) { plugMarketPage.classList.add('open'); renderPlugMarket(); }
@@ -13281,6 +13451,9 @@ function bindInput() {
 function bindDrag() {
   const headEl = $('#head');
   let lastX = 0, lastY = 0, isDown = false;
+  // 整个深粉色标题区都可拖；只放过真正的交互控件，保证按钮照常点击。
+  const isControl = (el) => !!(el && el.closest &&
+    el.closest('button,input,textarea,select,a,label,[contenteditable],[data-no-drag]'));
 
   const start = (x, y) => {
     if (!HAS_PERM || !Perm.moveWindow) return;
@@ -13298,7 +13471,7 @@ function bindDrag() {
   const end = () => { isDown = false; };
 
   headEl.addEventListener('touchstart', e => {
-    if (e.target.closest('button')) return;
+    if (isControl(e.target)) return;
     const t = e.touches[0];
     start(t.screenX, t.screenY);
   }, { passive: true });
@@ -13312,7 +13485,7 @@ function bindDrag() {
   headEl.addEventListener('touchcancel', end);
 
   headEl.addEventListener('mousedown', e => {
-    if (e.button !== 0 || e.target.closest('button')) return;
+    if (e.button !== 0 || isControl(e.target)) return;
     start(e.screenX, e.screenY);
     e.preventDefault();
   });

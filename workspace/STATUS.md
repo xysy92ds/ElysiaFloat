@@ -16,8 +16,8 @@
 - 私有 Git：`main` 最新 `d979df1`（0.12.0 E5 依赖 + E6 持久会话完成提交；推送待 token 恢复）。
 - 公开 Git：`xysy92ds/ElysiaFloat` `main` = `1b2e09a`（发布提交 `cb10e91`），tag `v0.7.2`。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
-- 最新测试包：`apk/ElysiaFloat-v0.7.2-0.12.1dev-debug.apk`（0.12.1 补丁候选，versionCode 17 / versionName 0.7.2，可覆盖已装 0.7.x）
-- 上一个测试包：`apk/ElysiaFloat-v0.7.2-0.12dev-debug.apk`（0.12 开发候选）；更早为 0.11 / 0.10 / 0.9 开发候选 `apk/ElysiaFloat-v0.7.2-0.11dev-debug.apk` / `apk/ElysiaFloat-v0.7.2-0.10dev-debug.apk` / `apk/ElysiaFloat-v0.7.2-0.9dev-debug.apk` 与 N1 修复候选；真机复测均暂缓。
+- 最新测试包：`apk/ElysiaFloat-v0.7.2-0.12.5dev-debug.apk`（0.12.5 体验/模型配置候选，versionCode 17 / versionName 0.7.2，可覆盖已装 0.7.x）
+- 上一个测试包：`apk/ElysiaFloat-v0.7.2-0.12.4dev-debug.apk`（0.12.4 输入框挤压修正）；更早为 0.12.3 / 0.12.2 / 0.12.1 / 0.12 / 0.11 / 0.10 / 0.9 开发候选；真机复测均暂缓。
 - 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`，与公开 Release 资产同一构建）。
 - 已发布包 SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`。
 - N1 修复候选包 SHA-256：`b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e`。
@@ -29,8 +29,9 @@
 - 0.12.2 体验补丁候选包 SHA-256：`17848a11f34ed220e9591d5c6c86d83363c12d83741cb4a208fc1bd4a48f5091`（2,693,448 字节）；设置页恢复单页分区、模型提供商独立页、保存条遮挡修复。
 - 0.12.3 体验补丁候选包 SHA-256：`e6c310ba24e3061aa85f0306b48799f8a1ec2c0460dd479529539d6375264135`（2,695,081 字节）；恢复设置折叠（箭头 + 记住状态）、原生 select 改 chips、运行秒数移到输入框下方。
 - 0.12.4 体验补丁候选包 SHA-256：`2fac488ef664a4cca2279b51b16b8c156cc94d26e6a92860c94207fbe5982d4b`（2,695,168 字节）；修复空插件 composer 插槽占满整行导致聊天输入框被挤成一条缝（I-071）。
+- 0.12.5 体验/模型配置候选包 SHA-256：`b6a5ba972c15d5784267446393795d082670e32af07f5ffaa60d906dc31dd1c8`（2,698,884 字节）；用途绑定点击反馈、顶栏整块可拖、输入区/设置底部条留白收紧、Provider 表单一键检测模型 + 能力标注、识图/向量 Provider 快捷选择、快捷服务商扩到 21 个、删除 EveryAPI（I-072/I-073）。
 - 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
-- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`assembleDebug` 全通过（2026-10-28 复跑，含 0.12.4 输入框挤压修正）；I-055~I-059、I-063~I-071 仍待真机复测。
+- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`assembleDebug` 全通过（2026-10-28 复跑，含 0.12.5 体验/模型配置修正）；I-055~I-073 仍待真机复测。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。
 - 更新链路：应用内更新检查读取公开仓库 `release/latest.json`，当前已指向 v0.7.2（私有归档副本已同步为公开 URL）。
 - 平台化路线：全部 0.x Beta 小步走——0.9 核心体验+模型中心 → 0.10 开放式插件运行时 →

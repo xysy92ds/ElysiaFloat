@@ -24,6 +24,31 @@ const PROVIDER_PURPOSE_LABEL = {
   chat: '聊天', vision: '识图', image: '生图', video: '视频',
   embedding: '向量', tts: '语音', asr: '语音识别', search: '网页搜索'
 };
+/** 添加 Provider 时的快捷服务商；只填默认地址与常用模型，Key 仍由用户自己填。 */
+const PROVIDER_PRESETS = [
+  { id: 'openai', label: 'OpenAI', kind: 'openai', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini', caps: ['chat', 'vision', 'image', 'tts', 'asr', 'embedding'] },
+  { id: 'anthropic', label: 'Anthropic', kind: 'anthropic', base: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-latest', caps: ['chat', 'vision', 'code'] },
+  { id: 'gemini', label: 'Gemini', kind: 'gemini', base: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.0-flash', caps: ['chat', 'vision', 'embedding'] },
+  { id: 'deepseek', label: 'DeepSeek', kind: 'openai', base: 'https://api.deepseek.com/v1', model: 'deepseek-chat', caps: ['chat', 'code'] },
+  { id: 'qwen', label: '通义千问', kind: 'openai', base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', caps: ['chat', 'vision', 'image', 'embedding'] },
+  { id: 'zhipu', label: '智谱 GLM', kind: 'openai', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash', caps: ['chat', 'vision', 'image', 'embedding'] },
+  { id: 'kimi', label: 'Kimi', kind: 'openai', base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', caps: ['chat', 'vision'] },
+  { id: 'siliconflow', label: '硅基流动', kind: 'openai', base: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct', caps: ['chat', 'vision', 'image', 'embedding', 'asr'] },
+  { id: 'openrouter', label: 'OpenRouter', kind: 'openai', base: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini', caps: ['chat', 'vision', 'code'] },
+  { id: 'groq', label: 'Groq', kind: 'openai', base: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile', caps: ['chat', 'asr'] },
+  { id: 'xai', label: 'xAI Grok', kind: 'openai', base: 'https://api.x.ai/v1', model: 'grok-2-latest', caps: ['chat', 'vision', 'code'] },
+  { id: 'mistral', label: 'Mistral', kind: 'openai', base: 'https://api.mistral.ai/v1', model: 'mistral-large-latest', caps: ['chat', 'code', 'embedding'] },
+  { id: 'baidu', label: '百度千帆', kind: 'openai', base: 'https://qianfan.baidubce.com/v2', model: 'ernie-4.5-turbo-128k', caps: ['chat', 'vision', 'embedding'] },
+  { id: 'xfyun', label: '讯飞星火', kind: 'openai', base: 'https://spark-api-open.xf-yun.com/v1', model: 'generalv3.5', caps: ['chat', 'vision'] },
+  { id: 'hunyuan', label: '腾讯混元', kind: 'openai', base: 'https://api.hunyuan.cloud.tencent.com/v1', model: 'hunyuan-turbos-latest', caps: ['chat', 'vision'] },
+  { id: 'minimax', label: 'MiniMax', kind: 'openai', base: 'https://api.minimax.chat/v1', model: 'abab6.5s-chat', caps: ['chat'] },
+  { id: 'stepfun', label: '阶跃星辰', kind: 'openai', base: 'https://api.stepfun.com/v1', model: 'step-1v-8k', caps: ['chat', 'vision'] },
+  { id: 'together', label: 'Together', kind: 'openai', base: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', caps: ['chat', 'code'] },
+  { id: 'ai302', label: '302.AI', kind: 'openai', base: 'https://api.302.ai/v1', model: 'gpt-4o-mini', caps: ['chat', 'vision', 'image', 'embedding'] },
+  { id: 'ollama', label: 'Ollama 本地', kind: 'openai', base: 'http://127.0.0.1:11434/v1', model: 'llama3.2', caps: ['chat', 'embedding'] },
+  { id: 'lmstudio', label: 'LM Studio', kind: 'openai', base: 'http://127.0.0.1:1234/v1', model: 'local-model', caps: ['chat', 'embedding'] },
+  { id: 'searxng', label: 'SearXNG', kind: 'custom', base: '', model: '', caps: ['search'] }
+];
 
 function providerId(prefix) {
   return (prefix || 'p') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5);
@@ -258,14 +283,11 @@ function providerTestHeaders(p, key) {
 }
 
 /**
- * E2-005：连接测试 + 能力探测。只 GET /models，不发起付费推理。
- * 返回 Promise<{ ok, latencyMs, status, error, models, capabilities }>。
+ * 用一份临时 Provider 配置探测 /models，不保存、不发起付费推理。
+ * 返回 { ok, latencyMs, status, error, models, capabilities }，失败也 resolve。
  */
-function providerTest(cfg, id) {
-  const p = providerFind(cfg, id);
-  if (!p) return Promise.reject(new Error('Provider 不存在'));
-  if (!String(p.base || '').trim()) return Promise.reject(new Error('还没填接口地址'));
-  const key = providerKeyOf(p);
+function providerProbe(p, key) {
+  if (!p || !String(p.base || '').trim()) return Promise.resolve({ ok: false, latencyMs: 0, status: 0, error: '还没填接口地址', models: [], capabilities: [] });
   let url = String(p.base).replace(/\/+$/, '');
   if (url.indexOf('/models') < 0) url += '/models';
   if (p.kind === 'gemini' && key) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(key);
@@ -294,4 +316,15 @@ function providerTest(cfg, id) {
     models: [],
     capabilities: []
   }));
+}
+
+/**
+ * E2-005：连接测试 + 能力探测。只 GET /models，不发起付费推理。
+ * 返回 Promise<{ ok, latencyMs, status, error, models, capabilities }>。
+ */
+function providerTest(cfg, id) {
+  const p = providerFind(cfg, id);
+  if (!p) return Promise.reject(new Error('Provider 不存在'));
+  if (!String(p.base || '').trim()) return Promise.reject(new Error('还没填接口地址'));
+  return providerProbe(p, providerKeyOf(p));
 }

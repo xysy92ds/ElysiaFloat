@@ -333,6 +333,73 @@ function provKindSync() {
     if (b && b.classList) b.classList.toggle('on', b.dataset.provKind === v);
   });
 }
+function providerApplyPreset(pid) {
+  const pr = PROVIDER_PRESETS.filter(x => x.id === pid)[0];
+  if (!pr) return;
+  const name = $('#prov-name'); if (name && !String(name.value || '').trim()) name.value = pr.label;
+  const kind = $('#prov-kind'); if (kind) kind.value = pr.kind;
+  provKindSync();
+  const base = $('#prov-base'); if (base) base.value = pr.base || '';
+  const model = $('#prov-model'); if (model) model.value = pr.model || '';
+  const list = $('#prov-model-list'); if (list) list.innerHTML = '';
+  $$('#prov-caps input[type=checkbox]').forEach(cb => {
+    cb.checked = (pr.caps || []).indexOf(cb.value) >= 0;
+  });
+  toast('已填入「' + pr.label + '」的默认配置');
+}
+function providerFormModelHtml(models, current) {
+  return models.map(m => {
+    const caps = providerInferCaps([m]).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未识别用途';
+    return '<button type="button" class="model-chip' + (m === current ? ' on' : '') + '" data-form-model="' + esc(m) + '">'
+      + '<b>' + esc(m) + '</b><span>' + esc(caps) + '</span></button>';
+  }).join('');
+}
+/** 添加/编辑表单里的一键检测：用当前填的地址+Key 拉取模型列表，点一下填入默认模型。 */
+function providerFormDetect() {
+  const box = $('#prov-model-list');
+  if (!box) return;
+  const base = String((($('#prov-base') || {}).value) || '').trim();
+  if (!base) { toast('先填接口地址，再检测模型'); return; }
+  const key = String((($('#prov-key') || {}).value) || '').trim();
+  const kind = String((($('#prov-kind') || {}).value) || 'openai');
+  box.innerHTML = '<div class="mini-note">正在检测模型…</div>';
+  providerProbe({ kind: kind, base: base }, key).then(r => {
+    if (!r.ok) {
+      box.innerHTML = '<div class="mini-note">检测失败：' + esc(r.error || ('HTTP ' + r.status)) + '</div>';
+      return;
+    }
+    const models = (r.models || []).slice(0, 80);
+    if (!models.length) {
+      box.innerHTML = '<div class="mini-note">接口正常（' + r.latencyMs + 'ms），但没有返回模型列表，可以直接手填模型名。</div>';
+      return;
+    }
+    const cur = String((($('#prov-model') || {}).value) || '').trim();
+    box.innerHTML = '<div class="mini-note">' + models.length + ' 个模型 · ' + r.latencyMs + 'ms，点一下填入「默认模型」：</div>'
+      + providerFormModelHtml(models, cur);
+  });
+}
+function providerFormPickModel(model) {
+  const el = $('#prov-model'); if (el) el.value = model;
+  $$('#prov-model-list [data-form-model]').forEach(b => {
+    if (b && b.classList) b.classList.toggle('on', b.dataset.formModel === model);
+  });
+  toast('已填入模型 ' + model);
+}
+function providerPickModel(id, model) {
+  const p = providerFind(CONFIG, id);
+  if (!p || !model) return;
+  p.model = model;
+  PROVIDER_PURPOSES.forEach(k => {
+    const b = CONFIG.bindings && CONFIG.bindings[k];
+    if (b && b.provider === id) b.model = model;
+  });
+  sSet('via_ai_config', CONFIG);
+  renderProviderCenter();
+  $$('[data-model-prov="' + id + '"]').forEach(x => {
+    if (x && x.classList) x.classList.toggle('on', x.dataset.modelPick === model);
+  });
+  toast('默认模型已设为 ' + model);
+}
 function bindPurposeChange(purpose, id) {
   if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
   if (!id) {
@@ -344,6 +411,10 @@ function bindPurposeChange(purpose, id) {
   }
   providerApply(CONFIG, purpose);
   sSet('via_ai_config', CONFIG);
+  // 立即更新当前分组的选中态；不依赖整页重绘，避免点了没反应。
+  $$('[data-bind-purpose="' + purpose + '"]').forEach(x => {
+    if (x && x.classList) x.classList.toggle('on', (x.dataset.bindPick || '') === id);
+  });
   renderProviderCenter();
   toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
 }
@@ -358,6 +429,7 @@ function providerOpenForm(id) {
   provKindSync();
   set('#prov-base', p ? p.base : '');
   set('#prov-model', p ? p.model : '');
+  const modelList = $('#prov-model-list'); if (modelList) modelList.innerHTML = '';
   const key = $('#prov-key');
   if (key) {
     key.value = '';
@@ -411,7 +483,16 @@ async function providerRunTest(id) {
     return;
   }
   const capText = (r.capabilities || []).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未从模型名推断出';
-  el.textContent = '连接正常 · ' + r.latencyMs + 'ms · ' + r.models.length + ' 个模型 · 可用能力：' + capText;
+  const curProv = providerFind(CONFIG, id);
+  const models = (r.models || []).slice(0, 60);
+  const chips = models.map(m => {
+    const caps = providerInferCaps([m]).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未识别用途';
+    const on = curProv && curProv.model === m ? ' on' : '';
+    return '<button type="button" class="model-chip' + on + '" data-model-pick="' + esc(m) + '" data-model-prov="' + esc(id) + '">'
+      + '<b>' + esc(m) + '</b><span>' + esc(caps) + '</span></button>';
+  }).join('');
+  el.innerHTML = '<div>连接正常 · ' + r.latencyMs + 'ms · ' + models.length + ' 个模型 · 可用能力：' + esc(capText) + '</div>'
+    + (chips ? '<div class="mini-note">点一个模型直接设为默认：</div><div class="chips model-list">' + chips + '</div>' : '');
 }
 function renderProviderCenter() {
   const bindBox = $('#provider-bind-box');
@@ -424,8 +505,8 @@ function renderProviderCenter() {
       const cur = (CONFIG.bindings && CONFIG.bindings[purpose] && CONFIG.bindings[purpose].provider) || '';
       return '<div class="sg"><label>' + esc(PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '</label>'
         + '<div class="chips">'
-        + '<button type="button" class="' + (cur ? '' : 'on') + '" data-bind-pick="" data-bind-purpose="' + purpose + '">自动选择</button>'
-        + usable.map(p => '<button type="button" class="' + (p.id === cur ? 'on' : '') + '" data-bind-pick="' + esc(p.id) + '" data-bind-purpose="' + purpose + '">' + esc(p.name) + '</button>').join('')
+        + '<button type="button" class="' + (cur ? '' : 'on') + '" data-bind-pick="" data-bind-purpose="' + purpose + '">' + (cur ? '自动选择' : '✓ 自动选择') + '</button>'
+        + usable.map(p => '<button type="button" class="' + (p.id === cur ? 'on' : '') + '" data-bind-pick="' + esc(p.id) + '" data-bind-purpose="' + purpose + '">' + (p.id === cur ? '✓ ' : '') + esc(p.name) + '</button>').join('')
         + '</div></div>';
     }).join('');
   }
@@ -472,12 +553,21 @@ function renderProvidersPage() {
 <div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-p">＋ 添加 Provider</button></div>
 <div id="provider-form" hidden>
   <div class="sub-title" id="provider-form-title">添加 Provider</div>
+  <div class="sg" style="margin-top:8px"><label>快捷服务商</label><div class="chips" id="prov-preset-chips">
+    ${PROVIDER_PRESETS.map(p => '<button type="button" data-prov-preset="' + esc(p.id) + '">' + esc(p.label) + '</button>').join('')}
+  </div><div class="mini-note">点一个服务商会自动填好类型、接口地址和常用模型；Key 仍需自己填。</div></div>
   <div class="sg" style="margin-top:8px"><label>名称</label><input id="prov-name" placeholder="例如 主模型 / 识图 / 备用"></div>
   <div class="sg"><label>类型</label><div class="chips" id="prov-kind-chips">
     ${Object.keys(PROVIDER_KINDS).map(k => '<button type="button" data-prov-kind="' + esc(k) + '"' + (k === 'openai' ? ' class="on"' : '') + '>' + esc(PROVIDER_KINDS[k].label) + '</button>').join('')}
   </div><input id="prov-kind" type="hidden" value="openai"></div>
   <div class="sg"><label>接口地址</label><input id="prov-base" placeholder="https://.../v1"></div>
-  <div class="sg"><label>默认模型</label><input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet"></div>
+  <div class="sg"><label>默认模型</label>
+    <div class="pin-row">
+      <input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet">
+      <button type="button" id="btn-prov-model-detect" class="btn-paste">检测模型</button>
+    </div>
+    <div class="chips model-list" id="prov-model-list"></div>
+  </div>
   <div class="sg"><label>API Key</label>
     <div class="pin-row">
       <input id="prov-key" type="password" autocomplete="off" placeholder="sk-...">
@@ -499,7 +589,12 @@ function renderProvidersPage() {
     if (b.id === 'btn-provider-add') { providerOpenForm(''); return; }
     if (b.id === 'btn-provider-save') { providerSaveForm(); providersCountRefresh(); return; }
     if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
+    if (b.id === 'btn-prov-model-detect') { providerFormDetect(); return; }
+    if (b.dataset && b.dataset.formModel) { providerFormPickModel(b.dataset.formModel); return; }
     if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    if (b.dataset && b.dataset.provPreset) { providerApplyPreset(b.dataset.provPreset); return; }
+    const mp = b.closest('[data-model-pick]');
+    if (mp) { providerPickModel(mp.dataset.modelProv, mp.dataset.modelPick); return; }
     const pa = b.closest('[data-provider-action]');
     if (pa) {
       const pid = pa.dataset.providerId || '';
@@ -552,6 +647,31 @@ function renderUsageBox() {
   box.innerHTML = s;
 }
 
+function legacyProviderChips(cap) {
+  const list = (CONFIG.providers || []).filter(p => p && p.enabled !== false && (p.capabilities || []).indexOf(cap) >= 0);
+  if (!list.length) return '<span class="mini-note">还没有支持「' + (PROVIDER_CAP_LABEL[cap] || cap) + '」的 Provider，先去模型提供商添加。</span>';
+  return list.map(p => '<button type="button" data-legacy-models="' + cap + '" data-provider-id="' + esc(p.id) + '">'
+    + esc(p.name) + (p.model ? ' · ' + esc(p.model) : '') + '</button>').join('');
+}
+function legacyModelsRefresh() {
+  const v = $('#vision-prov-chips'); if (v) v.innerHTML = legacyProviderChips('vision');
+  const e = $('#vec-prov-chips'); if (e) e.innerHTML = legacyProviderChips('embedding');
+}
+function legacyModelApply(cap, id) {
+  const p = providerFind(CONFIG, id);
+  if (!p) return;
+  const key = providerKeyOf(p);
+  const fill = (baseSel, modelSel, keySel) => {
+    const b = $(baseSel), m = $(modelSel), k = $(keySel);
+    if (b) b.value = p.base || '';
+    if (m) m.value = p.model || '';
+    if (k && key) k.value = key;
+  };
+  if (cap === 'vision') fill('#set-vision-base', '#set-vision-model', '#set-vision-key');
+  else fill('#set-vec-base', '#set-vec-model', '#set-vec-key');
+  toast('已填入「' + p.name + '」的地址与模型，记得保存设置');
+}
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
@@ -577,6 +697,7 @@ function renderSettings() {
 <div class="sg" style="margin-top:8px"><label>识图 API 地址</label><input id="set-vision-base" value="${esc(CONFIG.visionBase || '')}" placeholder="https://.../v1"></div>
 <div class="sg"><label>识图 API Key</label><div class="pin-row"><input id="set-vision-key" class="secret" type="text" autocomplete="off" value="${esc(CONFIG.visionKey || '')}"><button type="button" id="btn-paste-vkey" class="btn-paste">粘贴</button></div></div>
 <div class="sg"><label>识图模型</label><input id="set-vision-model" value="${esc(CONFIG.visionModel || '')}" placeholder="如 gpt-4o / qwen-vl-max"></div>
+<div class="sg"><label>从模型提供商快捷选择（识图）</label><div class="chips" id="vision-prov-chips"></div><div class="mini-note">点一下就把地址、模型和 Key 填进来；也可以继续手填。</div></div>
 <div class="acts" style="margin-top:10px"><button type="button" id="btn-models-page" class="btn-p">模型提供商 ›</button></div>
 <div class="mini-note">管理多个模型接口与用途绑定：对话、识图、生图、视频、向量、语音、语音识别、网页搜索可分别指定 Provider。插件申请 AI 能力时也从这些绑定里选。</div>
 
@@ -721,6 +842,7 @@ function renderSettings() {
     <button type="button" id="btn-paste-vkey2" class="btn-paste">粘贴</button>
   </div></div>
 <div class="sg"><label>向量模型</label><input id="set-vec-model" value="${esc(MEMCFG.vecModel || '')}" placeholder="如 text-embedding-3-small / bge-m3"></div>
+<div class="sg"><label>从模型提供商快捷选择（向量）</label><div class="chips" id="vec-prov-chips"></div><div class="mini-note">点一下就把地址、模型和 Key 填进来；也可以继续手填。</div></div>
 
 <div class="sec-title">屏幕翻译</div>
 <div class="mini-note" style="margin-top:8px">点「翻译屏幕」后，浮窗会先收成小胶囊以免遮挡，读取屏幕文字后再翻译。文字与位置直接来自无障碍节点，无需额外 OCR。</div>
@@ -776,10 +898,13 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
   <button id="set-back" type="button" class="settings-return" data-action="settings-back">← 返回对话</button>
   <button id="set-save" type="button" class="settings-inline-save" data-action="save-settings">保存设置</button>
 </div>
-<div id="settings-bottom-spacer" style="height:96px"></div>`;
+<div id="settings-bottom-spacer" style="height:64px"></div>`;
 
   organizeSettingsSections();
+  legacyModelsRefresh();
   $('#settings').onclick = (e) => {
+    const legacy = e.target && e.target.closest ? e.target.closest('[data-legacy-models]') : null;
+    if (legacy) { legacyModelApply(legacy.dataset.legacyModels, legacy.dataset.providerId); return; }
     const actionEl = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
     if (actionEl && actionEl.dataset.action === 'save-settings') {
       e.preventDefault(); e.stopPropagation(); saveSettings(); return false;

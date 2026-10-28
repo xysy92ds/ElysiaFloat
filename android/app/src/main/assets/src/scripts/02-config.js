@@ -189,9 +189,9 @@ const TTS_VOICES = [
 ];
 
 const DC = {
-  apiBase: 'https://app.everyapi.ai/v1',
+  apiBase: '',
   apiKey: '',
-  model: 'gpt-5.6-luna',
+  model: 'gpt-4o-mini',
   assistantName: '爱莉希雅',
   avatarUrl: 'https://pic.rmb.bdstatic.com/bjh/250418/beautify/dd8fae8238e68e365619e0537dce3698.jpeg@c_1,w_1977,h_2636,x_0,y_0?for=bg',
   avatarFit: 'top',
@@ -320,7 +320,6 @@ const UPDATE_API = 'https://raw.githubusercontent.com/' + UPDATE_REPO + '/main/r
 const UPDATE_RELEASES = 'https://github.com/' + UPDATE_REPO + '/releases';
 
 const PRESETS = {
-  everyapi: { label: 'EveryAPI', base: 'https://app.everyapi.ai/v1', model: 'gpt-5.6-luna' },
   openai: { label: 'OpenAI', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   deepseek: { label: 'DeepSeek', base: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   zhipu: { label: '智谱 GLM', base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
