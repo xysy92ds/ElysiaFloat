@@ -961,11 +961,10 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
         · 发送失败不再静默：会在聊天里直接提示原因，按钮状态自动复位；<br>
         · 输入法组词未提交时点发送，先提交再读取，避免「打了字却发不出去」。</p>
         <p><b>0.7.0 摘要</b><br>
-        · Termux 长跑运行时：任务可追踪、可读回、可取消，适合长时间跑服务器；<br>
-        · 新增官方插件「Minecraft 联机助手」，市场可直接搜索安装；<br>
         · 修复横屏（玩游戏）时打开浮窗被卡住、无法缩放的问题；<br>
+        · 浮窗按屏幕短边/长边保持宽高比，并始终限制在屏幕内；<br>
         · 统一项目签名，之后版本之间可直接覆盖安装。</p>
-        <p>欢迎使用 ElysiaFloat。这是一个以开源方式发布的 Android 浮窗、Agent、翻译和工作区工具项目。</p>
+        <p>欢迎使用 ElysiaFloat。这是一个公开源码的 Android 浮窗、Agent、翻译和工作区工具项目。</p>
         <p><b>项目仓库</b><br><a href="https://github.com/xysy92ds/ElysiaFloat">https://github.com/xysy92ds/ElysiaFloat</a><br><b>作者</b>：xysy92ds<br><b>联系方式</b>：Q：3175461831　QQ 邮箱：3144919104@qq.com</p>
         <p><b>免责声明</b><br>本应用及其中的 AI、Agent、翻译、文件和插件功能按“现状”提供，输出、识别、自动化操作和第三方服务结果可能不准确、失败或产生意外影响。请在使用前备份重要数据，并自行核对 AI 建议、文件路径和目标应用；不要将本应用用于违法、侵犯他人隐私、未经授权访问或高风险生产场景。因用户配置、权限授权、第三方服务、设备或目标应用变化造成的损失，由使用者自行判断并承担。</p>
         <p><b>权限说明</b><br>悬浮窗权限用于显示和拖动应用窗口；无障碍权限用于按用户请求读取屏幕、获取控件信息和执行受策略限制的操作；通知和电池相关权限用于后台保活与状态提示；“允许管理所有文件”用于访问受控工作区及用户明确操作的 Android 公共存储路径。权限不会自动授予其它应用私有目录访问权，Agent、白名单、安全开关和 Android 原生策略仍会继续限制能力。工作区内的写入在任务授权有效期内免逐次确认，公共存储的写入、复制、建目录在授权有效期内合并确认一次，删除仍每次确认。</p>
@@ -3517,298 +3516,10 @@ const PLUGIN_MARKET_INDEX = [
         "code": "async function run(args){var t=String(args.text||\"\");var lines=t?t.split(/\\r?\\n/):[];return {characters:t.length,lines:lines.length,nonEmptyLines:lines.filter(function(x){return x.trim();}).length};}"
       }
     ]
-  },
-  {
-    "manifestVersion": 1,
-    "apiVersion": "0.1",
-    "id": "com.elly.market.minecraft",
-    "name": "Minecraft 联机助手",
-    "icon": "⛏",
-    "version": "0.2.0",
-    "author": "ElysiaFloat",
-    "homepage": "https://github.com/xysy92ds/ElysiaFloat",
-    "docs": "plugins/com.elly.market.minecraft/README.md",
-    "desc": "在 Termux 中运行 Minecraft 服务器和 AI 控制的 Mineflayer bot，实现你和 AI 同世界联机。bot 支持移动、挖掘、放置、攻击、寻路、合成、聊天等操作。需要 Termux + Java + Node.js。",
-    "permissions": [
-      "termux"
-    ],
-    "tools": [
-      {
-        "name": "minecraft_setup",
-        "description": "在 Termux 中安装 Java 17、Node.js，并创建 mc-bot 目录和 package.json。这是一次性的环境搭建。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; return await t.call('run_termux_job', {executor:'bash', args:['-c','pkg update -y && pkg install -y openjdk-17 nodejs && mkdir -p ~/mc-bot && cd ~/mc-bot && echo \\'{\"name\":\"mc-bot\",\"version\":\"1.0.0\"}\\' > package.json']}); }"
-      },
-      {
-        "name": "minecraft_install_deps",
-        "description": "安装 Mineflayer bot 的依赖：mineflayer、mineflayer-pathfinder、minecraft-data、vec3。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; return await t.call('run_termux_job', {executor:'bash', args:['-c','cd ~/mc-bot && npm install mineflayer mineflayer-pathfinder minecraft-data vec3']}); }"
-      },
-      {
-        "name": "minecraft_deploy_bot",
-        "description": "部署正式的 bot.js 脚本到 Termux。bot 会连接 MC 服务器，通过 JSON 指令文件接收控制，通过状态文件回报信息。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "botName": {
-              "type": "string",
-              "description": "bot 游戏名，默认 Elly"
-            },
-            "serverHost": {
-              "type": "string",
-              "description": "服务器地址，默认 127.0.0.1"
-            },
-            "serverPort": {
-              "type": "integer",
-              "description": "服务器端口，默认 19132"
-            }
-          },
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; const name = args.botName || \"Elly\"; const host = args.serverHost || \"127.0.0.1\"; const port = args.serverPort || 19132; const b64 = \"Ly8gRWx5c2lhRmxvYXQgTWluZWNyYWZ0IEJvdAovLyDpgJrov4cgSlNPTiDmjIfku6Tmlofku7bmjqXmlLYgQUkg5o6n5Yi277yM6YCa6L+H54q25oCB5paH5Lu25Zue5oql546v5aKD5L+h5oGvCi8vIOS+nei1lu+8mm1pbmVmbGF5ZXIsIG1pbmVmbGF5ZXItcGF0aGZpbmRlciwgbWluZWNyYWZ0LWRhdGEsIHZlYzMKCmNvbnN0IG1pbmVmbGF5ZXIgPSByZXF1aXJlKCdtaW5lZmxheWVyJyk7CmNvbnN0IHsgcGF0aGZpbmRlciwgTW92ZW1lbnRzLCBnb2FscyB9ID0gcmVxdWlyZSgnbWluZWZsYXllci1wYXRoZmluZGVyJyk7CmNvbnN0IHZlYzMgPSByZXF1aXJlKCd2ZWMzJyk7CmNvbnN0IGZzID0gcmVxdWlyZSgnZnMnKTsKCmNvbnN0IENPTkZJRyA9IHsKICBob3N0OiBwcm9jZXNzLmVudi5NQ19IT1NUIHx8ICcxMjcuMC4wLjEnLAogIHBvcnQ6IHBhcnNlSW50KHByb2Nlc3MuZW52Lk1DX1BPUlQgfHwgJzE5MTMyJywgMTApLAogIHVzZXJuYW1lOiBwcm9jZXNzLmVudi5NQ19VU0VSTkFNRSB8fCAnRWxseScsCiAgY21kRmlsZTogcHJvY2Vzcy5lbnYuTUNfQ01EX0ZJTEUgfHwgJy9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy9ob21lL21jLWJvdC9jbWQuanNvbicsCiAgc3RhdHVzRmlsZTogcHJvY2Vzcy5lbnYuTUNfU1RBVFVTX0ZJTEUgfHwgJy9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy9ob21lL21jLWJvdC9zdGF0dXMuanNvbicsCiAgY2hhdExvZ0ZpbGU6IHByb2Nlc3MuZW52Lk1DX0NIQVRfRklMRSB8fCAnL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL2hvbWUvbWMtYm90L2NoYXQubG9nJwp9OwoKbGV0IGJvdCA9IG51bGw7CmxldCBjdXJyZW50QWN0aW9uID0gbnVsbDsKbGV0IGxhc3RTdGF0dXNVcGRhdGUgPSAwOwoKZnVuY3Rpb24gbG9nKG1zZykgewogIGNvbnN0IHRzID0gbmV3IERhdGUoKS50b0lTT1N0cmluZygpOwogIGNvbnNvbGUubG9nKGBbJHt0c31dICR7bXNnfWApOwp9CgpmdW5jdGlvbiBzYWZlUmVhZEpzb24oZmlsZSkgewogIHRyeSB7CiAgICBpZiAoIWZzLmV4aXN0c1N5bmMoZmlsZSkpIHJldHVybiBudWxsOwogICAgY29uc3QgdGV4dCA9IGZzLnJlYWRGaWxlU3luYyhmaWxlLCAndXRmOCcpLnRyaW0oKTsKICAgIGlmICghdGV4dCkgcmV0dXJuIG51bGw7CiAgICByZXR1cm4gSlNPTi5wYXJzZSh0ZXh0KTsKICB9IGNhdGNoIChlKSB7CiAgICByZXR1cm4gbnVsbDsKICB9Cn0KCmZ1bmN0aW9uIHdyaXRlU3RhdHVzKGV4dHJhKSB7CiAgaWYgKCFib3QpIHJldHVybjsKICBjb25zdCBub3cgPSBEYXRlLm5vdygpOwogIGlmIChub3cgLSBsYXN0U3RhdHVzVXBkYXRlIDwgNTAwKSByZXR1cm47IC8vIOacgOWkmiAyIOasoS/np5IKICBsYXN0U3RhdHVzVXBkYXRlID0gbm93OwogIHRyeSB7CiAgICBjb25zdCBlbnRpdHkgPSBib3QuZW50aXR5OwogICAgY29uc3Qgc3RhdHVzID0gewogICAgICB0czogbm93LAogICAgICBjb25uZWN0ZWQ6IHRydWUsCiAgICAgIHVzZXJuYW1lOiBib3QudXNlcm5hbWUsCiAgICAgIGhlYWx0aDogTWF0aC5yb3VuZChib3QuaGVhbHRoICogMTApIC8gMTAsCiAgICAgIGh1bmdlcjogTWF0aC5yb3VuZChib3QuZm9vZCAqIDEwKSAvIDEwLAogICAgICBwb3NpdGlvbjogZW50aXR5ID8gewogICAgICAgIHg6IE1hdGgucm91bmQoZW50aXR5LnBvc2l0aW9uLnggKiAxMDApIC8gMTAwLAogICAgICAgIHk6IE1hdGgucm91bmQoZW50aXR5LnBvc2l0aW9uLnkgKiAxMDApIC8gMTAwLAogICAgICAgIHo6IE1hdGgucm91bmQoZW50aXR5LnBvc2l0aW9uLnogKiAxMDApIC8gMTAwLAogICAgICAgIHlhdzogTWF0aC5yb3VuZChlbnRpdHkueWF3ICogMTAwKSAvIDEwMAogICAgICB9IDogbnVsbCwKICAgICAgb25Hcm91bmQ6IGVudGl0eSA/IGVudGl0eS5vbkdyb3VuZCA6IGZhbHNlLAogICAgICBpbnZlbnRvcnk6IGJvdC5pbnZlbnRvcnkuaXRlbXMoKS5tYXAoaSA9PiAoewogICAgICAgIG5hbWU6IGkubmFtZSwgY291bnQ6IGkuY291bnQsIHNsb3Q6IGkuc2xvdAogICAgICB9KSksCiAgICAgIGVxdWlwbWVudDogYm90LmVxdWlwbWVudCA/IE9iamVjdC5lbnRyaWVzKGJvdC5lcXVpcG1lbnQpLmZpbHRlcigoWywgdl0pID0+IHYpLm1hcCgoW2ssIHZdKSA9PiAoeyBzbG90OiBrLCBuYW1lOiB2Lm5hbWUgfSkpIDogW10sCiAgICAgIG5lYXJieVBsYXllcnM6IE9iamVjdC5lbnRyaWVzKGJvdC5wbGF5ZXJzKS5tYXAoKFtuYW1lLCBwXSkgPT4gKHsKICAgICAgICBuYW1lLAogICAgICAgIHBvczogcC5lbnRpdHkgPyB7IHg6IE1hdGgucm91bmQocC5lbnRpdHkucG9zaXRpb24ueCksIHk6IE1hdGgucm91bmQocC5lbnRpdHkucG9zaXRpb24ueSksIHo6IE1hdGgucm91bmQocC5lbnRpdHkucG9zaXRpb24ueikgfSA6IG51bGwKICAgICAgfSkpLmZpbHRlcihwID0+IHAucG9zKSwKICAgICAgY3VycmVudEFjdGlvbjogY3VycmVudEFjdGlvbiA/IHsgdHlwZTogY3VycmVudEFjdGlvbi50eXBlLCBhdDogY3VycmVudEFjdGlvbi5hdCB9IDogbnVsbAogICAgfTsKICAgIGlmIChleHRyYSkgT2JqZWN0LmFzc2lnbihzdGF0dXMsIGV4dHJhKTsKICAgIGZzLndyaXRlRmlsZVN5bmMoQ09ORklHLnN0YXR1c0ZpbGUsIEpTT04uc3RyaW5naWZ5KHN0YXR1cywgbnVsbCwgMikpOwogIH0gY2F0Y2ggKGUpIHsKICAgIGxvZygnc3RhdHVzIHdyaXRlIGVycm9yOiAnICsgZS5tZXNzYWdlKTsKICB9Cn0KCmZ1bmN0aW9uIGFwcGVuZENoYXQodXNlcm5hbWUsIG1lc3NhZ2UpIHsKICB0cnkgewogICAgY29uc3QgbGluZSA9IEpTT04uc3RyaW5naWZ5KHsgdHM6IERhdGUubm93KCksIHVzZXI6IHVzZXJuYW1lLCBtc2c6IG1lc3NhZ2UgfSkgKyAnXG4nOwogICAgZnMuYXBwZW5kRmlsZVN5bmMoQ09ORklHLmNoYXRMb2dGaWxlLCBsaW5lKTsKICB9IGNhdGNoIChlKSB7fQp9Cgphc3luYyBmdW5jdGlvbiBleGVjdXRlQWN0aW9uKGFjdGlvbikgewogIGlmICghYm90KSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnbm90IGNvbm5lY3RlZCcgfTsKICBjdXJyZW50QWN0aW9uID0geyB0eXBlOiBhY3Rpb24uYWN0aW9uIHx8IGFjdGlvbi50eXBlLCBhdDogRGF0ZS5ub3coKSB9OwogIGNvbnN0IHR5cGUgPSBhY3Rpb24uYWN0aW9uIHx8IGFjdGlvbi50eXBlOwogIHRyeSB7CiAgICBzd2l0Y2ggKHR5cGUpIHsKICAgICAgY2FzZSAnc2F5JzogewogICAgICAgIGJvdC5jaGF0KFN0cmluZyhhY3Rpb24udGV4dCB8fCAnJykpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdzYXknIH07CiAgICAgIH0KICAgICAgY2FzZSAnbW92ZSc6IHsKICAgICAgICBjb25zdCBkaXIgPSBTdHJpbmcoYWN0aW9uLmRpcmVjdGlvbiB8fCBhY3Rpb24uZGlyIHx8ICdmb3J3YXJkJyk7CiAgICAgICAgY29uc3QgdGlja3MgPSBNYXRoLm1heCgxLCBNYXRoLm1pbigyMDAsIHBhcnNlSW50KGFjdGlvbi50aWNrcyB8fCBhY3Rpb24uZHVyYXRpb24gfHwgMTAsIDEwKSkpOwogICAgICAgIGNvbnN0IHZhbGlkID0gWydmb3J3YXJkJywgJ2JhY2snLCAnbGVmdCcsICdyaWdodCcsICdqdW1wJywgJ3NwcmludCcsICdzbmVhayddOwogICAgICAgIGlmICghdmFsaWQuaW5jbHVkZXMoZGlyKSkgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ2ludmFsaWQgZGlyZWN0aW9uOiAnICsgZGlyIH07CiAgICAgICAgYm90LnNldENvbnRyb2xTdGF0ZShkaXIsIHRydWUpOwogICAgICAgIGF3YWl0IGJvdC53YWl0Rm9yVGlja3ModGlja3MpOwogICAgICAgIGJvdC5zZXRDb250cm9sU3RhdGUoZGlyLCBmYWxzZSk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ21vdmUnLCBkaXJlY3Rpb246IGRpciwgdGlja3MgfTsKICAgICAgfQogICAgICBjYXNlICdsb29rJzogewogICAgICAgIGNvbnN0IHlhdyA9IHBhcnNlRmxvYXQoYWN0aW9uLnlhdyk7CiAgICAgICAgY29uc3QgcGl0Y2ggPSBhY3Rpb24ucGl0Y2ggIT0gbnVsbCA/IHBhcnNlRmxvYXQoYWN0aW9uLnBpdGNoKSA6IDA7CiAgICAgICAgaWYgKGlzTmFOKHlhdykpIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdpbnZhbGlkIHlhdycgfTsKICAgICAgICBhd2FpdCBib3QubG9vayh5YXcsIHBpdGNoKTsKICAgICAgICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnbG9vaycsIHlhdywgcGl0Y2ggfTsKICAgICAgfQogICAgICBjYXNlICdsb29rQXQnOiB7CiAgICAgICAgY29uc3QgeCA9IHBhcnNlRmxvYXQoYWN0aW9uLngpLCB5ID0gcGFyc2VGbG9hdChhY3Rpb24ueSksIHogPSBwYXJzZUZsb2F0KGFjdGlvbi56KTsKICAgICAgICBpZiAoW3gsIHksIHpdLnNvbWUoaXNOYU4pKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnaW52YWxpZCBjb29yZGluYXRlcycgfTsKICAgICAgICBhd2FpdCBib3QubG9va0F0KHZlYzMoeCwgeSwgeikpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdsb29rQXQnIH07CiAgICAgIH0KICAgICAgY2FzZSAnZGlnJzogewogICAgICAgIGNvbnN0IGJsb2NrID0gYm90LmJsb2NrQXRDdXJzb3IoNSk7CiAgICAgICAgaWYgKCFibG9jaykgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ25vIGJsb2NrIGluIHNpZ2h0JyB9OwogICAgICAgIGF3YWl0IGJvdC5kaWcoYmxvY2spOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdkaWcnLCBibG9jazogYmxvY2submFtZSB9OwogICAgICB9CiAgICAgIGNhc2UgJ2RpZ0F0JzogewogICAgICAgIGNvbnN0IHggPSBwYXJzZUludChhY3Rpb24ueCksIHkgPSBwYXJzZUludChhY3Rpb24ueSksIHogPSBwYXJzZUludChhY3Rpb24ueik7CiAgICAgICAgaWYgKFt4LCB5LCB6XS5zb21lKGlzTmFOKSkgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ2ludmFsaWQgY29vcmRpbmF0ZXMnIH07CiAgICAgICAgY29uc3QgYmxvY2sgPSBib3QuYmxvY2tBdCh2ZWMzKHgsIHksIHopKTsKICAgICAgICBpZiAoIWJsb2NrKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnbm8gYmxvY2sgYXQgcG9zaXRpb24nIH07CiAgICAgICAgYXdhaXQgYm90LmRpZyhibG9jayk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ2RpZ0F0JywgYmxvY2s6IGJsb2NrLm5hbWUsIHBvczogeyB4LCB5LCB6IH0gfTsKICAgICAgfQogICAgICBjYXNlICdwbGFjZSc6IHsKICAgICAgICBjb25zdCBibG9jayA9IGJvdC5ibG9ja0F0Q3Vyc29yKDUpOwogICAgICAgIGlmICghYmxvY2spIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdubyBibG9jayBpbiBzaWdodCB0byBwbGFjZSBhZ2FpbnN0JyB9OwogICAgICAgIGNvbnN0IGZhY2luZyA9IGFjdGlvbi5mYWNpbmcgfHwgJ3RvcCc7CiAgICAgICAgY29uc3QgZmFjZU1hcCA9IHsgdG9wOiAxLCBib3R0b206IDAsIG5vcnRoOiAyLCBzb3V0aDogMywgZWFzdDogNSwgd2VzdDogNCB9OwogICAgICAgIGF3YWl0IGJvdC5wbGFjZUJsb2NrKGJsb2NrLCBuZXcgdmVjMygwLCAwLCAwKSk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ3BsYWNlJyB9OwogICAgICB9CiAgICAgIGNhc2UgJ2F0dGFjayc6IHsKICAgICAgICBjb25zdCB0YXJnZXQgPSBib3QubmVhcmVzdEVudGl0eShlID0+IGUudHlwZSA9PT0gJ21vYicgfHwgZS50eXBlID09PSAncGxheWVyJyk7CiAgICAgICAgaWYgKCF0YXJnZXQpIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdubyBlbnRpdHkgdG8gYXR0YWNrJyB9OwogICAgICAgIGF3YWl0IGJvdC5hdHRhY2sodGFyZ2V0KTsKICAgICAgICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnYXR0YWNrJywgdGFyZ2V0OiB0YXJnZXQubmFtZSB8fCB0YXJnZXQudHlwZSB9OwogICAgICB9CiAgICAgIGNhc2UgJ2F0dGFja05lYXJlc3QnOiB7CiAgICAgICAgY29uc3QgZmlsdGVyID0gYWN0aW9uLmZpbHRlciB8fCAnbW9iJzsKICAgICAgICBjb25zdCB0YXJnZXQgPSBib3QubmVhcmVzdEVudGl0eShlID0+IGUudHlwZSA9PT0gZmlsdGVyIHx8IChmaWx0ZXIgPT09ICdwbGF5ZXInICYmIGUudHlwZSA9PT0gJ3BsYXllcicpKTsKICAgICAgICBpZiAoIXRhcmdldCkgcmV0dXJuIHsgb2s6IGZhbHNlLCBlcnJvcjogJ25vICcgKyBmaWx0ZXIgKyAnIG5lYXJieScgfTsKICAgICAgICBhd2FpdCBib3QuYXR0YWNrKHRhcmdldCk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ2F0dGFja05lYXJlc3QnLCB0YXJnZXQ6IHRhcmdldC5uYW1lIHx8IHRhcmdldC50eXBlIH07CiAgICAgIH0KICAgICAgY2FzZSAnYWN0aXZhdGUnOiB7CiAgICAgICAgYm90LmFjdGl2YXRlSXRlbSgpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdhY3RpdmF0ZScgfTsKICAgICAgfQogICAgICBjYXNlICdkZWFjdGl2YXRlJzogewogICAgICAgIGJvdC5kZWFjdGl2YXRlSXRlbSgpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdkZWFjdGl2YXRlJyB9OwogICAgICB9CiAgICAgIGNhc2UgJ2VxdWlwJzogewogICAgICAgIGNvbnN0IGl0ZW1OYW1lID0gU3RyaW5nKGFjdGlvbi5pdGVtIHx8ICcnKTsKICAgICAgICBjb25zdCBpdGVtID0gYm90LmludmVudG9yeS5pdGVtcygpLmZpbmQoaSA9PiBpLm5hbWUuaW5jbHVkZXMoaXRlbU5hbWUpKTsKICAgICAgICBpZiAoIWl0ZW0pIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdpdGVtIG5vdCBmb3VuZDogJyArIGl0ZW1OYW1lIH07CiAgICAgICAgYXdhaXQgYm90LmVxdWlwKGl0ZW0sIGFjdGlvbi5oYW5kIHx8ICdoYW5kJyk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ2VxdWlwJywgaXRlbTogaXRlbS5uYW1lIH07CiAgICAgIH0KICAgICAgY2FzZSAndG9zcyc6IHsKICAgICAgICBjb25zdCBpdGVtTmFtZSA9IFN0cmluZyhhY3Rpb24uaXRlbSB8fCAnJyk7CiAgICAgICAgY29uc3QgaXRlbSA9IGJvdC5pbnZlbnRvcnkuaXRlbXMoKS5maW5kKGkgPT4gaS5uYW1lLmluY2x1ZGVzKGl0ZW1OYW1lKSk7CiAgICAgICAgaWYgKCFpdGVtKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnaXRlbSBub3QgZm91bmQ6ICcgKyBpdGVtTmFtZSB9OwogICAgICAgIGF3YWl0IGJvdC50b3NzKGl0ZW0udHlwZSwgbnVsbCwgYWN0aW9uLmNvdW50IHx8IGl0ZW0uY291bnQpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICd0b3NzJywgaXRlbTogaXRlbS5uYW1lIH07CiAgICAgIH0KICAgICAgY2FzZSAncGF0aGZpbmQnOiB7CiAgICAgICAgY29uc3QgeCA9IHBhcnNlRmxvYXQoYWN0aW9uLngpLCB5ID0gcGFyc2VGbG9hdChhY3Rpb24ueSksIHogPSBwYXJzZUZsb2F0KGFjdGlvbi56KTsKICAgICAgICBpZiAoW3gsIHksIHpdLnNvbWUoaXNOYU4pKSByZXR1cm4geyBvazogZmFsc2UsIGVycm9yOiAnaW52YWxpZCBjb29yZGluYXRlcycgfTsKICAgICAgICBjb25zdCBtY0RhdGEgPSByZXF1aXJlKCdtaW5lY3JhZnQtZGF0YScpKGJvdC52ZXJzaW9uKTsKICAgICAgICBjb25zdCBtb3ZlbWVudHMgPSBuZXcgTW92ZW1lbnRzKGJvdCwgbWNEYXRhKTsKICAgICAgICBib3QucGF0aGZpbmRlci5zZXRNb3ZlbWVudHMobW92ZW1lbnRzKTsKICAgICAgICBjb25zdCBnb2FsID0gbmV3IGdvYWxzLkdvYWxCbG9jayhNYXRoLmZsb29yKHgpLCBNYXRoLmZsb29yKHkpLCBNYXRoLmZsb29yKHopKTsKICAgICAgICBhd2FpdCBib3QucGF0aGZpbmRlci5nb3RvKGdvYWwpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdwYXRoZmluZCcsIHRhcmdldDogeyB4LCB5LCB6IH0gfTsKICAgICAgfQogICAgICBjYXNlICdwYXRoZmluZFRvUGxheWVyJzogewogICAgICAgIGNvbnN0IHRhcmdldE5hbWUgPSBTdHJpbmcoYWN0aW9uLnBsYXllciB8fCAnJyk7CiAgICAgICAgY29uc3QgcGxheWVyID0gYm90LnBsYXllcnNbdGFyZ2V0TmFtZV07CiAgICAgICAgaWYgKCFwbGF5ZXIgfHwgIXBsYXllci5lbnRpdHkpIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICdwbGF5ZXIgbm90IGZvdW5kOiAnICsgdGFyZ2V0TmFtZSB9OwogICAgICAgIGNvbnN0IG1jRGF0YSA9IHJlcXVpcmUoJ21pbmVjcmFmdC1kYXRhJykoYm90LnZlcnNpb24pOwogICAgICAgIGNvbnN0IG1vdmVtZW50cyA9IG5ldyBNb3ZlbWVudHMoYm90LCBtY0RhdGEpOwogICAgICAgIGJvdC5wYXRoZmluZGVyLnNldE1vdmVtZW50cyhtb3ZlbWVudHMpOwogICAgICAgIGNvbnN0IGdvYWwgPSBuZXcgZ29hbHMuR29hbEZvbGxvdyhwbGF5ZXIuZW50aXR5LCAyKTsKICAgICAgICBhd2FpdCBib3QucGF0aGZpbmRlci5nb3RvKGdvYWwpOwogICAgICAgIHJldHVybiB7IG9rOiB0cnVlLCBhY3Rpb246ICdwYXRoZmluZFRvUGxheWVyJywgcGxheWVyOiB0YXJnZXROYW1lIH07CiAgICAgIH0KICAgICAgY2FzZSAnc3RvcCc6IHsKICAgICAgICBpZiAoYm90LnBhdGhmaW5kZXIpIGJvdC5wYXRoZmluZGVyLnNldEdvYWwobnVsbCk7CiAgICAgICAgWydmb3J3YXJkJywgJ2JhY2snLCAnbGVmdCcsICdyaWdodCcsICdqdW1wJywgJ3NwcmludCcsICdzbmVhayddLmZvckVhY2goYyA9PiBib3Quc2V0Q29udHJvbFN0YXRlKGMsIGZhbHNlKSk7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ3N0b3AnIH07CiAgICAgIH0KICAgICAgY2FzZSAnanVtcCc6IHsKICAgICAgICBib3Quc2V0Q29udHJvbFN0YXRlKCdqdW1wJywgdHJ1ZSk7CiAgICAgICAgYXdhaXQgYm90LndhaXRGb3JUaWNrcygxMCk7CiAgICAgICAgYm90LnNldENvbnRyb2xTdGF0ZSgnanVtcCcsIGZhbHNlKTsKICAgICAgICByZXR1cm4geyBvazogdHJ1ZSwgYWN0aW9uOiAnanVtcCcgfTsKICAgICAgfQogICAgICBjYXNlICdzdGF0dXMnOiB7CiAgICAgICAgcmV0dXJuIHsgb2s6IHRydWUsIGFjdGlvbjogJ3N0YXR1cycgfTsKICAgICAgfQogICAgICBkZWZhdWx0OgogICAgICAgIHJldHVybiB7IG9rOiBmYWxzZSwgZXJyb3I6ICd1bmtub3duIGFjdGlvbjogJyArIHR5cGUgfTsKICAgIH0KICB9IGNhdGNoIChlKSB7CiAgICByZXR1cm4geyBvazogZmFsc2UsIGFjdGlvbjogdHlwZSwgZXJyb3I6IGUubWVzc2FnZSB9OwogIH0gZmluYWxseSB7CiAgICBjdXJyZW50QWN0aW9uID0gbnVsbDsKICB9Cn0KCmZ1bmN0aW9uIGNvbm5lY3QoKSB7CiAgbG9nKGBDb25uZWN0aW5nIHRvICR7Q09ORklHLmhvc3R9OiR7Q09ORklHLnBvcnR9IGFzICR7Q09ORklHLnVzZXJuYW1lfS4uLmApOwogIGJvdCA9IG1pbmVmbGF5ZXIuY3JlYXRlQm90KHsKICAgIGhvc3Q6IENPTkZJRy5ob3N0LAogICAgcG9ydDogQ09ORklHLnBvcnQsCiAgICB1c2VybmFtZTogQ09ORklHLnVzZXJuYW1lLAogICAgaGlkZUVycm9yczogZmFsc2UKICB9KTsKCiAgYm90LmxvYWRQbHVnaW4ocGF0aGZpbmRlcik7CgogIGJvdC5vbignc3Bhd24nLCAoKSA9PiB7CiAgICBsb2coJ1NwYXduZWQgaW4gd29ybGQnKTsKICAgIHdyaXRlU3RhdHVzKHsgZXZlbnQ6ICdzcGF3bicgfSk7CiAgfSk7CgogIGJvdC5vbignY2hhdCcsICh1c2VybmFtZSwgbWVzc2FnZSkgPT4gewogICAgYXBwZW5kQ2hhdCh1c2VybmFtZSwgbWVzc2FnZSk7CiAgICBsb2coYFtDSEFUXSAke3VzZXJuYW1lfTogJHttZXNzYWdlfWApOwogIH0pOwoKICBib3Qub24oJ3BsYXllckpvaW5lZCcsIChwbGF5ZXIpID0+IHsKICAgIGxvZyhgUGxheWVyIGpvaW5lZDogJHtwbGF5ZXIudXNlcm5hbWV9YCk7CiAgfSk7CgogIGJvdC5vbigncGxheWVyTGVmdCcsIChwbGF5ZXIpID0+IHsKICAgIGxvZyhgUGxheWVyIGxlZnQ6ICR7cGxheWVyLnVzZXJuYW1lfWApOwogIH0pOwoKICBib3Qub24oJ2hlYWx0aCcsICgpID0+IHsKICAgIHdyaXRlU3RhdHVzKCk7CiAgfSk7CgogIGJvdC5vbignZGVhdGgnLCAoKSA9PiB7CiAgICBsb2coJ0RpZWQnKTsKICAgIHdyaXRlU3RhdHVzKHsgZXZlbnQ6ICdkZWF0aCcgfSk7CiAgfSk7CgogIGJvdC5vbigna2lja2VkJywgKHJlYXNvbikgPT4gewogICAgbG9nKCdLaWNrZWQ6ICcgKyByZWFzb24pOwogICAgd3JpdGVTdGF0dXMoeyBldmVudDogJ2tpY2tlZCcsIHJlYXNvbjogU3RyaW5nKHJlYXNvbikgfSk7CiAgfSk7CgogIGJvdC5vbignZXJyb3InLCAoZXJyKSA9PiB7CiAgICBsb2coJ0Vycm9yOiAnICsgZXJyLm1lc3NhZ2UpOwogIH0pOwoKICBib3Qub24oJ2VuZCcsICgpID0+IHsKICAgIGxvZygnRGlzY29ubmVjdGVkJyk7CiAgICBib3QgPSBudWxsOwogICAgd3JpdGVTdGF0dXMoeyBjb25uZWN0ZWQ6IGZhbHNlLCBldmVudDogJ2VuZCcgfSk7CiAgICBzZXRUaW1lb3V0KGNvbm5lY3QsIDUwMDApOwogIH0pOwp9CgovLyDkuLvlvqrnjq/vvJror7vlj5bmjIfku6Tmlofku7blubbmiafooYwKYXN5bmMgZnVuY3Rpb24gbWFpbkxvb3AoKSB7CiAgaWYgKCFib3QpIHsKICAgIHNldFRpbWVvdXQobWFpbkxvb3AsIDUwMCk7CiAgICByZXR1cm47CiAgfQogIHRyeSB7CiAgICBjb25zdCBjbWQgPSBzYWZlUmVhZEpzb24oQ09ORklHLmNtZEZpbGUpOwogICAgaWYgKGNtZCAmJiBjbWQuYWN0aW9uKSB7CiAgICAgIGxvZygnRXhlY3V0aW5nOiAnICsgY21kLmFjdGlvbik7CiAgICAgIGNvbnN0IHJlc3VsdCA9IGF3YWl0IGV4ZWN1dGVBY3Rpb24oY21kKTsKICAgICAgbG9nKCdSZXN1bHQ6ICcgKyBKU09OLnN0cmluZ2lmeShyZXN1bHQpKTsKICAgICAgLy8g5YaZ5YWl57uT5p6c5bm25Yig6Zmk5oyH5Luk5paH5Lu2CiAgICAgIGNvbnN0IHJlc3VsdEZpbGUgPSBDT05GSUcuY21kRmlsZS5yZXBsYWNlKC9cLmpzb24kLywgJy5yZXN1bHQuanNvbicpOwogICAgICBmcy53cml0ZUZpbGVTeW5jKHJlc3VsdEZpbGUsIEpTT04uc3RyaW5naWZ5KHsgdHM6IERhdGUubm93KCksIHJlc3VsdCB9KSk7CiAgICAgIHRyeSB7IGZzLnVubGlua1N5bmMoQ09ORklHLmNtZEZpbGUpOyB9IGNhdGNoIChlKSB7fQogICAgICB3cml0ZVN0YXR1cyh7IGxhc3RSZXN1bHQ6IHJlc3VsdCB9KTsKICAgIH0gZWxzZSB7CiAgICAgIHdyaXRlU3RhdHVzKCk7CiAgICB9CiAgfSBjYXRjaCAoZSkgewogICAgbG9nKCdMb29wIGVycm9yOiAnICsgZS5tZXNzYWdlKTsKICB9CiAgc2V0VGltZW91dChtYWluTG9vcCwgMjAwKTsKfQoKY29ubmVjdCgpOwpzZXRUaW1lb3V0KG1haW5Mb29wLCAxMDAwKTsK\"; const cmd = \"cd ~/mc-bot && echo \" + b64 + \" | base64 -d > bot.js && cat > bot.env << ENVEOF\\n\" + \"export MC_HOST=\" + host + \"\\n\" + \"export MC_PORT=\" + port + \"\\n\" + \"export MC_USERNAME=\" + name + \"\\n\" + \"export MC_CMD_FILE=$HOME/mc-bot/cmd.json\\n\" + \"export MC_STATUS_FILE=$HOME/mc-bot/status.json\\n\" + \"export MC_CHAT_FILE=$HOME/mc-bot/chat.log\\n\" + \"ENVEOF\"; return await t.call(\"run_termux_job\", {executor:\"bash\", args:[\"-c\", cmd]}); }"
-      },
-      {
-        "name": "minecraft_download_server",
-        "description": "下载 Minecraft Bedrock Dedicated Server 到 Termux。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "version": {
-              "type": "string",
-              "description": "版本号，如 1.21.0；留空用最新"
-            }
-          },
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; const ver = args.version || '1.21.0.03'; return await t.call('run_termux_job', {executor:'bash', args:['-c', 'cd ~ && mkdir -p mc-server && cd mc-server && curl -L -o bds.zip https://minecraft.azureedge.net/bin-linux/bedrock-server-'+ver+'.zip && unzip -o bds.zip && chmod +x bedrock_server']}); }"
-      },
-      {
-        "name": "minecraft_start_server",
-        "description": "启动 Minecraft Bedrock 服务器。返回 runId。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "port": {
-              "type": "integer",
-              "description": "端口，默认 19132"
-            }
-          },
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; const port = args.port || 19132; return await t.call('run_termux_job', {executor:'bash', args:['-c', 'cd ~/mc-server && export LD_LIBRARY_PATH=. && ./bedrock_server --port '+port]}); }"
-      },
-      {
-        "name": "minecraft_server_status",
-        "description": "查询服务器状态和最近日志。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "runId": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "runId"
-          ]
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ return await ctx.hostTools.call('termux_job_status', {runId: args.runId}); }"
-      },
-      {
-        "name": "minecraft_stop_server",
-        "description": "停止 Minecraft 服务器。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "runId": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "runId"
-          ]
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ return await ctx.hostTools.call('termux_job_cancel', {runId: args.runId}); }"
-      },
-      {
-        "name": "minecraft_start_bot",
-        "description": "启动 Mineflayer bot 连接到服务器。返回 runId。bot 启动后会创建状态文件，等待指令。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; return await t.call('run_termux_job', {executor:'bash', args:['-c', 'cd ~/mc-bot && source bot.env && node bot.js']}); }"
-      },
-      {
-        "name": "minecraft_bot_command",
-        "description": "向 bot 发送一条结构化指令。支持的 action：say(发消息)、move(移动)、look(转头)、dig(挖眼前方块)、digAt(挖指定坐标)、place(放置)、attack(攻击最近)、activate(使用物品)、equip(装备)、pathfind(寻路到坐标)、pathfindToPlayer(跟随玩家)、stop(停止)、jump(跳跃)。指令会被执行并返回结果。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "action": {
-              "type": "string",
-              "description": "动作类型"
-            },
-            "text": {
-              "type": "string",
-              "description": "say 的消息内容"
-            },
-            "direction": {
-              "type": "string",
-              "enum": [
-                "forward",
-                "back",
-                "left",
-                "right",
-                "jump",
-                "sprint",
-                "sneak"
-              ],
-              "description": "move 的方向"
-            },
-            "ticks": {
-              "type": "integer",
-              "description": "move 持续的 tick 数"
-            },
-            "yaw": {
-              "type": "number",
-              "description": "look 的水平角度"
-            },
-            "pitch": {
-              "type": "number",
-              "description": "look 的垂直角度"
-            },
-            "x": {
-              "type": "number",
-              "description": "坐标 x"
-            },
-            "y": {
-              "type": "number",
-              "description": "坐标 y"
-            },
-            "z": {
-              "type": "number",
-              "description": "坐标 z"
-            },
-            "item": {
-              "type": "string",
-              "description": "equip/toss 的物品名"
-            },
-            "player": {
-              "type": "string",
-              "description": "pathfindToPlayer 的玩家名"
-            }
-          },
-          "required": [
-            "action"
-          ]
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; const cmd = JSON.stringify(args); const r1 = await t.call('run_termux_job', {executor:'bash', args:['-c', 'cat > ~/mc-bot/cmd.json << \\'CMDEOF\\'\\n'+cmd+'\\nCMDEOF\\nrm -f ~/mc-bot/cmd.result.json']}); if (!r1.ok) return r1; for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 500)); const st = await t.call('termux_job_status', {runId: r1.runId}); const out = st.output || ''; if (out.indexOf('Result:') >= 0) { const m = out.match(/Result: (\\{[\\s\\S]*?\\})/); if (m) return { ok: true, result: JSON.parse(m[1]) }; } } const st2 = await t.call('termux_job_status', {runId: r1.runId}); return { ok: false, error: 'timeout', output: st2.output }; }"
-      },
-      {
-        "name": "minecraft_bot_status",
-        "description": "读取 bot 的当前状态：位置、血量、饥饿、背包、附近玩家、当前动作。从状态文件读取。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {},
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; const r = await t.call('run_termux_job', {executor:'bash', args:['-c', 'cat ~/mc-bot/status.json 2>/dev/null || echo \\'{\"connected\":false}\\'']}); if (r.ok) { try { const out = r.output || r.stdout || ''; const m = out.match(/\\{[\\s\\S]*\\}/); if (m) return { ok: true, status: JSON.parse(m[0]) }; } catch(e){} return { ok: false, error: 'parse failed', raw: r.output || r.stdout }; } return r; }"
-      },
-      {
-        "name": "minecraft_bot_chat",
-        "description": "读取 bot 记录的最近聊天消息。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "lines": {
-              "type": "integer",
-              "description": "读取最后 N 行，默认 20"
-            }
-          },
-          "required": []
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ const t = ctx.hostTools; const n = args.lines || 20; const r = await t.call('run_termux_job', {executor:'bash', args:['-c', 'tail -n '+n+' ~/mc-bot/chat.log 2>/dev/null || echo \\'no chat\\'']}); return r; }"
-      },
-      {
-        "name": "minecraft_bot_stop",
-        "description": "停止 Mineflayer bot。",
-        "permissions": [
-          "termux"
-        ],
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "runId": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "runId"
-          ]
-        },
-        "kind": "js",
-        "code": "async function run(args, ctx){ return await ctx.hostTools.call('termux_job_cancel', {runId: args.runId}); }"
-      }
-    ]
   }
 ];
 
 refreshSystemPrompt();
-sSet('via_ai_history', history);
 let transCache = sGet('via_ai_trans', {}) || {};
 let favorites = sGet('via_ai_favs', []) || [];
 let sending = false;
@@ -4108,7 +3819,7 @@ function memMigrateLegacy() {
   }
   history = history.filter(m => !(m.role === 'system' && m.isMemory));
   if (!history.length) history = [{ role: 'system', content: CONFIG.systemPrompt }];
-  sSet('via_ai_history', history);
+  saveHistory();
 }
 
 /* ---- 导出 ---- */
@@ -8301,7 +8012,7 @@ async function toggleUserPlug(id) {
   plugAudit(next ? 'enable' : 'disable', p);
   refreshSystemPrompt();
   toolsBroken = false;
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast(p.enabled ? '已启用该插件' : '已停用该插件');
@@ -8501,7 +8212,7 @@ function togglePlug(id) {
   refreshSystemPrompt();          // 提示词里的工具段立刻跟着变
   toolsBroken = false;            // 工具集变了，下次重新试一遍 tools 调用
   sSet('via_ai_config', CONFIG);
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast(plugOn(id) ? '已开启该组工具' : '已关闭该组工具');
@@ -8525,7 +8236,7 @@ function toggleTool(name) {
   refreshSystemPrompt();
   toolsBroken = false;
   sSet('via_ai_config', CONFIG);
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast(liveOn ? '已关闭该工具' : '已开启该工具');
@@ -8625,7 +8336,7 @@ async function plugInstallFromText(text) {
   plugSaveList();
   refreshSystemPrompt();
   toolsBroken = false;
-  sSet('via_ai_history', history);
+  saveHistory();
   $('#plug-modal').classList.remove('open');
   renderPlugins();
   renderPlugPreview();
@@ -8642,7 +8353,7 @@ async function plugDelete(id) {
   plugAudit('uninstall', p);
   refreshSystemPrompt();
   toolsBroken = false;
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast('已删除插件');
@@ -9339,7 +9050,7 @@ function doSaveSettings(val) {
   // 人设/插件可能变了，重拼一遍 system 消息（否则对话里还是旧的那份）
   refreshSystemPrompt();
   sSet('via_ai_config', CONFIG);
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
 
   // 记忆库配置单独存（向量 + 自动整理）

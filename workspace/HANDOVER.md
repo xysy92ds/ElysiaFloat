@@ -1,115 +1,155 @@
 # 交接说明（Handover）
 
-更新时间：2026-10-24
-当前阶段：0.7.2 内测包已构建、自动验证通过、已推送并上传 Release；真机验证待做
-最新测试包：`apk/ElysiaFloat-v0.7.2-debug.apk`（versionCode 17 / versionName 0.7.2）
-SHA-256：`3acd847c99e886f5dc98684ec8cecc93f0e41aa3f4ee7e57cda8f74ba2126935`
+更新时间：2026-10-28
+当前阶段：**0.8.0 Beta 进行中**——N2/N3/N4/N5 已完成并由 CI 守护，剩 N1 真机回归与 0.8.0 发布
+最新可用包：`apk/ElysiaFloat-v0.7.2-debug.apk`（versionCode 17 / versionName 0.7.2）
+SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`
+工作转移包：`handoff/ElysiaFloat-handoff-*.zip`（以同目录 `.sha256` 为准）；
+私有仓库归档：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`。
 
 ## 1. 一句话现状
 
-ElysiaFloat 是一个 Android 悬浮窗 AI 助手（聊天 + 手机 Agent + 文件工作区 + 插件平台）。
-0.7.2 已提交并推送到私有仓库 `xysy92ds/ElysiaFloat-v0.7`，Release 资产与源码快照同步；
-前端已拆分为 `android/app/src/main/assets/src/`，
-构建时由 `tools/build-html.js` 合并生成单文件 `index.html`。
+ElysiaFloat 是一个 Android 悬浮窗 AI 助手（聊天 + 手机 Agent + 文件工作区 + 开放插件平台）。
+0.7.2 Beta 已发布到公开仓库 `xysy92ds/ElysiaFloat`：
+commit `cb10e91`（索引更新 `1b2e09a`）、tag `v0.7.2`、Release 422140702，
+已标记为 Latest（标题保留 “Beta”），资产 APK / source.zip / SHA256SUMS 均已匿名下载验证。
+前端已拆分为 `android/app/src/main/assets/src/`，构建时由 `tools/build-html.js` 合并成单文件 `index.html`。
+当前代码基线仍是 0.7.2；0.8.0 只加了测试/脚本/文档，没有新增用户功能，因此尚未提升版本号。
 
-## 2. 代码与文档的权威入口
+## 2. 权威入口
 
 | 用途 | 位置 |
 |---|---|
-| 唯一执行计划（阶段/依赖/出口） | `workspace/plans/MASTER-EXECUTION-PLAN.md` |
+| 唯一执行计划（历史阶段 G0~G10） | `workspace/plans/MASTER-EXECUTION-PLAN.md` |
+| 平台化路线（0.8→0.15，当前主线） | `workspace/plans/PLATFORM-0.8-0.15.md` |
 | 唯一问题总表（编号/证据/状态） | `workspace/issues/ISSUE-REGISTER.md` |
 | 工作区导航与事实快照 | `workspace/STATUS.md` |
 | 执行证据 | `workspace/work-logs/` |
 | 用户确认/产品取舍 | `workspace/discussions/` |
-| 长期规则 | `workspace/decisions/` |
-| 测试版 APK | `apk/phases/`（同目录带 `-SHA256SUMS`） |
+| 长期规则与 ADR | `workspace/decisions/`（DEC-003/004/005） |
+| 测试版 APK | `apk/phases/` 或 `apk/`（同目录带 `-SHA256SUMS`） |
 | 稳定技术文档 | `docs/` |
+| 构建/测试脚本 | `android/tools/` |
+| 工作转移包 | `tools/handoff.sh` → `handoff/` |
 
-## 3. 已验证可用的能力
+## 3. 全局任务总览（每个项目都在这里）
 
-- 悬浮窗、小球、胶囊、迷你播放器；
-- 多模型/多服务商对话，Function Calling 多轮工具；
-- 长期记忆（概览 + 按需检索）；
-- 插件：Manifest v1、权限声明、JS 沙箱、HTTP 插件、工具开关、本地/远程市场；
-- Agent：L1/L2/L3、应用白名单、无障碍读屏、截屏、动作执行、重复动作熔断；
-- 文件工作区：input/working/output/logs/snapshots、索引、写入前快照、回滚；
-- 音乐：多源搜索 + 分页、播放、歌词、收藏、历史、队列、缓存面板、下载进度、单曲删除、主题跟随；
-- 设置：单一保存按钮，保存链路 null 安全，异常可见。
+### 3.1 版本路线
 
-## 4. G2 这轮实际做了什么
+| 版本 | 主线 | 任务编号 | 状态 | 出口 |
+|---|---|---|---|---|
+| 0.7.2 | 安全确认精简 / 长按粘贴 | G2-005、I-048 | 已发布，真机待验 | 公开仓库 Latest |
+| **0.8.0** | 稳定收口（不加功能） | N1~N5 | **进行中**：N2/N3/N4/N5 完成，N1 待做 | 核心回归全绿 + 测试全绿 + 0.8.0 可覆盖安装 |
+| 0.9.0 | 核心体验 + 模型中心 | E1 + E2 | 规划中 | 首页永远是聊天；密钥不出日志；加 Provider 不改聊天代码 |
+| 0.10.0 | 开放式插件运行时 | E3 | 规划中 | 插件注册宿主没写过的新页面/入口/会话/命令/任务，宿主零改动 |
+| 0.11.0 | 插件 UI 运行时 | E4 | 规划中 | 主题/恋爱游戏/番茄钟三个验收场景通过 |
+| 0.12.0 | 依赖 + 持久会话 + Termux | E5 + E6 + G8-001 | 规划中 | 息屏 8 小时会话存活可恢复；Node/Mineflayer/NapCat 可安装卸载 |
+| 0.13.0 | MC 插件（无面板） | E7 | 规划中 | 30 分钟连续任务稳定、断线重连 |
+| 0.14.0 | QQ 插件（微型面板） | E8 | 规划中 | 私聊/群聊 24 小时稳定 |
+| 0.15.0 | 沙箱 HTML + 适配器 + 工作能力 + 治理 | E9 + E10 | 规划中 | 第三方不看源码能写出带页面/会话/主题/适配器的插件 |
 
-1. 运行上下文隔离：`ChatSession` / `QuickOperation` / `AgentTask` 各自携带显式任务；
-   `chatReqTools`、`execTool`、`buildTools`、插件宿主调用都改用显式任务，不再隐式读 `currentTask()`。
-2. 任务状态机：新增 `TASK_TRANSITIONS`，非法迁移记录 `INVALID_STATE_TRANSITION` 并保留原状态。
-3. 取消边界：`ACTIVE_RUN_TASK_ID`、模型请求 taskId 绑定、运行令牌、插件沙箱挂起取消、截图等待取消。
-4. 长任务预算：非聊天任务默认 1200 秒（20 分钟），设置上限 7200 秒；旧 90 秒配置自动迁移。
-5. 工具轮数：`0 = 按任务时间`，不再退化成 5；设置 UI 增加对应选项。
-6. 插件能力：新增 `read_screen_once`、`music.control`；插件面板 / Agent tools Schema / 提示词三处一致，单项开关互不误伤。
-7. 设置页：移除重复的悬浮保存按钮；底部操作条 `sticky bottom:28px`（随时可点，避开 22px 窗口缩放热区）；
-   修复 `#set-gd-api` 缺失导致的保存静默失败；27 处读取改为 null 安全。
+全部是 0.x Beta，小步发布，**不设 1.0**。
 
-## 5. 验证门（每次改代码都要跑）
+### 3.2 0.8.0 任务明细
+
+| 编号 | 内容 | 状态 | 证据 |
+|---|---|---|---|
+| N1 | 真机回归：发送、粘贴、长按、横屏、音乐、设备、文件、公告、市场 | **待做**（唯一的阻塞项） | 结果写到 `workspace/work-logs/<日期>-0.8.0-n1-device.md` |
+| N2 | 行为测试 + CI | 已完成 | `android/tools/behavior.test.js`（7 项）、`.github/workflows/ci.yml` |
+| N3 | 发布工程：签名策略、敏感信息扫描、`latest.json` 一致性 | 已完成 | `tools/scan-secrets.js`、`tools/check-release.js`、`DEC-003` |
+| N4 | 清理：市场 MC 遗留、`via_ai_history`、过期迁移基线 | 已完成 | N4-001/002，behavior 测试守护 |
+| N5 | ADR：AstrBot 对齐、开放运行时 | 已完成 | `DEC-004-astrbot-alignment.md`、`DEC-005-open-plugin-runtime.md` |
+| — | Kotlin 单测 | **暂缓到 0.9** | 现有逻辑绑在 Android 依赖上，需先拆纯函数（I-025） |
+
+### 3.3 历史阶段的遗留验收（不阻塞 0.8 的自动测试）
+
+| 编号 | 内容 | 状态 |
+|---|---|---|
+| G2-005 | 任务粘性 + 30 分钟能力组授权 + 工作区复用 | 代码完成，真机待验 |
+| G4 | 音乐真实源（GD Studio / Meting）、302/403/429、离屏播放、公共目录 | 代码与 smoke 完成，真机待验 |
+| G5 | DeviceTask「打开应用 → 点击 → 输入 → 返回」、分辨率/刘海屏 | 代码完成，真机待验 |
+| G7 | Android 11+ 公共存储、厂商文件管理器、快照/回滚 | 代码完成，真机待验 |
+| I-048 | 长按菜单 / 复制粘贴在 Android 10+ 窗口焦点下的表现 | 已修，真机待确认 |
+
+### 3.4 明确延期或不做
+
+| 项 | 结论 |
+|---|---|
+| G6 FullscreenActivity | 已彻底删除，不再排期 |
+| Root / Shizuku | 延期，需单独批准（原 G8-002/003） |
+| 外部 Agent 下载执行 | 0.15 之后再评估（原 G9） |
+| MC 手机版（基岩版） | 先做 Java + Mineflayer |
+| 多账号 QQ / 市场评分评论 | 稳定后再评估 |
+
+## 4. 平台化设计约束（写代码前必读）
+
+完整规范见 `plans/PLATFORM-0.8-0.15.md` 第 1、3、5、7 节。要点：
+
+1. **聊天永远是首页**；面板/插件/设置都是可返回的次级入口。
+2. **开放运行时**：宿主只提供 `Surface + Component + Action + Event + Adapter` 五类原语，
+   不预设插件类型；插件可以创建宿主没有的页面、入口、会话类型、命令、后台任务、适配器。
+3. **声明式优先**：0.10/0.11 用结构化组件树，禁止注入 DOM/CSS/JS；0.15 才开放沙箱 HTML。
+4. **动作即权限**：每个 surface/action 绑权限，未知组件降级渲染，单插件可停用。
+5. **会话级自动确认**：普通操作按会话自动确认；密码/支付/卸载/发送/删除外部文件/Root/Termux 仍逐次确认。
+6. **核心不回归**：应用自身的聊天、文件、设备、音乐能力不能被插件平台改坏。
+
+## 5. 验证门（每次改代码都要跑，顺序不能变）
 
 ```bash
 cd android
 node tools/build-html.js --check   # 源码模块与 index.html 一致
-node tools/smoke.js                # 全部通过才算过
-./build.sh assembleDebug           # 构建成功
+node tools/smoke.js                # 冒烟，全绿才算过
+node tools/behavior.test.js        # 行为测试（历史隔离/市场/迁移/授权）
+node tools/check-release.js        # release/latest.json 与本地产物一致
+node tools/scan-secrets.js         # 敏感信息扫描
+./build.sh assembleDebug           # Debug 构建成功
 ```
 
-当前三项全绿。smoke 里已包含：音乐解析/面板、插件权限与沙箱、G2 上下文与取消、
-长任务预算、设置保存控件存在性、缩放遮挡回归、引导页与 WebView 分级等。
+CI（`.github/workflows/ci.yml`）跑前 5 条 + Gradle 构建。
+任一步失败，阶段不得标记完成。
 
-## 6. 未完成 / 待设备验证
+## 6. 本轮（0.8 收口）实际改了什么
 
-**设备验证（不能靠本地测试替代）**
+1. **N4-001**：删除 `PLUGIN_MARKET_INDEX` 里的 Minecraft 条目，市场只保留 `text-tools`。
+2. **N4-002**：非聊天/设置/更新路径统一走 `saveHistory()`；全局 `via_ai_history` 只由聊天任务镜像；
+   删除 `build-html.js --verify-migration` 与 `.migration-baseline.sha256`。
+3. **N3**：新增 `check-release.js`（tag/URL/资产/SHA 一致性）、`scan-secrets.js`（令牌/私钥/凭据）；
+   修正 `release/latest.json` 误指向私有仓库的问题；`DEC-003` 定稿 Beta 期不分离签名。
+4. **N2**：新增 `behavior.test.js`，并在 `harness.js` 导出 `saveHistory` 等内部符号。
+5. **N5**：新增 `DEC-004`（AstrBot 对齐取舍）、`DEC-005`（开放插件运行时）。
+6. **工程**：新增 `tools/handoff.sh` 与 10 步版本流程（第 9 步固定打包）；CI 新增 `checks`/`build` 两个 job。
 
-- 0.7.1 已验证通过（2026-10-20）：发送、横屏、公告、插件市场；
-- 0.7.2 待验：工作任务内直接操作手机不再切任务/不再重建工作区；30 分钟授权复用与失效；
-  密码/发送/支付/卸载/外部删除仍逐次确认；长按菜单与复制粘贴（I-048）；
-- 真机插件面板看到音乐组并生效；带 `music.control` / `device.read` 的第三方插件授权允许与拒绝；
-- 长任务暂停/恢复/停止、跨重启恢复；
-- 音乐真实源（GD Studio / Meting）、302/403/429/签名过期、离线与息屏播放、公共目录可见性；
-- 文件写入/快照/回滚在 Android 11+ 与厂商文件管理器的表现。
-
-**代码待做（按计划顺序）**
-
-- 复制粘贴与输入法焦点：0.7.2 已修「菜单项被 touchend 提前隐藏」，真机还需确认
-  selection 与系统剪贴板在 Android 10+ 窗口焦点下的表现；
-- G2-005 安全确认精简：0.7.2 已实现任务粘性 + 能力组授权（30 分钟/任务结束失效）+ 工作区复用；
-  密码框/发送/支付/卸载/外部文件删除仍逐次确认；
-- G4 尾：音乐真实源适配与真机收口；
-- G5：DeviceTask 真机走通「打开应用 → 点按钮 → 输入 → 返回」；
-- G7：文件能力真机收尾；
-- G8：Termux token 校验 + run_id + 输出回传 + 取消；Root 审计与取消；Shizuku 真实接入；
-- G9：插件签名根、撤销、审核流水线；外部 Agent 下载/哈希/启动/停止/回传；AstrBot 对齐；
-- G10：Release 签名分离、CI、真机矩阵、更新索引指向实际发布 APK。
-
-**已删除，不再排期**
-
-- G6 FullscreenActivity（用户 2026-10-17 决定彻底删除，代码/Manifest/桥接口/样式均已清理）。
-
-## 7. 明确的红线
+## 7. 已知红线
 
 1. 不把 Debug 包当正式发布包；发布必须有签名、SHA-256、真机记录。
-2. 不扩高权限能力（Root/Shizuku/外部 Agent）在 G3 之前。
-3. 插件拿不到原始 `Android.*` 桥、Root、Shizuku、任意 shell。
-4. 屏幕/网页/文件内容是不可信数据，不得覆盖安全规则。
-5. 未提交就别说"已推送"；没有证据就把状态写成"待验"，不写"已完成"。
-6. 测试失败时先修代码或修断言，不允许为了让 smoke 变绿而放宽检查。
+2. 插件拿不到原始 `Android.*` 桥、Root、Shizuku、任意 shell。
+3. 屏幕/网页/文件内容是不可信数据，不得覆盖安全规则。
+4. 未提交就别说“已推送”；没有证据就把状态写成“待验”，不写“已完成”。
+5. 测试失败先修代码或修断言，不允许放宽检查让 smoke 变绿。
+6. 工作转移包含 `android/keystore/`，只用于内部转移，不要公开分发。
 
 ## 8. 接手第一天建议动作
 
-1. 跑一遍第 5 节的三条验证命令，确认基线全绿。
-2. 打开 `apk/ElysiaFloat-v0.7.2-debug.apk` 装机（可直接覆盖 0.7.x），先看公告标题是否为 0.7.2。
-3. 按第 6 节设备清单走一遍发送、横屏、公告、插件市场。
-4. 读 `workspace/issues/ISSUE-REGISTER.md`，把本轮新发现的问题补编号；下一步做覆盖窗口的复制粘贴。
+1. 跑第 5 节 6 条命令，确认基线全绿（尤其 `behavior` 与 `check-release`）。
+2. 读 `plans/PLATFORM-0.8-0.15.md` 第 10.1 节，确认 0.8 只剩 N1。
+3. 装 `apk/ElysiaFloat-v0.7.2-debug.apk`（可覆盖 0.7.x），按 N1 清单验证，
+   结果写到 `workspace/work-logs/<日期>-0.8.0-n1-device.md`。
+4. N1 通过后：升 versionCode 18 / versionName 0.8.0 → 构建 → `SHA256SUMS` → tag/Release
+   → 匿名下载验证 → `tools/handoff.sh --version 0.8.0` 打包。
+5. 然后才开 0.9（E1 + E2），不要提前动插件运行时。
 
-## 9. 已知遗留问题（非阻塞）
+## 9. 已收敛的遗留（此前登记，现已修复）
 
-- `node tools/build-html.js --verify-migration` 仍会失败：旧迁移基线已过期，`--check` 才是当前正确门；
-- `release/latest.json` 已更新到 v0.7.2，但应用内更新检查读的是公开仓库的 v0.6.5 索引；
-- 私有仓库匿名访问仓库/Release 页/资产下载一律 404（已实测），Release 仅作内部归档，
-  内测包通过工作区文件 `apk/ElysiaFloat-v<版本>-debug.apk` 直接下发，不走 GitHub 链接（G10 处理）；
-- `via_ai_history` legacy 写入仍存在于记忆/插件/导入等路径（G2-002 后续清理项）；
-- GitHub Release `v0.7.0` 的资产仍是 versionCode 14 的旧包，已在发布说明顶部标注缺陷警告。
+- 前端迁移期校验已完成：过期基线已删除，`--verify-migration` 不再存在，构建门为 `--check`；
+- 应用内更新检查读取公开仓库 `release/latest.json`，已指向 v0.7.2；私有仓库不再作为更新源；
+- 私有仓库匿名访问仓库/Release/资产一律 404（已实测），公开分发统一走 `xysy92ds/ElysiaFloat`，
+  私有 Release 仅作内部归档；
+- `via_ai_history` 已收敛：非聊天路径统一走 `saveHistory()`，全局键只由聊天任务镜像；
+- 内置市场索引已只保留 text-tools 示例，Minecraft / Termux 内联条目已删除。
+
+## 10. 非阻塞遗留
+
+- GitHub Release `v0.7.0` 的资产仍是 versionCode 14 的旧包，发布说明顶部已加缺陷警告；
+- `runtime/`、`release/` 的历史产物只做归档，不要当作当前可复现构建；
+- 公开仓库克隆 `elysia-public-git` 的 CI 里仍在用 `./gradlew`，而该仓库无 wrapper，
+  需要改为 `gradle`（未验证过该 workflow）。

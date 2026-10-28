@@ -36,12 +36,14 @@ android {
     }
 
     buildTypes {
+        // 仓库里不包含私钥。存在 keystore.properties 时使用项目签名；
+        // 否则回退到系统 debug 签名，保证公开源码能被任何人直接构建。
         debug {
-            signingConfig signingConfigs.elysia
+            signingConfig keystorePropsFile.exists() ? signingConfigs.elysia : signingConfigs.debug
         }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.elysia
+            signingConfig keystorePropsFile.exists() ? signingConfigs.elysia : signingConfigs.debug
         }
     }
 

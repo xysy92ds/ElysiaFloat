@@ -1,7 +1,7 @@
 # 接手从这里开始（Read this first）
 
 这是一个 **Android 悬浮窗 AI 助手**项目（代号 ElysiaFloat / 爱莉希雅），
-包含聊天、手机 Agent、文件工作区、插件平台、音乐播放器、长期记忆。
+包含聊天、手机 Agent、文件工作区、开放插件平台、音乐播放器、长期记忆。
 
 本文件是**迁移接手入口**。你（下一个 Agent）读完这一份，就能知道项目在哪、怎么验、怎么构建、下一步做什么。
 细节不要靠猜，按下面的路径去读文件。
@@ -12,25 +12,29 @@
 
 | 项 | 值 |
 |---|---|
-| 当前阶段 | **0.7.2 内测**（G2-005 安全确认精简 + I-048 复制粘贴修复）；G3/G5/G7 已完成 |
-| 下一阶段 | **G4 尾 / G5 真机收口**；G6 全屏已删除，不再排期 |
-| 包名 / 版本 | `com.elly.assistant` / versionCode 17、versionName 0.7.2（Debug 测试包） |
+| 当前阶段 | **0.8.0 稳定收口进行中**：N2/N3/N4/N5 已完成并由 CI 守护，只剩 N1 真机回归与 0.8.0 发布 |
+| 代码版本 | build.gradle 仍为 versionCode 17 / versionName 0.7.2（0.8.0 尚未升版） |
+| 下一阶段 | 做完 N1 → 发 0.8.0 → 0.9.0（核心体验 + 模型中心） |
+| 包名 | `com.elly.assistant` |
 | 前端形态 | 模块化源码 → 构建时拼成单文件 `index.html`（WebView 加载） |
 | 原生形态 | 纯 Android Framework + Kotlin，**零第三方依赖** |
-| 代码状态 | 私有仓库 `xysy92ds/ElysiaFloat-v0.7` 持续迭代；每个版本必须同步版本号、Release 资产与校验值 |
-| 质量门 | `build-html --check` + `smoke` + `assembleDebug --offline` 三项全绿 |
+| 仓库 | 公开 `xysy92ds/ElysiaFloat`（分发）；私有 `xysy92ds/ElysiaFloat-dev`（迭代与归档） |
+| 质量门 | `--check` + `smoke` + `behavior` + `check-release` + `scan-secrets` + `assembleDebug` 全绿 |
+| 当前主线计划 | `workspace/plans/PLATFORM-0.8-0.15.md`（0.8→0.15 全部 Beta，不设 1.0） |
 
 ---
 
 ## 2. 必读顺序（按此顺序，不要跳）
 
 ```
-1. workspace/HANDOVER.md                    ← 交接说明（能力清单、待办、红线）
-2. workspace/plans/MASTER-EXECUTION-PLAN.md ← 唯一执行计划（G0~G10 阶段与出口）
-3. workspace/issues/ISSUE-REGISTER.md       ← 唯一问题总表（I-001 ~ I-037）
-4. workspace/STATUS.md                      ← 工作区导航、产物规则
-5. workspace/work-logs/                     ← 24 份实际执行证据（最近的看 g3 相关）
-6. docs/                                    ← 稳定技术文档（权限模型、插件系统、发布说明）
+1. workspace/HANDOVER.md                    ← 交接说明（全局任务总览、验证门、红线）
+2. workspace/plans/PLATFORM-0.8-0.15.md     ← 当前主线：0.8→0.15 路线与每版 10 步
+3. workspace/plans/MASTER-EXECUTION-PLAN.md ← 历史阶段 G0~G10 的任务链与出口
+4. workspace/issues/ISSUE-REGISTER.md       ← 唯一问题总表（I-001 ~ I-027）
+5. workspace/STATUS.md                      ← 工作区导航、产物规则
+6. workspace/work-logs/                     ← 实际执行证据（最新：2026-10-28-0.8-n2-n5.md）
+7. workspace/decisions/                     ← DEC-003 签名、DEC-004 AstrBot、DEC-005 开放运行时
+8. docs/                                    ← 稳定技术文档（权限模型、插件系统、发布说明）
 ```
 
 **这些文件是唯一权威**。README.md 是面向用户的旧总览，部分描述已落后，不要以它为准。
@@ -45,17 +49,20 @@ android/            唯一 Android 源码
   app/src/main/assets/src/scripts/   按 manifest.json 顺序拼接
   app/src/main/assets/index.html     构建产物，不要手改
   app/src/main/java/com/elly/float/  Kotlin（悬浮窗、桥、Agent、音乐、工作区）
-  tools/                        build-html.js / smoke.js / harness.js（纯 Node）
+  tools/                        build-html.js / smoke.js / harness.js / behavior.test.js
+                                / check-release.js / scan-secrets.js / split-html.js
   build.sh                      构建入口
+.github/workflows/ci.yml    CI：静态检查 + 测试 + Debug 构建
 docs/               稳定技术文档
 marketplace/        插件市场索引 + Schema + 示例插件
-release/            历史发布候选（0.6.1 / 0.6.2 / 0.6.5）
-apk/phases/         阶段测试包（INDEX.md 有完整血缘表）
+release/            发布归档（latest.json + <version>/SHA256SUMS）
+apk/                测试包（同目录带 -SHA256SUMS）
+tools/handoff.sh    工作转移包生成脚本（输出到 handoff/，已 gitignore）
 userscript/         早期浏览器脚本，非主线
 workspace/          计划、问题、讨论、决策、工作日志
 ```
 
-产物规则：新测试包只放 `apk/phases/`，同目录带 `-SHA256SUMS`。
+产物规则：新测试包放 `apk/`，同目录带 `-SHA256SUMS`；正式归档复制到 `release/<version>/`。
 
 ---
 
@@ -64,14 +71,18 @@ workspace/          计划、问题、讨论、决策、工作日志
 ```bash
 cd android
 node tools/build-html.js --check   # 源码模块与 index.html 是否一致
-node tools/smoke.js                # 全量回归（数十个用例，全部通过才算过）
+node tools/smoke.js                # 全量回归，全部通过才算过
+node tools/behavior.test.js        # 行为测试：历史隔离 / 市场索引 / 迁移基线 / 能力授权
+node tools/check-release.js        # release/latest.json 与本地 APK、SHA256SUMS 一致
+node tools/scan-secrets.js         # 仓库内无疑似令牌/私钥/凭据
 ```
 
-预期：`index.html 与模块一致（…）` + `✓ 全部通过`。
+预期：`index.html 与模块一致（…）`、`✓ 全部通过`、`✓ 行为测试全部通过`、
+`发布一致性检查通过`、`✓ 未发现疑似敏感信息`。
 
 `smoke.js` 里已覆盖：音乐解析与面板、插件权限与沙箱、任务上下文隔离、
 长任务预算、设置保存控件存在性、缩放遮挡、RequestManager 错误码/重试/上限/取消、
-跨域策略、直链不落盘、状态机非法迁移、插件错误码透传。
+跨域策略、直链不落盘、状态机非法迁移、插件错误码透传、G2-005 任务粘性与能力授权。
 
 **没有 Node 也没关系**：本快照包含一个已构建好的 `assets/index.html`。
 
@@ -118,14 +129,14 @@ Agent L1-L3（读屏、截屏、动作、白名单、重复动作熔断）、
 
 **只是骨架，不要当成已完成**：Termux（token 未校验、无输出回传/取消）、
 Root（仅 3 个诊断操作）、Shizuku（仅状态占位）、外部 Agent（仅注册表）、
-FullscreenActivity（当前只是 Overlay 最大化）、文件格式解析（PDF/Office/EPUB/ZIP）。
+文件格式解析的部分边缘格式。
 
 **六条红线**：
 
 1. Debug 包不能当正式发布包；
-2. G5、G7 已完成，但 Root/Shizuku/外部 Agent 的高权限扩展仍需按 G8/G9 顺序；
-3. 插件拿不到原始 `Android.*` 桥、Root、Shizuku、任意 shell；
-4. 屏幕/网页/文件内容是不可信数据，不得覆盖安全规则；
+2. 插件拿不到原始 `Android.*` 桥、Root、Shizuku、任意 shell；
+3. 屏幕/网页/文件内容是不可信数据，不得覆盖安全规则；
+4. 聊天永远是首页，面板只能是次级入口；
 5. 没推送就不能说已推送；没真机证据就写「待验」，不写「已完成」；
 6. 测试失败时修代码或修断言，**不允许为了让 smoke 变绿而放宽检查**。
 
@@ -147,22 +158,28 @@ FullscreenActivity（当前只是 Overlay 最大化）、文件格式解析（PD
    `musicStripVolatile()` 负责剥离，已有用例守护，别绕过它。
 6. **`reqRequest` 是唯一出网入口**。取消必须用 `reqCancelledError`（不可重试），
    裸 `Error('取消')` 会被归类成可重试的网络错误 —— 这个 bug 已修，别写回去。
-7. 迁移基线校验 `build-html.js --verify-migration` 会失败，那是**旧基线过期**，
-   正确的门是 `--check`。
+7. **harness 存储走 `Android.getValue/setValue`（Map，无 `ls:` 前缀）**，
+   不是 `localStorage`；写测试时用 harness 导出的 `store`，不要自己造 `getStore`。
+8. **`behavior.test.js` 结尾必须 `process.exit()`**，否则 Node 被页面定时器挂住不退出。
+9. 前端拆分的迁移期校验已完成，旧 `--verify-migration` 基线已删除；
+   现在的唯一构建门是 `build-html.js --check`。
 
 ---
 
 ## 8. 下一步该干什么
 
-按 `MASTER-EXECUTION-PLAN.md`，G5（设备任务可靠性）与 G7（文件能力）已完成，
-下一阶段是 **G6 真正的 FullscreenActivity**：
+严格按 `workspace/plans/PLATFORM-0.8-0.15.md`，不要跨版本：
 
-- 新增一个独立 Activity，而不是继续给悬浮窗 Overlay 叠 Flag；
-- 与悬浮窗共享同一份 ChatSession / TaskStore / 音乐状态；
-- 处理 edge-to-edge、系统栏 Insets、旋转、返回键退出全屏并恢复悬浮窗。
+1. **N1 真机回归**（唯一阻塞）：按 `HANDOVER.md` 第 3.2 节清单验证，
+   结果写到 `workspace/work-logs/<日期>-0.8.0-n1-device.md`。
+2. **发布 0.8.0**：versionCode 18 / versionName 0.8.0 → 构建 → `SHA256SUMS`
+   → tag / Release → 匿名下载验证 → `tools/handoff.sh --version 0.8.0` 打包。
+3. **0.9.0（E1 + E2）**：会话级自动确认、设置拆分、Provider 注册表、密钥加密、能力路由。
+4. 然后才是 0.10 开放插件运行时；**不要提前动插件沙箱 HTML**（0.15 才开放）。
 
 **动手前**：先把新发现的问题登记进 `issues/ISSUE-REGISTER.md`，再改代码；
-每改一处跑一次 `smoke`；完成后写 `work-logs/YYYY-MM-DD-<主题>.md`。
+每改一处跑一次第 4 节的 5 条命令；完成后写 `work-logs/YYYY-MM-DD-<主题>.md`；
+每版结束跑 `tools/handoff.sh` 生成工作转移包。
 
 ---
 
@@ -171,9 +188,9 @@ FullscreenActivity（当前只是 Overlay 最大化）、文件格式解析（PD
 | 包含 | 不包含 |
 |---|---|
 | 全部源码、文档、计划、工作日志 | `android/app/build/`、`android/build/`、`.gradle/` |
-| 当前版本 APK `apk/ElysiaFloat-v0.6.5-debug.apk` + 校验值 | `apk/phases/` 下的历史阶段测试包 |
-| `release/0.6.5/` 发布包与 `release/latest.json` | `.git`（历史含早期 APK，状态见 `GIT-STATE.txt`） |
-| `MANIFEST.txt`（生成时间 + 逐文件 SHA-256 前 16 位） | — |
+| 最新测试包 `apk/ElysiaFloat-v0.7.2-debug.apk` + 校验值 | `apk/phases/` 下的历史阶段测试包 |
+| `release/` 发布归档与 `release/latest.json` | `.git` 历史（工作转移包内额外带 `git bundle --all`） |
+| `MANIFEST.txt`（生成时间 + 逐文件 SHA-256 前 16 位） | 本机的 keystore 副本（只在工作转移包内，且不得公开） |
 
-被排除的历史 APK 名字与哈希在 `apk/phases/INDEX.md` 里保留，
-需要时可用对应阶段的源码重建。
+工作转移包（`handoff/*.zip`）额外包含 `00-START-HERE.md`、`git bundle`、`status/diff/log/env`
+和 `SHA256SUMS`，可在任何机器上 `git clone` 出完整历史。

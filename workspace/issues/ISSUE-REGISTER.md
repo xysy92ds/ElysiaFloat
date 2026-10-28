@@ -1,6 +1,6 @@
 # ElysiaFloat 问题总表
 
-更新时间：2026-10-16
+更新时间：2026-10-28
 状态：当前唯一问题登记入口
 
 状态含义：
@@ -23,7 +23,7 @@
 | I-004 | 自动验证不是全绿 | 当前 `node tools/smoke.js` 已全部通过；行为测试和真实服务/真机仍待验 | 已修复（自动） | G1-003 |
 | I-005 | “真正全屏”尚未实现 | 没有 `FullscreenActivity`；仍是 `TYPE_APPLICATION_OVERLAY` | 进行中 | G6 |
 | I-006 | QuickOperation 与持久任务执行上下文仍耦合 | `chatReqTools()` 使用隐式 `currentTask()`；快捷操作未传显式 task context | 进行中 | G2-002 |
-| I-007 | 全局 `via_ai_history` 残留写入 | 记忆、插件、设置、导入等模块仍写 legacy history | 进行中 | G2-002 |
+| I-007 | 全局 `via_ai_history` 残留写入 | 记忆、插件、设置、导入路径已统一改用 `saveHistory()`；全局键只由聊天任务镜像 | 已修复（自动） | G2-002 / 0.8 N4-002 |
 | I-032 | 非聊天任务默认时长只有 90 秒 | 已迁移到 1200 秒默认、7200 秒上限；真机长任务仍待验 | 已修复（自动） | G2-001 |
 | I-038 | Git 历史里提交过 18 个早期 APK（约 26MB） | 后续推送会把无用二进制带到远端、拖慢克隆；迁移快照已改为不含 `.git`，原状态记在 `GIT-STATE.txt` | 规划中 | G10 |
 | I-039 | 设备动作"一次一个"只写在提示词，代码不拦 | 已由 `planToolBatch` 串行排队（不报错）；设备动作永不进并行组 | 已修复（自动） | G5-1 |
@@ -74,13 +74,15 @@
 
 | ID | 问题 | 当前证据 | 状态 | 对应任务 |
 |---|---|---|---|---|
-| I-025 | 没有 Kotlin 单元测试 | `app/src/test/` 未形成覆盖 | 未开始 | G1-003 / G7 |
-| I-026 | 没有独立行为测试入口和 CI | `android/tools/` 当前只有 smoke/harness 等，暂无 behavior.test.js | 未开始 | G1-003 / G10 |
-| I-027 | 前端迁移基线与当前源码漂移 | `--verify-migration` 期望旧 hash，当前 hash 不同；`--check` 本身通过 | 进行中 | G0-003 |
-| I-028 | Debug 签名，缺正式 Release 流程 | `0.6.2` 验收清单明确未完成 | 未开始 | G10 |
-| I-029 | `release/latest.json` 与当前本地构建不是同一 APK | 发布索引仍指向旧 0.6.2 包，本地最新 hash 不同 | 进行中 | G10 |
-| I-030 | README/稳定文档部分落后于当前源码 | README 仍把前端描述为单文件、把 Root/Shizuku 描述为不存在 | 进行中 | G0-003 |
+| I-025 | 没有 Kotlin 单元测试 | 暂缓到 0.9：当前逻辑几乎都在 Android 依赖里，先补 JS 行为测试；需要重构出纯函数后再加 JUnit | 规划中 | G1-003 / G7 |
+| I-026 | 没有独立行为测试入口和 CI | 已新增 `tools/behavior.test.js`（跨任务历史隔离、市场索引、迁移基线、能力授权）与 `.github/workflows/ci.yml`（静态/冒烟/行为/发布/敏感信息 + Gradle 构建） | 已修复（自动） | G1-003 / G10 / 0.8 N2 |
+| I-027 | 前端迁移基线与当前源码漂移 | 旧基线文件与 `--verify-migration` 已删除，构建门统一为 `--check`（通过） | 已修复（自动） | G0-003 / 0.8 N4-002 |
+| I-028 | Debug 签名，缺正式 Release 流程 | 0.7.2 Beta 仍以 debug 构建发布；公开文档已说明测试签名用途；release 签名与产物分离未做 | 未开始 | G10 / N3-001 |
+| I-029 | `release/latest.json` 与当前本地构建不是同一 APK | 公开仓库 `release/latest.json` 已更新到 v0.7.2，与 Release 资产 APK SHA `6cf5ff19…` 一致；私有归档 APK 已同步为同一构建 | 已修复 | G10 |
+| I-030 | README/稳定文档部分落后于当前源码 | 公开仓库 README/CHANGELOG/docs 已全部重写并与 0.7.2 对齐；私有 README 仍保留内部迭代表述，待 N4-002 统一 | 进行中 | G0-003 / N4-002 |
 | I-031 | 阶段 APK 和未提交源码的对应关系需要统一记录 | `apk/phases/` 有多个阶段包，工作区改动未提交 | 进行中 | G0-001 / G10 |
+| I-050 | 公开仓库缺少标准发布门面与 Beta 发布 | 已建 `xysy92ds/ElysiaFloat` 公开仓库：README / CHANGELOG / docs 7 篇全部重写，新增 `.gitignore`、GitHub Actions；发布 tag `v0.7.2`、Release 422140702（prerelease），APK / source.zip / SHA256SUMS 三资产匿名下载与校验通过 | 已修复 | G10 |
+| I-051 | App 内置市场仍展示未完善的 Minecraft / Termux 示例 | `PLUGIN_MARKET_INDEX` 仍含 `com.elly.market.minecraft`，依赖 Termux 且公开市场已移除该插件 | 规划中 | N4-001 |
 
 ## 已知但不应误判为问题的设计
 

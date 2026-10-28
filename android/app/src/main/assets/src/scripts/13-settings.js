@@ -193,7 +193,7 @@ async function toggleUserPlug(id) {
   plugAudit(next ? 'enable' : 'disable', p);
   refreshSystemPrompt();
   toolsBroken = false;
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast(p.enabled ? '已启用该插件' : '已停用该插件');
@@ -393,7 +393,7 @@ function togglePlug(id) {
   refreshSystemPrompt();          // 提示词里的工具段立刻跟着变
   toolsBroken = false;            // 工具集变了，下次重新试一遍 tools 调用
   sSet('via_ai_config', CONFIG);
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast(plugOn(id) ? '已开启该组工具' : '已关闭该组工具');
@@ -417,7 +417,7 @@ function toggleTool(name) {
   refreshSystemPrompt();
   toolsBroken = false;
   sSet('via_ai_config', CONFIG);
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast(liveOn ? '已关闭该工具' : '已开启该工具');
@@ -517,7 +517,7 @@ async function plugInstallFromText(text) {
   plugSaveList();
   refreshSystemPrompt();
   toolsBroken = false;
-  sSet('via_ai_history', history);
+  saveHistory();
   $('#plug-modal').classList.remove('open');
   renderPlugins();
   renderPlugPreview();
@@ -534,7 +534,7 @@ async function plugDelete(id) {
   plugAudit('uninstall', p);
   refreshSystemPrompt();
   toolsBroken = false;
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
   renderPlugPreview();
   toast('已删除插件');

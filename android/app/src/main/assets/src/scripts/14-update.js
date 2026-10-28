@@ -689,7 +689,7 @@ function doSaveSettings(val) {
   // 人设/插件可能变了，重拼一遍 system 消息（否则对话里还是旧的那份）
   refreshSystemPrompt();
   sSet('via_ai_config', CONFIG);
-  sSet('via_ai_history', history);
+  saveHistory();
   renderPlugins();
 
   // 记忆库配置单独存（向量 + 自动整理）

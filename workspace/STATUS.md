@@ -1,7 +1,7 @@
 # ElysiaFloat 工作区状态与导航
 
-更新时间：2026-10-24
-状态：0.7.2 内测包已构建并归档；G2-005 安全确认精简（任务粘性 + 30 分钟能力授权）、I-048 长按菜单/粘贴修复已落地；真机待验
+更新时间：2026-10-28
+状态：0.7.2 Beta 已发布到公开仓库 `xysy92ds/ElysiaFloat`（tag `v0.7.2` / Release 422140702 / commit `cb10e91`）；G2-005 安全确认精简、I-048 长按菜单/粘贴修复已落地；0.8.0 进行中（N2/N3/N4/N5 已完成，N1 真机待验）；0.9~0.15 路线与逐步执行清单见 `plans/PLATFORM-0.8-0.15.md`
 
 > 本文件是工作区导航，不替代技术文档。项目当前真正的执行入口是：
 > - `plans/MASTER-EXECUTION-PLAN.md`：唯一任务链和阶段出口；
@@ -12,14 +12,25 @@
 ## 当前结论
 
 - 项目定位：悬浮窗 Android AI 助手 + 手机 Agent + 工作区 + 插件平台。
-- 基线：`0.7.2` / versionCode `17`，Debug 构建。
-- Git：`main` 已与 `origin/main` 同步（上一提交 `d665d92`）；0.7.2 代码、公告与 Release v0.7.2 已推送/上传。
+- 基线：`0.7.2` / versionCode `17`，Debug 测试构建。
+- 私有 Git：`main` 上一提交 `819ea69`；本轮新增的文档、签名回退与校验值改动尚未提交。
+- 公开 Git：`xysy92ds/ElysiaFloat` `main` = `1b2e09a`（发布提交 `cb10e91`），tag `v0.7.2`。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
-- 最新测试包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`）。
-- 最新测试包 SHA-256：`3acd847c99e886f5dc98684ec8cecc93f0e41aa3f4ee7e57cda8f74ba2126935`。
-- 当前质量门：HTML 检查和 smoke 全通过；0.7.2 待真机覆盖确认。
-- 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1。
-- 发布提醒：GitHub Release `v0.7.0` 上是 versionCode 14 的旧包（仍含发送按钮缺陷）；应用内更新检查指向公开仓库的 v0.6.5 索引，私有迭代期请直接到 Release 页下载。
+- 最新测试包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`，与公开 Release 资产同一构建）。
+- 最新测试包 SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`。
+- 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
+- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js` 全通过；0.7.2 仍待真机覆盖确认。
+- 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。
+- 更新链路：应用内更新检查读取公开仓库 `release/latest.json`，当前已指向 v0.7.2（私有归档副本已同步为公开 URL）。
+- 平台化路线：全部 0.x Beta 小步走——0.9 核心体验+模型中心 → 0.10 开放式插件运行时 →
+  0.11 插件 UI 运行时 → 0.12 依赖+持久会话 → 0.13 MC 插件 → 0.14 QQ 插件 → 0.15 沙箱 HTML+适配器生态+工作能力+治理；
+  详见 `plans/PLATFORM-0.8-0.15.md`（决策 1A / 2C / 3C / 4ABC 已确认）。
+- 执行状态：0.8.0 的 N2/N3/N4/N5 已完成，只剩 N1 真机回归与最终发布；0.9~0.15 规划中；
+  每版按 10 步流程执行（新增「生成工作转移包」），变更记录见该文档第 13 节。
+- 工作转移：`tools/handoff.sh` 生成 `handoff/ElysiaFloat-handoff-v<版本>-<时间戳>.zip`
+  （源码 + docs + APK + git bundle + status/diff + SHA256SUMS + 恢复说明），每版发布后必做；`handoff/` 已 gitignore；
+  另有副本作为 Release 资产存放在私有仓库：
+  `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`。
 
 ## 目录边界
 
@@ -30,8 +41,9 @@ ElysiaFloat/
 ├── marketplace/             # 插件市场索引、Schema、示例插件
 ├── release/                 # 已归档的发布候选包及说明
 ├── apk/                     # 阶段构建产物和历史 APK；每个产物必须有校验记录
-├── userscript/              # 早期浏览器用户脚本，不属于 Android 主线
+├── userscript/              # 早期浏览器用户脚本，仅私有存档，不进入公开仓库
 ├── workspace/               # AI 工作区：计划、问题、讨论、决策、工作证据
+├── tools/                   # 仓库级脚本（handoff.sh 工作转移包）
 ├── README.md                # 面向用户的项目总览
 └── PLUGINS.md               # 插件开发入口
 ```
@@ -48,8 +60,8 @@ ElysiaFloat/
 
 ## 产物规则
 
-1. 新的测试 APK 统一复制到项目内 `/workspace/gh-ElysiaFloat/apk/phases/`，这是用户下载测试版的默认目录；每个 APK 同目录放对应 `-SHA256SUMS` 文件。
-2. 其它阶段归档 APK 也只放 `apk/phases/` 或 `release/<version>/`，不放项目根目录。
+1. 新的测试 APK 统一放到项目内 `apk/`，每个 APK 同目录放对应 `-SHA256SUMS` 文件；正式归档再复制到 `release/<version>/`。
+2. 其它阶段归档 APK 也只放 `apk/` 或 `release/<version>/`，不放项目根目录。
 3. 每个 APK 必须同步记录：来源提交/工作区状态、构建命令、测试结果、SHA-256、真机状态。
 4. 报告和临时分析放 `workspace/`；稳定结论再同步到 `docs/`。
 5. 不把 API Key、Token、Cookie、设备信息、用户数据或完整敏感文件写入仓库。
@@ -57,10 +69,11 @@ ElysiaFloat/
 
 ## 推荐阅读顺序
 
-1. `HANDOVER.md`
-2. `plans/MASTER-EXECUTION-PLAN.md`
-3. `issues/ISSUE-REGISTER.md`
-4. `plans/current.md`
-5. `issues/2026-10-16-comprehensive-audit.md`
-6. `work-logs/` 中与当前阶段对应的记录
-7. `docs/` 稳定技术文档
+1. `HANDOVER.md`（全局任务总览与验证门）
+2. `plans/PLATFORM-0.8-0.15.md`（当前主线 0.8→0.15）
+3. `plans/MASTER-EXECUTION-PLAN.md`（历史阶段 G0~G10）
+4. `issues/ISSUE-REGISTER.md`
+5. `plans/current.md`
+6. `issues/2026-10-16-comprehensive-audit.md`
+7. `work-logs/` 中与当前阶段对应的记录
+8. `docs/` 稳定技术文档

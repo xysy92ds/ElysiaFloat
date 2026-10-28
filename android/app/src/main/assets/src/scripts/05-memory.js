@@ -291,7 +291,7 @@ function memMigrateLegacy() {
   }
   history = history.filter(m => !(m.role === 'system' && m.isMemory));
   if (!history.length) history = [{ role: 'system', content: CONFIG.systemPrompt }];
-  sSet('via_ai_history', history);
+  saveHistory();
 }
 
 /* ---- 导出 ---- */

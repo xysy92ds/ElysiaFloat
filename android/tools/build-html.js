@@ -5,7 +5,6 @@
  * 运行期产物仍然是单个 index.html，WebView 加载方式不变。
  * 用法：
  *   node tools/build-html.js                 构建
- *   node tools/build-html.js --verify-migration  构建并校验与迁移基线一致
  *   node tools/build-html.js --check         只校验当前 index.html 是否与模块一致（CI 用）
  */
 'use strict';
@@ -49,7 +48,6 @@ function build() {
 
 function main() {
   const args = process.argv.slice(2);
-  const verifyMigration = args.includes('--verify-migration');
   const checkOnly = args.includes('--check');
   const { html, manifest } = build();
   const digest = sha256(html);
@@ -67,17 +65,6 @@ function main() {
   fs.writeFileSync(OUT, html, 'utf8');
   console.log('已生成 ' + path.relative(ROOT, OUT) + '：' + Buffer.byteLength(html) + ' 字节，'
     + manifest.scripts.length + ' 个脚本模块，SHA-256 ' + digest.slice(0, 12) + '…');
-
-  if (verifyMigration) {
-    const baselinePath = path.join(SRC, '.migration-baseline.sha256');
-    if (!fs.existsSync(baselinePath)) { console.error('缺少迁移基线文件'); process.exit(1); }
-    const baseline = fs.readFileSync(baselinePath, 'utf8').trim();
-    if (baseline !== digest) {
-      console.error('迁移基线不一致：期望 ' + baseline + '，实际 ' + digest);
-      process.exit(1);
-    }
-    console.log('迁移无损校验通过：与拆分前字节一致。');
-  }
 }
 
 try { main(); } catch (e) { console.error('构建失败：' + (e && e.message ? e.message : e)); process.exit(1); }

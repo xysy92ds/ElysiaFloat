@@ -29,7 +29,17 @@ sha256sum -c SHA256SUMS
 
 签名与 0.7.0 / 0.7.1 一致（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖安装。
 
-> 这是本地测试用的 Debug 包，不用于正式分发。
+公开测试版发布：
+
+- 仓库：`https://github.com/xysy92ds/ElysiaFloat`
+- Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest）
+- tag：`v0.7.2`，commit `cb10e91`（索引 `1b2e09a`），Release ID `422140702`
+- 说明：Release 标题保留 “Beta”，GitHub 上按 Latest 展示，便于访客直接下载
+- 资产：`ElysiaFloat-v0.7.2-debug.apk`、`ElysiaFloat-v0.7.2-source.zip`、`SHA256SUMS`
+- APK SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`
+
+> 这是测试用的 Debug 包，不用于正式分发。
 >
-> 仓库是私有的：未登录或无权限账号打开 Release 页/下载资产会得到 404。
-> 内测包以工作区文件 `apk/ElysiaFloat-v0.7.2-debug.apk` 直接分发，Release 仅作内部归档。
+> 本目录 APK 与公开 Release 资产为同一构建；私有仓库的 Release 仅作内部归档，
+> 匿名访问会得到 404，公开下载请使用上面的公开 Release 链接。
+> `/workspace` 内测下发仍使用 `apk/ElysiaFloat-v0.7.2-debug.apk`。

@@ -1318,7 +1318,7 @@ function step(name, fn) {
     const fs = require('fs'), path = require('path');
     const dir = path.join(__dirname, '../app/src/main');
     const tw = fs.readFileSync(path.join(dir, 'java/com/elly/float/TermuxWorker.kt'), 'utf8');
-    // 白名单执行器包含 java 和 bash（Minecraft 前置）
+    // 白名单执行器包含 java 和 bash（Termux 运行时前置）
     if (tw.indexOf('"java"') < 0) throw new Error('Termux 白名单缺少 java');
     if (tw.indexOf('"bash"') < 0) throw new Error('Termux 白名单缺少 bash');
     // run_id 追踪、输出捕获、取消能力
@@ -1356,13 +1356,12 @@ function step(name, fn) {
     const g = fs.readFileSync(gradlePath, 'utf8');
     // 必须定义项目自有签名配置
     if (!/signingConfigs\s*\{[\s\S]*?elysia\s*\{/.test(g)) throw new Error('缺少 signingConfigs.elysia');
-    // debug 与 release 都必须用它，不能再复用 signingConfigs.debug
-    if (/signingConfig\s+signingConfigs\.debug/.test(g)) throw new Error('release 仍复用 signingConfigs.debug，会导致签名不一致');
-    const uses = (g.match(/signingConfig\s+signingConfigs\.elysia/g) || []).length;
-    if (uses < 2) throw new Error('debug 与 release 未同时使用 signingConfigs.elysia，实际 ' + uses + ' 处');
-    // keystore 与属性文件随仓库分发（私有仓库，保证多环境签名一致）
-    if (!fs.existsSync(path.join(__dirname, '../keystore/elysia.jks'))) throw new Error('缺少 keystore/elysia.jks');
-    if (!fs.existsSync(path.join(__dirname, '../keystore.properties'))) throw new Error('缺少 keystore.properties');
+    // debug 与 release 必须走同一套签名选择逻辑；无 keystore 时回退系统 debug 签名
+    const uses = (g.match(/signingConfig\s+keystorePropsFile\.exists\(\)\s*\?\s*signingConfigs\.elysia\s*:\s*signingConfigs\.debug/g) || []).length;
+    if (uses < 2) throw new Error('debug 与 release 未同时走项目签名/回退逻辑，实际 ' + uses + ' 处');
+    // 存在 keystore.properties 时，私钥文件必须同时存在
+    const props = path.join(__dirname, '../keystore.properties');
+    if (fs.existsSync(props) && !fs.existsSync(path.join(__dirname, '../keystore/elysia.jks'))) throw new Error('存在 keystore.properties 但缺少 keystore/elysia.jks');
   });
 
   await step('引导页：权限项按系统版本过滤（Android 11 应有 channel、Android 7 不应有）', () => {
