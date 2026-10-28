@@ -13,7 +13,7 @@
 
 - 项目定位：悬浮窗 Android AI 助手 + 手机 Agent + 工作区 + 插件平台。
 - 基线：`0.7.2` / versionCode `17`，Debug 测试构建。
-- 私有 Git：`main` 上一提交 `819ea69`；本轮新增的文档、签名回退与校验值改动尚未提交。
+- 私有 Git：`main` 最新 `97d9c85`（0.8/N1-3 真机反馈修复 + 候选包记录）。
 - 公开 Git：`xysy92ds/ElysiaFloat` `main` = `1b2e09a`（发布提交 `cb10e91`），tag `v0.7.2`。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
 - 最新测试包：`apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（N1 修复候选，versionCode 17 / versionName 0.7.2，可覆盖已装 0.7.2）。
