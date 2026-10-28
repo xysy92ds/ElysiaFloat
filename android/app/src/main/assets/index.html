@@ -7598,10 +7598,8 @@ function firstMeaningfulLine(s) {
   return lines.length ? lines[0] : '';
 }
 /** 把剪贴板第一行填进输入框；填完短暂显示明文，方便核对 */
-function pasteIntoInput(input) {
-  if (!input) return;
-  const v = firstMeaningfulLine(readClipboard());
-  if (!v) { toast('剪贴板里没读到文字，先复制一下 API Key 吧~'); return; }
+function fillPastedValue(input, v) {
+  if (!input || !v) return;
   input.value = v;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   if (input.classList.contains('secret')) {
@@ -7611,6 +7609,21 @@ function pasteIntoInput(input) {
   }
   toast('已粘贴，记得点「保存配置」~');
   vibrate(20);
+}
+function pasteIntoInput(input) {
+  if (!input) return;
+  const v = firstMeaningfulLine(readClipboard());
+  if (v) { fillPastedValue(input, v); return; }
+  // Android 10+ 常限制浮窗读剪贴板；再用 WebView 的剪贴板 API 兜底一次。
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    navigator.clipboard.readText().then(t => {
+      const v2 = firstMeaningfulLine(t);
+      if (v2) fillPastedValue(input, v2);
+      else toast('剪贴板里没读到文字，先复制一下 API Key 吧~');
+    }).catch(() => toast('剪贴板里没读到文字，先复制一下 API Key 吧~'));
+    return;
+  }
+  toast('剪贴板里没读到文字，先复制一下 API Key 吧~');
 }
 function writeClipboard(t) {
   try {
