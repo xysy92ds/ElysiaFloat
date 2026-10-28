@@ -24,8 +24,8 @@
 - 0.9 开发候选包 SHA-256：`8a7dc745cb235443de254609fb890a5e9f556a5443f050baf82ddbc1f22455bc`（2,648,457 字节）；私有归档 `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.9-2026-10-28`。
 - 0.10 开发候选包 SHA-256：`634b1af3169ad19c827b1f04fe174c8bb5ac98aed3b1905f2199c464de766e73`（2,666,026 字节）；私有归档 `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.10-2026-10-28`。
 - 0.11 开发候选包 SHA-256：`2d1fbac349e4ebacf9d033e6c89d753cc9cb9e6b3bcfc560468f8b0931429c08`（2,673,141 字节）；私有归档 `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.11-2026-10-28`。
-- 0.12 开发候选包 SHA-256：`c5662e24575d7df56e9a07c277bf7c072c8296fc6ee69cc03d00ac9af48c386d`（2,689,084 字节）；私有归档待补（token 401）。
-- 0.12.1 补丁候选包 SHA-256：`4770e2f8412ba948c02953374b3426f76c0dcfa720498a5dfd4943b2a5c85729`（2,694,210 字节）；私有归档待补（token 401）。
+- 0.12 开发候选包 SHA-256：`c5662e24575d7df56e9a07c277bf7c072c8296fc6ee69cc03d00ac9af48c386d`（2,689,084 字节）；已归档私有 Release `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12-2026-10-28`。
+- 0.12.1 补丁候选包 SHA-256：`4770e2f8412ba948c02953374b3426f76c0dcfa720498a5dfd4943b2a5c85729`（2,694,210 字节）；已归档私有 Release `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12.1-2026-10-28`。
 - 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
 - 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`assembleDebug` 全通过（2026-10-28 复跑，含 0.12.1 补丁）；I-055~I-059、I-063~I-065 仍待真机复测。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。

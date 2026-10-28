@@ -12,7 +12,8 @@ N1 修复候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/n
 0.9 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.9-2026-10-28`（私有，需登录）；
 0.10 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.10-2026-10-28`（私有，需登录）；
 0.11 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.11-2026-10-28`（私有，需登录）；
-0.12 开发候选包：私有 Release 与推送被 GitHub token 401 拦截，**待新 token 后补 `dev-0.12-2026-10-28`**。
+0.12 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12-2026-10-28`（私有，需登录）；
+0.12.1 补丁候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12.1-2026-10-28`（私有，需登录）；
 
 > 2026-10-28 补：本轮修复粘贴/复制（I-055）、横屏退出跑出屏幕（I-056）、
 > 音乐工具被 `toolsBroken` 毒化（I-057）、设备任务发送（I-058）、任务模式不调工具（I-059）。
