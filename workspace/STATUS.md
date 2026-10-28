@@ -38,6 +38,7 @@
   另有副本作为 Release 资产存放在私有仓库：
   `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`。
 - 0.10.0 工作转移包：`handoff/ElysiaFloat-handoff-v0.10.0-20261028-202751.zip`（58 MB，SHA-256 `8ec259f9f2d9c4869d01c766774f8ead3cf143a4fef6a5ccacdb9d039fa0229f`），已作为资产上传 `dev-0.10-2026-10-28`。
+- 0.11.0 工作转移包：`handoff/ElysiaFloat-handoff-v0.11.0-20261028-205609.zip`（58 MB，SHA-256 `8fbe0a440a9e1e8ed6d672c9047fd37f43b38cf67b1a10d26fa98570a2d3fd41`），已作为资产上传 `dev-0.11-2026-10-28`。
 
 ## 目录边界
 
