@@ -12618,11 +12618,28 @@ function bindAdvancedPerms() {
   const tRef = $('#btn-perm-termux-refresh');
   if (tRef) tRef.onclick = () => { renderTermuxPerm(); renderRuntimeState(); toast('已刷新 Termux 状态'); };
   const tSetup = $('#btn-perm-termux-setup');
-  if (tSetup) tSetup.onclick = () => {
-    const cmd = (HAS_PERM && Perm.getTermuxSetupCommands) ? Perm.getTermuxSetupCommands()
-      : 'pkg install -y termux-am\necho allow-external-apps=true >> ~/.termux/termux.properties';
-    if (writeClipboard(cmd)) toast('配置命令已复制，去 Termux 粘贴执行');
-    else toast(cmd);
+  if (tSetup) tSetup.onclick = async () => {
+    if (!(HAS_PERM && Perm.autoConfigureTermux)) return toast('当前环境不支持自动配置');
+    permSetStatus('termux', '配置中…', 'warn');
+    try {
+      const r = JSON.parse(Perm.autoConfigureTermux() || '{}');
+      if (r.ok) {
+        permSetStatus('termux', '已就绪', 'ok');
+        toast(r.message || '配置成功');
+        renderRuntimeState();
+      } else if (r.need === 'install_termux') {
+        permSetStatus('termux', '未安装', 'bad');
+        toast(r.message);
+      } else if (r.need === 'manual') {
+        if (r.commands && HAS_NATIVE && Android.setClipboard) Android.setClipboard(r.commands);
+        try { if (HAS_NATIVE && Android.openUrl) Android.openUrl('package:com.termux'); } catch (e) {}
+        permSetStatus('termux', '待手动配置', 'warn');
+        toast(r.message || '已复制命令并打开 Termux');
+      } else {
+        permSetStatus('termux', '配置失败', 'bad');
+        toast(r.message || '配置失败');
+      }
+    } catch (e) { permSetStatus('termux', '配置失败', 'bad'); toast('配置异常'); }
   };
   const tOpen = $('#btn-perm-termux-open');
   if (tOpen) tOpen.onclick = () => {

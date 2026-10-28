@@ -5,8 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /**
  * Termux Worker：通过 Termux RUN_COMMAND 执行结构化任务。
@@ -98,7 +101,53 @@ object TermuxWorker {
     fun setupCommands(): String =
         "pkg install -y termux-am\n" +
         "echo allow-external-apps=true >> ~/.termux/termux.properties\n" +
-        "# 执行后请重启 Termux，再回到本应用。"
+        "# 执行后请重启 Termux。若 RUN_COMMAND 权限仍缺失，请卸载重装本应用。"
+
+    /**
+     * 一键配置 Termux 权限。
+     * - 已就绪：直接返回
+     * - 有 root：自动 pm grant 授权 + 写入 allow-external-apps=true
+     * - 无 root：返回 manual，由前端复制命令并打开 Termux
+     */
+    fun autoConfigure(ctx: Context): JSONObject {
+        if (ctx.checkSelfPermission(RUN_PERM) == PackageManager.PERMISSION_GRANTED) {
+            return JSONObject().apply {
+                put("ok", true); put("alreadyReady", true)
+                put("message", "Termux 权限已就绪")
+            }
+        }
+        val installed = try { ctx.packageManager.getPackageInfo("com.termux", 0); true } catch (_: Exception) { false }
+        if (!installed) return JSONObject().apply {
+            put("ok", false); put("need", "install_termux")
+            put("message", "请先安装 Termux（F-Droid 版），再回来点一次")
+        }
+        if (RootWorker.isRootBinaryAvailable()) {
+            val r = tryRootAutoConfigure(ctx)
+            if (r.optBoolean("ok")) return r
+        }
+        return JSONObject().apply {
+            put("ok", false); put("need", "manual")
+            put("message", "未获得 root。已复制命令到剪贴板并打开 Termux，请粘贴执行后重启 Termux；若仍提示权限缺失，请卸载重装本应用（RUN_COMMAND 权限只能在安装时授予）。")
+            put("commands", setupCommands())
+        }
+    }
+
+    private fun tryRootAutoConfigure(ctx: Context): JSONObject = try {
+        val grant = Runtime.getRuntime().exec(arrayOf("su", "-c", "pm grant ${ctx.packageName} $RUN_PERM"))
+        grant.waitFor(15, TimeUnit.SECONDS)
+        val propsDir = "/data/data/com.termux/files/home/.termux"
+        val propsCmd = "mkdir -p $propsDir && grep -q '^allow-external-apps=true' $propsDir/termux.properties 2>/dev/null || echo 'allow-external-apps=true' >> $propsDir/termux.properties"
+        val props = Runtime.getRuntime().exec(arrayOf("su", "-c", propsCmd))
+        props.waitFor(15, TimeUnit.SECONDS)
+        val granted = ctx.checkSelfPermission(RUN_PERM) == PackageManager.PERMISSION_GRANTED
+        JSONObject().apply {
+            put("ok", granted); put("permissionGranted", granted)
+            put("message", if (granted) "自动配置成功：已授予权限并写入 allow-external-apps=true"
+                            else "root 执行完成，但权限未生效，请重启应用后重试")
+        }
+    } catch (e: Exception) {
+        JSONObject().apply { put("ok", false); put("message", "root 配置失败：${e.message ?: "未知错误"}") }
+    }
 
     fun createSession(ctx: Context): JSONObject {
         val token = UUID.randomUUID().toString().replace("-", "")

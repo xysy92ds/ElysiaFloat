@@ -93,6 +93,10 @@ class PermissionBridge(private val ctx: Context) {
     @JavascriptInterface
     fun getTermuxSetupCommands(): String = TermuxWorker.setupCommands()
 
+    /** 一键配置 Termux：有 root 全自动，无 root 返回 manual 由前端复制命令并打开 Termux。 */
+    @JavascriptInterface
+    fun autoConfigureTermux(): String = TermuxWorker.autoConfigure(ctx).toString()
+
     @JavascriptInterface
     fun createTermuxSession(): String = TermuxWorker.createSession(ctx).toString()
 
