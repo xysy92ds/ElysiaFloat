@@ -400,6 +400,11 @@ function step(name, fn) {
     if (!html.includes('id="btn-provider-add"') || !html.includes('id="btn-provider-save"')) throw new Error('模型中心缺少新增/保存按钮');
     if (!html.includes('data-provider-action="test"')) throw new Error('模型中心缺少连接测试入口');
     if (!/url\.indexOf\('\/models'\) < 0\) url \+= '\/models'/.test(js)) throw new Error('连接测试没有固定探测 /models');
+    for (const id of ['usage-box', 'set-usage-calls', 'set-usage-tokens', 'btn-usage-reset']) {
+      if (!html.includes('id="' + id + '"')) throw new Error('模型中心缺少用量控件：#' + id);
+    }
+    if (!/const quota = usageCheck\(\)/.test(js)) throw new Error('聊天请求没有接入限额拦截');
+    if (!/usageRecord\(pid, taskId, d\.usage\)/.test(js)) throw new Error('聊天请求没有记录用量');
     const css = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
     for (const sel of ['.settings-tabs', '.settings-tab', '.set-group', '.provider-card', '.cap-chip']) {
       if (css.indexOf(sel + '{') < 0) throw new Error('缺少样式：' + sel);

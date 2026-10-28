@@ -183,6 +183,45 @@ step('模型中心：删除 Provider 会清理绑定与专属密钥（E2-001）'
   if (vaultStore.has('ai.provider.beh-custom')) throw new Error('专属密钥没有清理');
 });
 
+step('用量与限额：按 Provider / 任务记账并持久化（E2-008）', () => {
+  T.usageReset();
+  T.usageRecord('legacy-chat', 'task-a', { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 });
+  T.usageRecord('legacy-chat', 'task-b', { input_tokens: 5, output_tokens: 5 });
+  const u = T.usageSummary();
+  if (u.calls !== 2) throw new Error('调用次数应为 2，实际 ' + u.calls);
+  if (u.tokens.total !== 40) throw new Error('Token 合计应为 40，实际 ' + u.tokens.total);
+  if (u.tokens.prompt !== 15 || u.tokens.completion !== 25) throw new Error('输入/输出拆分不对');
+  if (u.byProvider.length !== 1 || u.byProvider[0].id !== 'legacy-chat') throw new Error('Provider 统计不对');
+  if (u.byTask.length !== 2) throw new Error('任务统计不对');
+  const saved = JSON.parse(store.get(T.USAGE_KEY) || 'null');
+  if (!saved || saved.calls !== 2) throw new Error('用量没有落盘');
+  if (JSON.stringify(saved).indexOf('secret') >= 0) throw new Error('用量数据不应含密钥');
+});
+
+step('用量与限额：达到上限后拦下新请求（E2-008）', () => {
+  const old = {
+    calls: T.CONFIG.usageDailyCalls, tokens: T.CONFIG.usageDailyTokens,
+    enabled: T.CONFIG.usageLimitEnabled
+  };
+  T.CONFIG.usageLimitEnabled = true;
+  T.CONFIG.usageDailyCalls = 2;
+  T.CONFIG.usageDailyTokens = 0;
+  if (!T.usageCheck()) throw new Error('调用次数用尽后没有返回超限');
+  T.CONFIG.usageDailyCalls = 0;
+  T.CONFIG.usageDailyTokens = 40;
+  if (!/Token/.test(T.usageCheck())) throw new Error('Token 用尽后没有返回超限');
+  T.CONFIG.usageDailyCalls = 0;
+  T.CONFIG.usageDailyTokens = 0;
+  if (T.usageCheck() !== '') throw new Error('0 应表示不限');
+  T.CONFIG.usageLimitEnabled = false;
+  T.CONFIG.usageDailyCalls = 1;
+  if (T.usageCheck() !== '') throw new Error('关闭限额后仍被拦');
+  T.CONFIG.usageDailyCalls = old.calls;
+  T.CONFIG.usageDailyTokens = old.tokens;
+  T.CONFIG.usageLimitEnabled = old.enabled;
+  T.usageReset();
+});
+
 (async () => {
   // E2-005：连接测试只探测 /models，不发付费推理请求。
   const calls = require('./harness').calls;

@@ -2581,6 +2581,11 @@ const DC = {
   deviceMaxActions: 120,          // 单个设备任务的设备动作上限（G5-4）
   deviceActionResumeChunk: 120,   // 预算耗尽后点继续，追加的数量
 
+  // E2-008 用量与限额骨架：0 = 不限；只在本地统计，不联网上报。
+  usageLimitEnabled: true,
+  usageDailyCalls: 0,
+  usageDailyTokens: 0,
+
   workPrompt: '先说明计划，再分阶段执行。读取文件可以直接进行；写入、覆盖、复制、建目录和删除前必须说明目标并等待用户确认。每完成一个阶段就汇报状态，遇到权限拒绝、页面无变化或不可恢复错误时停止并如实说明。',
   plugins: { screen: true, system: true, music: true, memory: true, agent: true, files: true },
   autoCheckUpdate: true,
@@ -2969,6 +2974,126 @@ function providerTest(cfg, id) {
     models: [],
     capabilities: []
   }));
+}
+/* ==========================================================
+ *  用量与限额骨架（0.9 / E2-008）
+ *
+ *  只做本地统计，不联网、不上报：
+ *   - 按天汇总调用次数与 token；
+ *   - 按 Provider / 任务拆开，方便界面展示；
+ *   - 限额为 0 表示不限；达到上限时聊天请求直接拦下。
+ * ========================================================== */
+const USAGE_KEY = 'via_ai_usage_v1';
+
+function usageDay() {
+  const n = new Date();
+  const p = x => String(x).padStart(2, '0');
+  return n.getFullYear() + '-' + p(n.getMonth() + 1) + '-' + p(n.getDate());
+}
+
+function usageBlank() {
+  return {
+    day: usageDay(),
+    calls: 0,
+    tokens: { prompt: 0, completion: 0, total: 0 },
+    byProvider: {},
+    byTask: {},
+    lastAt: 0
+  };
+}
+
+function usageNum(v) {
+  const n = parseInt(v, 10);
+  return isFinite(n) && n > 0 ? n : 0;
+}
+
+/** 读取今日用量；跨天自动归零。损坏数据按空账本处理。 */
+function usageLoad() {
+  let u = null;
+  try {
+    // sGet 在原生桥下已经解析成对象；浏览器兜底也可能返回字符串。
+    const raw = sGet(USAGE_KEY, null);
+    u = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch (e) { u = null; }
+  if (!u || typeof u !== 'object' || Array.isArray(u) || u.day !== usageDay()) u = usageBlank();
+  if (!u.tokens || typeof u.tokens !== 'object') u.tokens = { prompt: 0, completion: 0, total: 0 };
+  if (!u.byProvider || typeof u.byProvider !== 'object') u.byProvider = {};
+  if (!u.byTask || typeof u.byTask !== 'object') u.byTask = {};
+  return u;
+}
+
+function usageSave(u) {
+  sSet(USAGE_KEY, u);
+  return u;
+}
+
+/** 记一次成功调用；usage 是响应里的 usage 对象，缺字段按 0 处理。 */
+function usageRecord(providerId, taskId, usage) {
+  const u = usageLoad();
+  const raw = usage && typeof usage === 'object' ? usage : {};
+  const prompt = usageNum(raw.prompt_tokens || raw.input_tokens);
+  const completion = usageNum(raw.completion_tokens || raw.output_tokens);
+  const total = usageNum(raw.total_tokens) || (prompt + completion);
+
+  u.calls += 1;
+  u.tokens.prompt += prompt;
+  u.tokens.completion += completion;
+  u.tokens.total += total;
+  u.lastAt = Date.now();
+
+  const add = (bucket, id) => {
+    const key = String(id || 'unknown');
+    const row = bucket[key] || (bucket[key] = { calls: 0, tokens: 0 });
+    row.calls += 1;
+    row.tokens += total;
+  };
+  add(u.byProvider, providerId || 'unknown');
+  add(u.byTask, taskId || 'unknown');
+  return usageSave(u);
+}
+
+/** 限额来自配置；未填写或 0 都表示不限。 */
+function usageLimits() {
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG) ? CONFIG : {};
+  return {
+    enabled: cfg.usageLimitEnabled !== false,
+    calls: Math.max(0, parseInt(cfg.usageDailyCalls, 10) || 0),
+    tokens: Math.max(0, parseInt(cfg.usageDailyTokens, 10) || 0)
+  };
+}
+
+/** 返回空串表示还能调；否则返回超限原因。 */
+function usageCheck() {
+  const lim = usageLimits();
+  if (!lim.enabled) return '';
+  const u = usageLoad();
+  if (lim.calls > 0 && u.calls >= lim.calls) return '调用 ' + u.calls + '/' + lim.calls;
+  if (lim.tokens > 0 && u.tokens.total >= lim.tokens) return 'Token ' + u.tokens.total + '/' + lim.tokens;
+  return '';
+}
+
+/** 界面摘要：数据可直接渲染，不含任何密钥。 */
+function usageSummary() {
+  const u = usageLoad();
+  const byProvider = Object.keys(u.byProvider).map(id => ({
+    id: id, calls: u.byProvider[id].calls, tokens: u.byProvider[id].tokens
+  })).sort((a, b) => b.tokens - a.tokens || b.calls - a.calls);
+  const byTask = Object.keys(u.byTask).map(id => ({
+    id: id, calls: u.byTask[id].calls, tokens: u.byTask[id].tokens
+  })).sort((a, b) => b.tokens - a.tokens || b.calls - a.calls);
+  return {
+    day: u.day,
+    calls: u.calls,
+    tokens: { prompt: u.tokens.prompt, completion: u.tokens.completion, total: u.tokens.total },
+    byProvider: byProvider,
+    byTask: byTask,
+    limits: usageLimits(),
+    hit: usageCheck()
+  };
+}
+
+function usageReset() {
+  return usageSave(usageBlank());
 }
 /* ==========================================================
  *  状态
@@ -5867,6 +5992,9 @@ function parseVars(t) {
 
 async function chatReq(messages, skipParse) {
   if (!CONFIG.apiKey) throw new Error('未填写 API Key，请到设置里配置');
+  // E2-008：额度用尽时先拦下，不再发请求。
+  const quota = usageCheck();
+  if (quota) throw new Error('今日用量已达上限（' + quota + '）。可在 设置 → 模型中心 调整限额或重置今日用量。');
   const memBlock = memResidentBlock();
   const proc = messages.map((m, i) => {
     if (m.role !== 'system') return m;
@@ -5889,6 +6017,14 @@ async function chatReq(messages, skipParse) {
   const d = r.json;
   if (d.error) throw new Error(d.error.message || 'API 错误');
   if (!d.choices || !d.choices[0]) throw new Error('响应格式异常');
+  // E2-008：成功调用后按 Provider / 任务记账；统计失败不影响聊天。
+  try {
+    const use = providerResolve(CONFIG, 'chat');
+    const pid = (use && use.provider && use.provider.id) || 'legacy-chat';
+    const taskId = (typeof ACTIVE_RUN_TASK_ID !== 'undefined' && ACTIVE_RUN_TASK_ID)
+      ? ACTIVE_RUN_TASK_ID : (currentTask() || {}).id;
+    usageRecord(pid, taskId, d.usage);
+  } catch (e) { }
   return d.choices[0].message.content || '';
 }
 
@@ -9292,6 +9428,26 @@ function renderProviderCenter() {
   ).join('');
 }
 
+function renderUsageBox() {
+  const box = $('#usage-box');
+  if (!box) return;
+  const u = usageSummary();
+  const lim = u.limits;
+  const top = list => list.slice(0, 3).map(x => x.id + ' ' + x.calls + ' 次 / ' + x.tokens + ' Token').join('；');
+  let s = '今日 ' + u.day + '：调用 ' + u.calls + ' 次 · Token ' + u.tokens.total;
+  if (u.tokens.prompt || u.tokens.completion) {
+    s += '（输入 ' + u.tokens.prompt + ' / 输出 ' + u.tokens.completion + '）';
+  }
+  if (u.hit) s += '<br><b>已超限：' + esc(u.hit) + '，新的聊天请求会被拦下。</b>';
+  else if (lim.calls > 0 || lim.tokens > 0) {
+    s += '<br>限额：' + (lim.calls || '不限') + ' 次 / ' + (lim.tokens || '不限') + ' Token';
+  }
+  if (!lim.enabled) s += '<br>限额已关闭。';
+  if (u.byProvider.length) s += '<br>Provider：' + esc(top(u.byProvider));
+  if (u.byTask.length) s += '<br>任务：' + esc(top(u.byTask));
+  box.innerHTML = s;
+}
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
@@ -9317,6 +9473,12 @@ function renderSettings() {
   <div class="sg"><label>能力</label><div id="prov-caps" class="cap-list"></div></div>
   <div class="acts"><button type="button" id="btn-provider-save" class="btn-p">保存 Provider</button><button type="button" id="btn-provider-cancel" class="btn-s">取消</button></div>
 </div>
+
+<div class="sub-title" style="margin-top:14px">用量与限额</div>
+<div id="usage-box" class="mini-note">今天还没有调用记录。</div>
+<div class="sg" style="margin-top:8px"><label>今日调用上限（0 = 不限）</label><input id="set-usage-calls" type="number" min="0" step="1" value="${esc(String(CONFIG.usageDailyCalls || 0))}"></div>
+<div class="sg"><label>今日 Token 上限（0 = 不限）</label><input id="set-usage-tokens" type="number" min="0" step="100" value="${esc(String(CONFIG.usageDailyTokens || 0))}"></div>
+<div class="acts"><button type="button" id="btn-usage-reset" class="btn-s">重置今日用量</button></div>
 
 <div class="sec-title">AI 与模型</div>
 <div class="sg"><label>模型预设</label>${chipGroup('preset', presetKey(), presetOpts)}</div>
@@ -9541,6 +9703,15 @@ function renderSettings() {
     if (b.id === 'btn-provider-save') { providerSaveForm(); return; }
     if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
     if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    if (b.id === 'btn-usage-reset') {
+      uiConfirm('重置后今日统计清零，确定吗？', '重置').then(ok => {
+        if (!ok) return;
+        usageReset();
+        renderUsageBox();
+        toast('今日用量已重置');
+      });
+      return;
+    }
     const pa = b.closest('[data-provider-action]');
     if (pa) {
       const pid = pa.dataset.providerId || '';
@@ -9670,6 +9841,7 @@ function renderSettings() {
   bindWorkspace();
   bindRuntime();
   renderProviderCenter();
+  renderUsageBox();
   renderEnvBox();
   const ceBtn = $('#btn-copy-env');
   if (ceBtn) ceBtn.onclick = () => {
@@ -9753,6 +9925,8 @@ function doSaveSettings(val) {
     modelTimeoutMs: Math.max(60000, Math.min(1800000, (parseInt(val('#set-model-timeout'), 10) || 600) * 1000)),
     deviceMaxActions: Math.max(20, Math.min(2000, parseInt(val('#set-device-max-actions'), 10) || 120)),
     deviceActionResumeChunk: Math.max(20, Math.min(2000, parseInt(val('#set-device-resume-chunk'), 10) || 120)),
+    usageDailyCalls: Math.max(0, parseInt(val('#set-usage-calls'), 10) || 0),
+    usageDailyTokens: Math.max(0, parseInt(val('#set-usage-tokens'), 10) || 0),
     workPrompt: val('#set-work-prompt').trim() || DC.workPrompt,
     // 人设只管普通聊天；工作提示词和工具说明由各自分层组装
     persona: val('#set-persona').trim() || DC.persona

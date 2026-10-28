@@ -425,6 +425,26 @@ function renderProviderCenter() {
   ).join('');
 }
 
+function renderUsageBox() {
+  const box = $('#usage-box');
+  if (!box) return;
+  const u = usageSummary();
+  const lim = u.limits;
+  const top = list => list.slice(0, 3).map(x => x.id + ' ' + x.calls + ' 次 / ' + x.tokens + ' Token').join('；');
+  let s = '今日 ' + u.day + '：调用 ' + u.calls + ' 次 · Token ' + u.tokens.total;
+  if (u.tokens.prompt || u.tokens.completion) {
+    s += '（输入 ' + u.tokens.prompt + ' / 输出 ' + u.tokens.completion + '）';
+  }
+  if (u.hit) s += '<br><b>已超限：' + esc(u.hit) + '，新的聊天请求会被拦下。</b>';
+  else if (lim.calls > 0 || lim.tokens > 0) {
+    s += '<br>限额：' + (lim.calls || '不限') + ' 次 / ' + (lim.tokens || '不限') + ' Token';
+  }
+  if (!lim.enabled) s += '<br>限额已关闭。';
+  if (u.byProvider.length) s += '<br>Provider：' + esc(top(u.byProvider));
+  if (u.byTask.length) s += '<br>任务：' + esc(top(u.byTask));
+  box.innerHTML = s;
+}
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
@@ -450,6 +470,12 @@ function renderSettings() {
   <div class="sg"><label>能力</label><div id="prov-caps" class="cap-list"></div></div>
   <div class="acts"><button type="button" id="btn-provider-save" class="btn-p">保存 Provider</button><button type="button" id="btn-provider-cancel" class="btn-s">取消</button></div>
 </div>
+
+<div class="sub-title" style="margin-top:14px">用量与限额</div>
+<div id="usage-box" class="mini-note">今天还没有调用记录。</div>
+<div class="sg" style="margin-top:8px"><label>今日调用上限（0 = 不限）</label><input id="set-usage-calls" type="number" min="0" step="1" value="${esc(String(CONFIG.usageDailyCalls || 0))}"></div>
+<div class="sg"><label>今日 Token 上限（0 = 不限）</label><input id="set-usage-tokens" type="number" min="0" step="100" value="${esc(String(CONFIG.usageDailyTokens || 0))}"></div>
+<div class="acts"><button type="button" id="btn-usage-reset" class="btn-s">重置今日用量</button></div>
 
 <div class="sec-title">AI 与模型</div>
 <div class="sg"><label>模型预设</label>${chipGroup('preset', presetKey(), presetOpts)}</div>
@@ -674,6 +700,15 @@ function renderSettings() {
     if (b.id === 'btn-provider-save') { providerSaveForm(); return; }
     if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
     if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    if (b.id === 'btn-usage-reset') {
+      uiConfirm('重置后今日统计清零，确定吗？', '重置').then(ok => {
+        if (!ok) return;
+        usageReset();
+        renderUsageBox();
+        toast('今日用量已重置');
+      });
+      return;
+    }
     const pa = b.closest('[data-provider-action]');
     if (pa) {
       const pid = pa.dataset.providerId || '';
@@ -803,6 +838,7 @@ function renderSettings() {
   bindWorkspace();
   bindRuntime();
   renderProviderCenter();
+  renderUsageBox();
   renderEnvBox();
   const ceBtn = $('#btn-copy-env');
   if (ceBtn) ceBtn.onclick = () => {
@@ -886,6 +922,8 @@ function doSaveSettings(val) {
     modelTimeoutMs: Math.max(60000, Math.min(1800000, (parseInt(val('#set-model-timeout'), 10) || 600) * 1000)),
     deviceMaxActions: Math.max(20, Math.min(2000, parseInt(val('#set-device-max-actions'), 10) || 120)),
     deviceActionResumeChunk: Math.max(20, Math.min(2000, parseInt(val('#set-device-resume-chunk'), 10) || 120)),
+    usageDailyCalls: Math.max(0, parseInt(val('#set-usage-calls'), 10) || 0),
+    usageDailyTokens: Math.max(0, parseInt(val('#set-usage-tokens'), 10) || 0),
     workPrompt: val('#set-work-prompt').trim() || DC.workPrompt,
     // 人设只管普通聊天；工作提示词和工具说明由各自分层组装
     persona: val('#set-persona').trim() || DC.persona

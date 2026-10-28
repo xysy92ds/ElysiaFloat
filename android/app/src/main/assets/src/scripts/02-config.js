@@ -237,6 +237,11 @@ const DC = {
   deviceMaxActions: 120,          // 单个设备任务的设备动作上限（G5-4）
   deviceActionResumeChunk: 120,   // 预算耗尽后点继续，追加的数量
 
+  // E2-008 用量与限额骨架：0 = 不限；只在本地统计，不联网上报。
+  usageLimitEnabled: true,
+  usageDailyCalls: 0,
+  usageDailyTokens: 0,
+
   workPrompt: '先说明计划，再分阶段执行。读取文件可以直接进行；写入、覆盖、复制、建目录和删除前必须说明目标并等待用户确认。每完成一个阶段就汇报状态，遇到权限拒绝、页面无变化或不可恢复错误时停止并如实说明。',
   plugins: { screen: true, system: true, music: true, memory: true, agent: true, files: true },
   autoCheckUpdate: true,
