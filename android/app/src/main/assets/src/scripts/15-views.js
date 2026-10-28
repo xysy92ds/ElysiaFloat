@@ -31,6 +31,9 @@ function showView(v, opts) {
     if (attachEl) attachEl.style.display = '';
     bodyEl.scrollTop = bodyEl.scrollHeight;
     updateMini();
+    // 0.11：回到聊天时刷新挂载点，并按当前任务恢复主题。
+    try { if (typeof plugMountRefresh === 'function') plugMountRefresh(); } catch (e) {}
+    try { if (typeof plugThemeRestore === 'function') plugThemeRestore(); } catch (e) {}
   } else if (v === 'settings') settings.classList.add('open');
   else if (v === 'plugins' && plugins) { plugins.classList.add('open'); renderPlugins(); }
   else if (v === 'plug-market' && plugMarketPage) { plugMarketPage.classList.add('open'); renderPlugMarket(); }

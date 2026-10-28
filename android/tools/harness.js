@@ -43,6 +43,9 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'plugStateGet', 'plugStateSet', 'plugStateClear', 'plugLifecycle', 'plugEmit', 'plugHostApi',
   'plugRuntimeEntriesHtml', 'plugOpenPage', 'plugOpenConfig', 'plugCommandFind', 'plugCommandRun',
   'plugRunJob', 'plugSessionCreate', 'plugSessionDelete', 'PLUG_SURFACE_TYPES', 'PLUG_ACTION_TYPES',
+  'plugNormalizeStyle', 'plugStyleAttr', 'plugMountEntries', 'plugMountHtml', 'plugMountRefresh',
+  'plugThemeApply', 'plugThemeReset', 'plugThemeRestore', 'plugThemesOf', 'plugThemeContrast',
+  'plugSessionAfterReply', 'plugSessionEnded', 'plugSessionOfTask',
   'PLUG_CONFIG_TYPES', 'PLUG_COMPONENT_TYPES', 'PLUG_STATE_KEY', 'PLUG_CONFIG_KEY', 'PLUG_EVENT_NAMES'];
 const cuts = js.lastIndexOf('})();');
 if (cuts < 0) { console.error('没找到 IIFE 结尾'); process.exit(1); }

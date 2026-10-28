@@ -1,0 +1,42 @@
+{
+  "manifestVersion": 2,
+  "apiVersion": "0.2",
+  "id": "com.example.hello",
+  "name": "最小示例",
+  "version": "1.0.0",
+  "author": "你的名字",
+  "desc": "一个页面 + 一个聊天头部入口，复制后改成自己的功能。",
+  "permissions": [],
+  "surfaces": [
+    {
+      "type": "entry",
+      "id": "head",
+      "title": "示例入口",
+      "mount": "chat.header",
+      "sort": 50,
+      "tree": {
+        "type": "button",
+        "label": "打开示例页",
+        "action": { "type": "navigate", "page": "home" }
+      }
+    },
+    {
+      "type": "page",
+      "id": "home",
+      "title": "示例页",
+      "tree": {
+        "type": "layout",
+        "children": [
+          { "type": "text", "text": "你好，{{config.name}}。" },
+          { "type": "button", "label": "写入状态", "action": { "type": "state.set", "path": "clicked", "value": 1 } }
+        ]
+      }
+    }
+  ],
+  "config": {
+    "schemaVersion": 1,
+    "fields": [
+      { "key": "name", "type": "string", "label": "称呼", "default": "世界" }
+    ]
+  }
+}

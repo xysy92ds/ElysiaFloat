@@ -339,6 +339,100 @@ step('开放式运行时：v2 surface 隔离、私有存储与 secret 不落明�
     errors.push('开放式运行时：动作权限、事件、后台任务、限流与卸载（E3-004/007）: ' + e.message);
   }
 
+  // E4-001/003/004/005：挂载点、主题作用域隔离、会话引擎与卸载清理。
+  try {
+    const raw = {
+      manifestVersion: 2, apiVersion: '0.2', id: 'com.beh.e4', name: 'E4 行为', permissions: [],
+      surfaces: [
+        { type: 'theme', id: 'day', title: '白昼', tokens: { bg: '#ffffff', color: '#222222' } },
+        { type: 'theme', id: 'night', title: '夜色', tokens: { bg: '#111111', color: '#eeeeee' } },
+        { type: 'entry', id: 'hi', mount: 'chat.header', tree: { type: 'text', text: '头' } },
+        { type: 'entry', id: 'aft', mount: 'chat.message.after', when: 'session', tree: { type: 'text', text: '尾' } },
+        { type: 'renderer', id: 'round', tree: { type: 'choice', options: ['甲', '乙'], prompt: '第 {{session.round}} 轮' } },
+        { type: 'sessionType', id: 'game', title: '游戏', opening: '开始', renderer: 'round',
+          stateSchema: { properties: { round: { default: 0 }, score: { default: 0 } } }, endWhen: 'score >= 2' }
+      ]
+    };
+    if (T.plugManifestV2Error(raw)) throw new Error('E4 清单被拒：' + T.plugManifestV2Error(raw));
+    const m = T.plugNormalize(raw);
+    T.USER_PLUGINS.push(m);
+    if (T.plugThemesOf(m).length !== 2) throw new Error('主题包没有进入注册表');
+    if (!/头/.test(T.plugMountHtml('chat.header'))) throw new Error('chat.header 挂载点没有渲染');
+    if (T.plugMountHtml('chat.message.after')) throw new Error('when=session 的入口在聊天首页就出现了');
+    const g = await T.plugRunAction(m, { type: 'theme.apply', theme: 'day', scope: 'global' }, {});
+    if (!g.ok || (T.plugThemeRestore() || {}).themeId !== 'day') throw new Error('全局主题没有生效');
+    const ses = await T.plugRunAction(m, { type: 'session.create', session: 'game' }, {});
+    if (!ses.ok) throw new Error('会话创建失败：' + JSON.stringify(ses));
+    const task = T.currentTask();
+    if (!task.pluginSession || task.pluginSession.surfaceId !== 'game') throw new Error('会话没有绑定插件类型');
+    if (!/尾/.test(T.plugMountHtml('chat.message.after'))) throw new Error('when=session 的入口在会话里没有出现');
+    const sn = await T.plugRunAction(m, { type: 'theme.apply', theme: 'night', scope: 'session' }, {});
+    if (!sn.ok || (T.plugThemeRestore() || {}).themeId !== 'night') throw new Error('会话主题没有生效');
+    const chatTask = T.TASKS.filter(t => t.type === 'chat' && !t.pluginSession)[0];
+    T.taskSetCurrent(chatTask.id);
+    if ((T.plugThemeRestore() || {}).themeId !== 'day') throw new Error('会话主题污染了全局/其它任务');
+    T.taskSetCurrent(task.id);
+    if (!/第/.test(T.plugSessionAfterReply(task))) throw new Error('每轮模板没有拿到轮次');
+    T.plugStateSet(m, 'score', 2);
+    const endHtml = T.plugSessionAfterReply(task);
+    if (!task.pluginSession.ended || !/结束/.test(endHtml)) throw new Error('结束条件没有生效');
+    T.plugLifecycle(m, 'uninstall');
+    T.USER_PLUGINS.length = 0;
+    if (T.plugMountEntries('chat.header').length) throw new Error('卸载后挂载入口仍在');
+    if ((T.plugThemeRestore() || {}).themeId === 'day') throw new Error('卸载没有清理主题');
+    if (T.TASKS.some(t => t.id === task.id)) throw new Error('卸载没有清理会话任务');
+    T.showView('chat');
+    console.log('  ✓ 插件 UI 运行时：挂载点、主题作用域隔离、会话结束与卸载清理（E4-001/003/004/005）');
+  } catch (e) {
+    errors.push('插件 UI 运行时：挂载点、主题作用域隔离、会话结束与卸载清理（E4-001/003/004/005）: ' + e.message);
+  }
+
+  // E4 出口：三个验收插件只用 surface/组件/动作/job 组合，宿主零改动。
+  try {
+    const dir = path.join(__dirname, '..', 'plugin-examples');
+    const load = f => T.plugNormalize(JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')));
+
+    const theme = load('theme-aurora.json');
+    T.USER_PLUGINS.push(theme);
+    if (T.plugThemesOf(theme).length !== 2) throw new Error('主题插件没有注册两个主题包');
+    if (!/极光夜/.test(T.plugMountHtml('settings.section'))) throw new Error('主题插件没有挂到设置分区');
+    const ap = await T.plugRunAction(theme, { type: 'theme.apply', theme: 'aurora', scope: 'global' }, {});
+    if (!ap.ok || (T.plugThemeRestore() || {}).themeId !== 'aurora') throw new Error('主题插件应用失败');
+    T.plugThemeReset('global');
+    if (T.plugThemeRestore()) throw new Error('主题重置没有清空');
+    T.plugLifecycle(theme, 'uninstall');
+    T.USER_PLUGINS.length = 0;
+
+    const game = load('dating-game.json');
+    T.USER_PLUGINS.push(game);
+    const sres = await T.plugRunAction(game, { type: 'session.create', session: 'date' }, {});
+    if (!sres.ok) throw new Error('恋爱游戏会话创建失败');
+    const gtask = T.currentTask();
+    if (!/第/.test(T.plugSessionAfterReply(gtask))) throw new Error('恋爱游戏每轮模板没有渲染');
+    T.plugStateSet(game, 'affinity', 3);
+    const gend = T.plugSessionAfterReply(gtask);
+    if (!gtask.pluginSession.ended || !/结束/.test(gend)) throw new Error('恋爱游戏结束条件没有生效');
+    T.plugLifecycle(game, 'uninstall');
+    T.USER_PLUGINS.length = 0;
+    if (T.TASKS.some(t => t.id === gtask.id)) throw new Error('恋爱游戏卸载没有清理会话');
+
+    const pomo = load('pomodoro.json');
+    T.USER_PLUGINS.push(pomo);
+    if (!/开始专注/.test(T.plugMountHtml('chat.header'))) throw new Error('番茄钟没有挂到聊天头部');
+    const jr = await T.plugRunJob(pomo.id, 'remind');
+    if (!jr || jr.ok !== true) throw new Error('番茄钟定时任务没有执行：' + JSON.stringify(jr));
+    const stats = pomo.surfaces.filter(x => x.type === 'page')[0];
+    if (!/完成番茄/.test(T.plugRenderTree(stats.tree, { state: T.plugStateGet(pomo), config: {}, session: {} }))) {
+      throw new Error('番茄钟统计页没有渲染');
+    }
+    T.plugLifecycle(pomo, 'uninstall');
+    T.USER_PLUGINS.length = 0;
+    T.showView('chat');
+    console.log('  ✓ 验收插件：主题包、恋爱游戏、番茄钟（E4 出口）');
+  } catch (e) {
+    errors.push('验收插件：主题包、恋爱游戏、番茄钟（E4 出口）: ' + e.message);
+  }
+
   // E2-005：连接测试只探测 /models，不发付费推理请求。
   const calls = require('./harness').calls;
   try {

@@ -797,3 +797,20 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
 .pc-unknown{padding:8px 10px;border:1px dashed rgba(214,51,108,.4);border-radius:9px;
   background:rgba(255,154,158,.08);color:var(--muted);font-size:11px}
 .pc-actions{display:flex;gap:8px;margin-top:10px}
+
+/* ===== 插件 UI 运行时（0.11 / E4）===== */
+#app{background-image:var(--plug-bgimg,none);background-size:cover;background-position:center}
+#body{background:var(--plug-page-bg,transparent)}
+.plug-mount{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+#plug-mount-head .plug-mount{margin-left:4px}
+#plug-mount-head .pc-btn{padding:4px 9px;font-size:11px}
+#plug-mount-foot{padding:0 10px;max-height:34vh;overflow-y:auto}
+#plug-mount-composer{width:100%;order:-1}
+#plug-mount-composer .plug-mount{width:100%}
+.msg.plug-card{background:transparent;border:0;box-shadow:none;padding:2px 0}
+.msg.plug-card .pc{background:var(--card);border:1px solid rgba(255,154,158,.26);
+  border-radius:14px;padding:10px 12px}
+.pc-choice .pc-btn{flex:0 1 auto}
+html.plug-themed #body .msg.ai{background:var(--plug-msg-bg,var(--card));color:var(--plug-fg,var(--text));
+  border-radius:var(--plug-radius,14px);box-shadow:var(--plug-shadow,none)}
+html.plug-themed #body .msg.ai .msg-t,html.plug-themed #body .msg.ai{font-size:var(--plug-font,inherit)}

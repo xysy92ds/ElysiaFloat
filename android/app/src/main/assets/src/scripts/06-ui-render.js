@@ -88,6 +88,20 @@ function addMsg(role, text) {
   if (role === 'assistant') attachTTS(d, d.textContent);
   const bodyEl = $('#body');
   bodyEl.appendChild(d);
+  if (role === 'assistant') {
+    // 0.11：消息后挂载点 + 插件会话每轮模板；任何异常都不能影响聊天主路径。
+    try {
+      const extra = (typeof plugMountHtml === 'function') ? plugMountHtml('chat.message.after') : '';
+      if (extra) {
+        const m = document.createElement('div');
+        m.className = 'msg ai plug-card';
+        m.innerHTML = extra;
+        bodyEl.appendChild(m);
+      }
+      const task = (typeof TASKS !== 'undefined' ? TASKS : []).filter(t => t.id === CURRENT_TASK_ID)[0];
+      if (task && task.pluginSession && typeof plugSessionAfterReply === 'function') plugSessionAfterReply(task);
+    } catch (e) {}
+  }
   bodyEl.scrollTop = bodyEl.scrollHeight;
   return d;
 }

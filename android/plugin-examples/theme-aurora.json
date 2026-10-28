@@ -1,0 +1,43 @@
+{
+  "manifestVersion": 2,
+  "apiVersion": "0.2",
+  "id": "com.example.theme.aurora",
+  "name": "极光主题包",
+  "version": "1.0.0",
+  "author": "ElysiaFloat 示例",
+  "desc": "两个主题包 + 预览页 + 设置分区，演示 E4 样式白名单与主题能力。",
+  "permissions": [],
+  "config": {
+    "schemaVersion": 1,
+    "fields": [
+      { "key": "note", "type": "string", "label": "预览备注", "default": "在设置里也能找到这个插件的分区。" }
+    ]
+  },
+  "surfaces": [
+    { "type": "theme", "id": "aurora", "title": "极光夜",
+      "tokens": { "bg": "#0b1026", "color": "#e6f0ff", "radius": "18px", "fontSize": "15px", "shadow": "0 4px 16px #000000" } },
+    { "type": "theme", "id": "dawn", "title": "晨雾",
+      "tokens": { "bg": "#f7f4ee", "color": "#3a3630", "radius": "14px", "fontSize": "15px" } },
+    { "type": "page", "id": "preview", "title": "主题预览", "sort": 10,
+      "style": { "bg": "#0b1026", "color": "#e6f0ff", "radius": "18px", "padding": "12px" },
+      "tree": {
+        "type": "layout",
+        "children": [
+          { "type": "text", "text": "这是极光夜主题的预览。应用后聊天背景、气泡与圆角都会跟随，随时可以重置。", "size": "md" },
+          { "type": "text", "text": "{{config.note}}", "muted": true },
+          { "type": "button", "label": "应用极光夜", "primary": true, "action": { "type": "theme.apply", "theme": "aurora", "scope": "global" } },
+          { "type": "button", "label": "应用晨雾", "action": { "type": "theme.apply", "theme": "dawn", "scope": "global" } },
+          { "type": "button", "label": "重置主题", "action": { "type": "theme.reset", "scope": "global" } }
+        ]
+      } },
+    { "type": "entry", "id": "settings", "title": "极光主题", "mount": "settings.section", "sort": 10,
+      "tree": {
+        "type": "layout",
+        "children": [
+          { "type": "text", "text": "极光主题包：应用后立即生效，不会影响聊天记录与工具权限。", "muted": true },
+          { "type": "button", "label": "应用极光夜", "primary": true, "action": { "type": "theme.apply", "theme": "aurora", "scope": "global" } },
+          { "type": "button", "label": "重置", "action": { "type": "theme.reset", "scope": "global" } }
+        ]
+      } }
+  ]
+}

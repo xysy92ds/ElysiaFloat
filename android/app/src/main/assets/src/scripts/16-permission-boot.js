@@ -282,6 +282,10 @@ function boot() {
     }
   } catch (e) {}
 
+  // 0.11：启动时恢复插件主题并挂载聊天入口（失败不影响主流程）。
+  try { if (typeof plugThemeRestore === 'function') plugThemeRestore(); } catch (e) {}
+  try { if (typeof plugMountRefresh === 'function') plugMountRefresh(); } catch (e) {}
+
   console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条 · 插件 ' + USER_PLUGINS.length + ' 个');
 }
 

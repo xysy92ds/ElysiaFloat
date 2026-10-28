@@ -1,0 +1,51 @@
+{
+  "manifestVersion": 2,
+  "apiVersion": "0.2",
+  "id": "com.example.pomodoro",
+  "name": "番茄钟（示例）",
+  "version": "1.0.0",
+  "author": "ElysiaFloat 示例",
+  "desc": "聊天头部计时器 + 专注会话 + 统计页 + 定时任务，全部由宿主原语组合，宿主零改动。",
+  "permissions": [],
+  "surfaces": [
+    { "type": "entry", "id": "timer", "title": "番茄钟", "mount": "chat.header", "sort": 20,
+      "tree": {
+        "type": "layout", "dir": "row",
+        "children": [
+          { "type": "stat", "label": "已完成", "value": "{{state.done}}/4" },
+          { "type": "button", "label": "开始专注", "primary": true, "action": { "type": "session.create", "session": "focus" } }
+        ]
+      } },
+    { "type": "renderer", "id": "tick",
+      "tree": {
+        "type": "layout",
+        "children": [
+          { "type": "progress", "value": "{{session.round}}", "label": "已完成 {{session.round}} 个番茄" },
+          { "type": "text", "text": "做完这一轮，回来点一下「完成」。", "muted": true },
+          { "type": "button", "label": "完成一个番茄", "action": { "type": "state.set", "path": "done", "value": 1 } }
+        ]
+      } },
+    { "type": "sessionType", "id": "focus", "title": "专注", "opening": "开始一个番茄：25 分钟后回来记录。",
+      "renderer": "tick", "deletable": true,
+      "stateSchema": { "properties": {
+        "round": { "default": 0 },
+        "done": { "default": 0 }
+      } },
+      "endWhen": "done >= 1" },
+    { "type": "job", "id": "remind", "every": 60,
+      "action": { "type": "state.set", "path": "remindedAt", "value": 1 } },
+    { "type": "page", "id": "stats", "title": "专注统计", "sort": 30,
+      "tree": {
+        "type": "layout",
+        "children": [
+          { "type": "stat", "label": "完成番茄", "value": "{{state.done}}" },
+          { "type": "chart", "bars": [
+            { "label": "一", "value": 2 }, { "label": "二", "value": 3 },
+            { "label": "三", "value": 1 }, { "label": "四", "value": 4 },
+            { "label": "五", "value": 2 }
+          ] },
+          { "type": "text", "text": "统计只读取本插件自己的状态，不碰聊天记录。", "muted": true }
+        ]
+      } }
+  ]
+}

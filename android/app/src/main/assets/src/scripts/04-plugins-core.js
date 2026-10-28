@@ -305,6 +305,13 @@ const PLUG_HELP = [
 '宿主仍会检查 Android 权限、Agent L1/L2/L3、安全开关、应用白名单和每次修改确认。',
 '插件不能通过声明绕过用户未开启的能力，也不能调用其它自定义插件。',
 '执行结果会保留 success；失败时还会提供 errorCode，例如 PERMISSION_DENIED、NETWORK_ERROR、HTTP_ERROR、PLUGIN_RUNTIME_ERROR。',
+'清单 v2 可只声明 surfaces，用组件树组合页面、入口、会话与主题，宿主不预设插件类型：',
+'  page / entry（mount 可为 chat.header、chat.footer、chat.composer.before、chat.message.after、settings.section 等）',
+'  sessionType（stateSchema 默认值、opening、renderer 每轮模板、endWhen 结束条件）',
+'  theme（tokens 只接受颜色、渐变、圆角、字号、字重、透明度、阴影；可全局或单会话应用与重置）',
+'  command / event / job / settings / renderer / adapter',
+'组件只由宿主渲染，插件不能写 HTML/CSS/JS；任意 CSS、url() 注入和脚本都会被丢弃。',
+'示例清单与校验工具见仓库 plugin-examples/ 与 tools/plugin-validate.js。',
 '远程市场索引只能由用户主动同步；每个远程清单必须使用 HTTPS，并在安装前通过索引提供的 SHA-256 校验。',
 '请同时提供 README、权限理由、参数/返回值、错误处理、隐私说明、版本记录和测试步骤。'
 ].join('\n');

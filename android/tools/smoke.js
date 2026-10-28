@@ -312,6 +312,56 @@ function step(name, fn) {
     T.refreshSystemPrompt(false);
   });
 
+  await step('E4-001~006：挂载点、样式白名单、主题包与会话引擎', async () => {
+    const okStyle = T.plugNormalizeStyle({ bg: '#123456', color: '#fff', radius: '12px', fontSize: '15px',
+      shadow: '0 2px 8px #000000', danger: 'red', css: 'expression(alert(1))' });
+    if (!okStyle || okStyle.bg !== '#123456' || okStyle.danger || okStyle.css) throw new Error('样式白名单没有过滤未知键');
+    if (T.plugNormalizeStyle({ bg: 'url(javascript:alert(1))' })) throw new Error('任意 CSS 没有被拒绝');
+    if (!T.plugNormalizeStyle({ bg: 'linear-gradient(180deg, #000000, #ffffff)' })) throw new Error('合法渐变被拒');
+    if (!/style="/.test(T.plugStyleAttr({ color: '#ffffff' }))) throw new Error('样式属性没有生成');
+    if (T.plugThemeContrast({ bg: '#ffffff', color: '#ffffff' }).ok !== false) throw new Error('低对比度没有警告');
+    if (T.plugThemeContrast({ bg: '#ffffff', color: '#333333' }).ok !== true) throw new Error('高对比度被误判');
+
+    const raw = {
+      manifestVersion: 2, apiVersion: '0.2', id: 'com.test.e4', name: 'E4 插件', permissions: [],
+      surfaces: [
+        { type: 'theme', id: 'day', title: '白昼', tokens: { bg: '#ffffff', color: '#333333', radius: '16px' } },
+        { type: 'entry', id: 'hi', title: '打招呼', mount: 'chat.header', tree: { type: 'button', label: '嗨', action: { type: 'message.send', text: '你好' } } },
+        { type: 'renderer', id: 'round', tree: { type: 'choice', options: ['A', 'B'], prompt: '选一个' } },
+        { type: 'sessionType', id: 'game', title: '小游戏', opening: '开始吧', renderer: 'round',
+          stateSchema: { properties: { round: { default: 0 }, score: { default: 0 } } }, endWhen: 'score >= 2' },
+        { type: 'page', id: 'st', title: '风格页', style: { bg: '#ffffff', fontSize: '15px' }, tree: { type: 'text', text: 'hi' } }
+      ]
+    };
+    if (T.plugManifestV2Error(raw)) throw new Error('合法 E4 清单被拒：' + T.plugManifestV2Error(raw));
+    const m = T.plugNormalize(Object.assign({}, raw, { grantedPermissions: [] }));
+    if (!m || m.surfaces.length !== 5) throw new Error('E4 surface 没有注册');
+    T.USER_PLUGINS.push(m);
+    if (T.plugThemesOf(m).length !== 1) throw new Error('主题包没有进入注册表');
+    if (!T.plugMountEntries('chat.header').some(e => e.plugin.id === m.id)) throw new Error('入口没有挂到 chat.header');
+    const mount = T.plugMountHtml('chat.header');
+    if (!/data-plug-act/.test(mount) || !/嗨/.test(mount)) throw new Error('挂载点没有渲染组件树');
+    const applied = await T.plugRunAction(m, { type: 'theme.apply', theme: 'day', scope: 'global' }, {});
+    if (!applied.ok) throw new Error('主题应用失败：' + JSON.stringify(applied));
+    if (!T.plugThemeRestore() || T.plugThemeRestore().themeId !== 'day') throw new Error('主题没有持久化');
+    T.plugThemeReset('global');
+    if (T.plugThemeRestore()) throw new Error('主题重置没有清空');
+
+    const ses = await T.plugRunAction(m, { type: 'session.create', session: 'game' }, {});
+    if (!ses.ok) throw new Error('会话创建失败：' + JSON.stringify(ses));
+    const task = T.currentTask();
+    if (!task.pluginSession || task.pluginSession.surfaceId !== 'game') throw new Error('会话没有绑定插件类型');
+    if (!/选一个/.test(T.plugSessionAfterReply(task))) throw new Error('每轮模板没有渲染');
+    T.plugStateSet(m, 'score', 2);
+    T.plugSessionAfterReply(task);
+    if (!task.pluginSession.ended) throw new Error('结束条件没有生效');
+    T.plugLifecycle(m, 'uninstall');
+    if (T.TASKS.some(t => t.id === task.id)) throw new Error('卸载没有清理插件会话');
+    T.USER_PLUGINS.length = 0;
+    T.showView('chat');
+    T.refreshSystemPrompt(false);
+  });
+
   await step('插件权限声明、授权和本地市场结构', () => {
     const safe = { manifestVersion: 1, apiVersion: '0.1', id: 'com.test.safe', name: '安全插件', permissions: [], tools: [{ name: 'safe_tool', description: '安全工具', permissions: [], kind: 'js', code: 'async function run(a){return a;}' }] };
     const dangerous = { manifestVersion: 1, apiVersion: '0.1', id: 'com.test.danger', name: '危险插件', permissions: ['files.public.write'], tools: [{ name: 'danger_tool', description: '写文件', permissions: ['files.public.write'], kind: 'js', code: 'async function run(a){return a;}' }] };

@@ -1,16 +1,17 @@
 # 交接说明（Handover）
 
 更新时间：2026-10-28
-当前阶段：**0.10.0 代码完成（E3 开放式插件运行时），0.11.0 待启动**——0.8.0 仍等 N1 真机复测（用户暂缓）；0.9.0 / 0.10.0 冻结项已落地，5 道自动门 + Gradle 全绿
-最新可用包：`apk/ElysiaFloat-v0.7.2-0.10dev-debug.apk`（versionCode 17 / versionName 0.7.2，0.10 开发候选包，可覆盖已装 0.7.x）
-SHA-256：`634b1af3169ad19c827b1f04fe174c8bb5ac98aed3b1905f2199c464de766e73`
-上一个候选包：`apk/ElysiaFloat-v0.7.2-0.9dev-debug.apk`（0.9 开发候选，SHA-256 `8a7dc745…`）；更早为 N1 修复候选 `apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（`b6e5c1d8…`）
+当前阶段：**0.11.0 代码完成（E4 插件 UI 运行时），0.12.0 待启动**——0.8.0 仍等 N1 真机复测（用户暂缓）；0.9.0 / 0.10.0 / 0.11.0 冻结项已落地，5 道自动门 + Gradle 全绿
+最新可用包：`apk/ElysiaFloat-v0.7.2-0.11dev-debug.apk`（versionCode 17 / versionName 0.7.2，0.11 开发候选包，可覆盖已装 0.7.x）
+SHA-256：`2d1fbac349e4ebacf9d033e6c89d753cc9cb9e6b3bcfc560468f8b0931429c08`
+上一个候选包：`apk/ElysiaFloat-v0.7.2-0.10dev-debug.apk`（0.10 开发候选，SHA-256 `634b1af3…`）；更早为 0.9 开发候选与 N1 修复候选（`8a7dc745…` / `b6e5c1d8…`）
 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（公开 Release 资产，SHA-256 `6cf5ff19…`）
 工作转移包：`handoff/ElysiaFloat-handoff-*.zip`（以同目录 `.sha256` 为准）；
 私有仓库归档：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`；
 N1 修复候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/n1fix-2026-10-28`（私有，需登录）；
 0.9 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.9-2026-10-28`（私有，需登录）；
-0.10 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.10-2026-10-28`（私有，需登录）。
+0.10 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.10-2026-10-28`（私有，需登录）；
+0.11 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.11-2026-10-28`（私有，需登录）。
 
 > 2026-10-28 补：本轮修复粘贴/复制（I-055）、横屏退出跑出屏幕（I-056）、
 > 音乐工具被 `toolsBroken` 毒化（I-057）、设备任务发送（I-058）、任务模式不调工具（I-059）。
@@ -52,7 +53,7 @@ commit `cb10e91`（索引更新 `1b2e09a`）、tag `v0.7.2`、Release 422140702�
 | **0.8.0** | 稳定收口（不加功能） | N1~N5 | **进行中**：N2/N3/N4/N5 完成，N1 待做 | 核心回归全绿 + 测试全绿 + 0.8.0 可覆盖安装 |
 | 0.9.0 | 核心体验 + 模型中心 | E1 + E2 | **代码完成**：E2-001~005/008、E1-001~004/006 已落地并通过自动门；真机待验；候选包已归档 | 首页永远是聊天；密钥不出日志；加 Provider 不改聊天代码 |
 | 0.10.0 | 开放式插件运行时 | E3 | **代码完成**：E3-001~009 已落地并通过自动门；真机待验；候选包已归档 | 插件注册宿主没写过的新页面/入口/会话/命令/任务，宿主零改动 |
-| 0.11.0 | 插件 UI 运行时 | E4 | **待启动**（下一步） | 主题/恋爱游戏/番茄钟三个验收场景通过 |
+| 0.11.0 | 插件 UI 运行时 | E4 | **代码完成**：E4-001~009 已落地，三个验收插件通过行为测试；真机待验；候选包已归档 | 主题/恋爱游戏/番茄钟三个验收场景通过 |
 | 0.12.0 | 依赖 + 持久会话 + Termux | E5 + E6 + G8-001 | 规划中 | 息屏 8 小时会话存活可恢复；Node/Mineflayer/NapCat 可安装卸载 |
 | 0.13.0 | MC 插件（无面板） | E7 | 规划中 | 30 分钟连续任务稳定、断线重连 |
 | 0.14.0 | QQ 插件（微型面板） | E8 | 规划中 | 私聊/群聊 24 小时稳定 |

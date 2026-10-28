@@ -11,12 +11,12 @@
  *  v1 清单（tools）继续按原样工作，不迁移也能运行。
  * ========================================================== */
 
-const PLUG_SURFACE_TYPES = ['page', 'entry', 'sessionType', 'command', 'event', 'job', 'settings', 'renderer', 'adapter'];
+const PLUG_SURFACE_TYPES = ['page', 'entry', 'sessionType', 'command', 'event', 'job', 'settings', 'renderer', 'adapter', 'theme'];
 const PLUG_COMPONENT_TYPES = ['layout', 'text', 'stat', 'button', 'input', 'select', 'list', 'table', 'image',
   'progress', 'chart', 'tabs', 'modal', 'choice', 'form', 'divider', 'spacer'];
 const PLUG_ACTION_TYPES = ['navigate', 'plugin.call', 'config.set', 'state.set', 'session.create', 'session.delete',
-  'message.send', 'theme.apply', 'confirm', 'openUrl', 'clipboard.write', 'job.schedule', 'dependency.install',
-  'custom'];
+  'message.send', 'theme.apply', 'theme.reset', 'confirm', 'openUrl', 'clipboard.write', 'job.schedule',
+  'dependency.install', 'custom'];
 const PLUG_CONFIG_TYPES = ['string', 'number', 'boolean', 'enum', 'secret', 'path', 'model-ref', 'json'];
 const PLUG_EVENT_NAMES = ['message.send', 'message.receive', 'session.create', 'session.delete', 'task.update',
   'job.run', 'plugin.enable', 'plugin.disable', 'dependency.ready', 'gateway.message'];
@@ -26,6 +26,7 @@ const PLUG_SURFACE_ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const PLUG_CONFIG_KEY = 'via_ai_plugin_config';
 const PLUG_STATE_KEY = 'via_ai_plugin_state';
 const PLUG_JOBS_KEY = 'via_ai_plugin_jobs';
+const PLUG_THEME_KEY = 'via_ai_theme';
 const PLUG_PAGE_VIEW = 'plug-page';
 const PLUG_MAX_TREE_DEPTH = 12;
 const PLUG_MAX_TREE_NODES = 300;
@@ -101,7 +102,7 @@ function plugNormalizeAction(a, declared) {
   if (permissions.some(p => declared.indexOf(p) < 0)) return null;
   const out = { type, permissions, confirm: a.confirm === true || typeof a.confirm === 'string' ? String(a.confirm || '').slice(0, 200) : '' };
   ['target', 'page', 'to', 'view', 'tool', 'key', 'path', 'value', 'text', 'url', 'session', 'job', 'message',
-    'label', 'okText', 'title', 'sid'].forEach(k => {
+    'label', 'okText', 'title', 'sid', 'theme', 'scope', 'mount', 'mode'].forEach(k => {
     if (a[k] !== undefined) out[k] = plugJsonSafe(a[k], 0);
   });
   if (a.args !== undefined) out.args = plugJsonSafe(a.args, 0);
@@ -126,13 +127,21 @@ function plugNormalizeSurface(s, declared) {
   if (type === 'page') {
     out.tree = plugJsonSafe(s.tree, 0);
     out.renderer = String(s.renderer || '').slice(0, 64);
+    out.style = plugNormalizeStyle(s.style);
   } else if (type === 'entry') {
     out.mount = PLUG_ENTRY_MOUNTS.indexOf(String(s.mount || '')) >= 0 ? String(s.mount) : 'plugins';
+    out.tree = plugJsonSafe(s.tree, 0);
+    out.renderer = String(s.renderer || '').slice(0, 64);
+    out.when = ['always', 'chat', 'session'].indexOf(String(s.when || '')) >= 0 ? String(s.when) : 'always';
+    out.style = plugNormalizeStyle(s.style);
   } else if (type === 'sessionType') {
     out.prompt = String(s.prompt || s.systemPrompt || '').slice(0, 4000);
     out.opening = String(s.opening || s.greeting || '').slice(0, 2000);
     out.stateSchema = plugJsonSafe(s.stateSchema, 0);
     out.endWhen = String(s.endWhen || '').slice(0, 200);
+    out.renderer = String(s.renderer || s.template || '').slice(0, 64);
+    out.deletable = s.deletable !== false;
+    out.vars = plugJsonSafe(s.vars, 0);
   } else if (type === 'command') {
     const cmd = String(s.command || '').trim();
     if (!/^\/[A-Za-z0-9_-]{1,32}$/.test(cmd)) return null;
@@ -148,6 +157,10 @@ function plugNormalizeSurface(s, declared) {
     out.config = plugNormalizeConfig(s.schema || s.config);
   } else if (type === 'renderer') {
     out.tree = plugJsonSafe(s.tree, 0);
+  } else if (type === 'theme') {
+    out.tokens = plugNormalizeThemeTokens(s.tokens || s.style);
+    out.background = plugSafeImage(s.background);
+    out.dark = s.dark === true;
   } else if (type === 'adapter') {
     out.kind = ['model', 'gateway', 'files', 'media'].indexOf(String(s.kind || '')) >= 0 ? String(s.kind) : 'model';
   }
@@ -218,6 +231,26 @@ function plugLifecycle(plugin, phase, payload) {
     const jobs = sGet(PLUG_JOBS_KEY, {}) || {};
     delete jobs[plugin.id];
     sSet(PLUG_JOBS_KEY, jobs);
+    plugThemeClearPlugin(plugin.id);
+    // 删除该插件创建的会话，避免卸载后留下无法归属的任务。
+    try {
+      const doomed = (typeof TASKS !== 'undefined' ? TASKS : []).filter(t => t && t.pluginSession && t.pluginSession.pluginId === plugin.id);
+      if (doomed.length) {
+        const ids = doomed.map(t => t.id);
+        doomed.forEach(t => {
+          const i = TASKS.indexOf(t);
+          if (i >= 0) TASKS.splice(i, 1);
+          try { sSet(taskHistoryKey(t.id), []); } catch (e) {}
+        });
+        if (ids.indexOf(CURRENT_TASK_ID) >= 0) {
+          const chat = TASKS.filter(t => t.type === 'chat')[0];
+          CURRENT_TASK_ID = chat ? chat.id : '';
+          if (chat) taskLoadContext(chat);
+        }
+        saveTasks();
+        plugAudit('session_cleanup', plugin, { tool: String(ids.length) });
+      }
+    } catch (e) {}
   }
   plugAudit('lifecycle_' + p, plugin, { tool: (payload && payload.surface) || '' });
   if (p === 'enable' || p === 'disable') {
@@ -428,7 +461,7 @@ function plugRenderNode(node, ctx) {
       const children = n.children || n.body || [];
       const dir = t === 'layout' && n.dir === 'row' ? ' pc-row' : '';
       const cls = t === 'modal' ? ' pc-modal' : (t === 'form' ? ' pc-form' : ' pc-layout');
-      let out = '<div class="pc' + cls + dir + '">';
+      let out = '<div class="pc' + cls + dir + '"' + plugStyleAttr(n.style) + '>';
       if (t === 'form' && n.title) out += '<div class="pc-title">' + kicker(n.title) + '</div>';
       out += plugRenderNode(children, ctx);
       if (t === 'form' && n.submit) out += plugRenderNode(Object.assign({ type: 'button' }, n.submit), ctx);
@@ -437,13 +470,13 @@ function plugRenderNode(node, ctx) {
     }
     if (t === 'text') {
       const size = ['sm', 'md', 'lg'].indexOf(String(n.size || '')) >= 0 ? ' pc-' + n.size : '';
-      return '<div class="pc pc-text' + (n.muted ? ' pc-muted' : '') + size + '">' + kicker(n.text != null ? n.text : n.value) + '</div>';
+      return '<div class="pc pc-text' + (n.muted ? ' pc-muted' : '') + size + '"' + plugStyleAttr(n.style) + '>' + kicker(n.text != null ? n.text : n.value) + '</div>';
     }
     if (t === 'stat') {
-      return '<div class="pc pc-stat"><div class="pc-stat-v">' + kicker(n.value) + '</div><div class="pc-stat-l">' + kicker(n.label) + '</div></div>';
+      return '<div class="pc pc-stat"' + plugStyleAttr(n.style) + '><div class="pc-stat-v">' + kicker(n.value) + '</div><div class="pc-stat-l">' + kicker(n.label) + '</div></div>';
     }
     if (t === 'button') {
-      return '<button type="button" class="pc-btn' + (n.primary ? ' pc-primary' : '') + '"' + plugActionAttr(ctx.plugin, n.action) + '>' + kicker(n.label || n.text) + '</button>';
+      return '<button type="button" class="pc-btn' + (n.primary ? ' pc-primary' : '') + '"' + plugStyleAttr(n.style) + plugActionAttr(ctx.plugin, n.action) + '>' + kicker(n.label || n.text) + '</button>';
     }
     if (t === 'input') {
       return '<label class="pc pc-field"><span>' + kicker(n.label) + '</span><input class="pc-input" data-plug-cfg="' + plugEsc(plugSafeId(n.key)) + '" value="' + kicker(n.value) + '" placeholder="' + kicker(n.placeholder) + '"></label>';
@@ -502,7 +535,10 @@ function plugRenderNode(node, ctx) {
         const act = plugPlainObject(o) ? o.action : null;
         return '<button type="button" class="pc-btn" ' + (act ? plugActionAttr(ctx.plugin, act) : 'data-plug-choice="' + plugEsc(String(label)) + '"') + '>' + plugEsc(String(label == null ? '' : label)) + '</button>';
       }).join('');
-      return '<div class="pc pc-choice">' + (n.prompt ? '<div class="pc-text">' + kicker(n.prompt) + '</div>' : '') + opts + '</div>';
+      // 自定义输入始终保留：插件只能给建议，不能锁死输入框。
+      const custom = n.custom === false ? '' : '<button type="button" class="pc-btn pc-mini" data-plug-choice-custom="1">' +
+        plugEsc(String(n.customLabel || '自定义输入…')) + '</button>';
+      return '<div class="pc pc-choice"' + plugStyleAttr(n.style) + '>' + (n.prompt ? '<div class="pc-text">' + kicker(n.prompt) + '</div>' : '') + opts + custom + '</div>';
     }
     if (t === 'divider') return '<div class="pc pc-divider"></div>';
     if (t === 'spacer') return '<div class="pc pc-spacer"></div>';
@@ -522,6 +558,272 @@ function plugRenderTree(tree, ctx) {
   };
   try { return walk(tree, 0); }
   catch (e) { return '<div class="pc pc-unknown">组件树渲染失败</div>'; }
+}
+
+/* ---------------- 样式令牌白名单 / 主题包（E4-002/003） ---------------- */
+const PLUG_COLOR_RE = /^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+)\s*)?\)|transparent|currentColor)$/;
+const PLUG_LEN_RE = /^(0|\d{1,3}(?:\.\d{1,2})?(?:px|%|rem|em))$/;
+const PLUG_WEIGHT_RE = /^(normal|bold|[1-9]00)$/;
+const PLUG_SHADOW_RE = /^(none|\d{1,3}px \d{1,3}px \d{1,3}px(?: \d{1,3}px)?(?: #[0-9a-fA-F]{3,8})?)$/;
+const PLUG_STYLE_KEYS = ['bg', 'color', 'radius', 'padding', 'margin', 'fontSize', 'fontWeight', 'opacity', 'shadow'];
+function plugColorOk(v) { return PLUG_COLOR_RE.test(String(v == null ? '' : v).trim()); }
+function plugGradientOk(v) {
+  const s = String(v == null ? '' : v).trim();
+  const m = /^linear-gradient\(\s*(0|45|90|135|180|225|270)deg\s*,\s*([^,]+)\s*,\s*([^,]+)\s*\)$/.exec(s);
+  return !!m && plugColorOk(m[2]) && plugColorOk(m[3]);
+}
+/** 把插件声明的样式令牌过白名单；不认识的键直接丢弃，绝不透传任意 CSS。 */
+function plugNormalizeStyle(style) {
+  if (!plugPlainObject(style)) return null;
+  const out = {};
+  PLUG_STYLE_KEYS.forEach(k => {
+    const v = style[k];
+    if (v == null || v === '') return;
+    const s = String(v).trim().slice(0, 80);
+    if (k === 'bg') { if (plugColorOk(s) || plugGradientOk(s)) out.bg = s; }
+    else if (k === 'color') { if (plugColorOk(s)) out.color = s; }
+    else if (k === 'radius' || k === 'padding' || k === 'margin' || k === 'fontSize') { if (PLUG_LEN_RE.test(s)) out[k] = s; }
+    else if (k === 'fontWeight') { if (PLUG_WEIGHT_RE.test(s)) out.fontWeight = s; }
+    else if (k === 'opacity') { const n = Number(s); if (Number.isFinite(n) && n >= 0 && n <= 1) out.opacity = String(n); }
+    else if (k === 'shadow') { if (PLUG_SHADOW_RE.test(s)) out.shadow = s; }
+  });
+  if (plugPlainObject(style.image)) out.image = plugSafeImage(style.image.src || style.image);
+  else if (style.image) out.image = plugSafeImage(style.image);
+  return Object.keys(out).length ? out : null;
+}
+function plugNormalizeThemeTokens(tokens) { return plugNormalizeStyle(tokens); }
+function plugStyleAttr(style) {
+  if (!style) return '';
+  const css = [];
+  if (style.bg) css.push('background:' + style.bg);
+  if (style.color) css.push('color:' + style.color);
+  if (style.radius) css.push('border-radius:' + style.radius);
+  if (style.padding) css.push('padding:' + style.padding);
+  if (style.margin) css.push('margin:' + style.margin);
+  if (style.fontSize) css.push('font-size:' + style.fontSize);
+  if (style.fontWeight) css.push('font-weight:' + style.fontWeight);
+  if (style.opacity) css.push('opacity:' + style.opacity);
+  if (style.shadow) css.push('box-shadow:' + style.shadow);
+  if (style.image) css.push('background-image:url("' + style.image + '")', 'background-size:cover');
+  return css.length ? ' style="' + plugEsc(css.join(';')) + '"' : '';
+}
+function plugThemesOf(plugin) { return plugin ? plugPluginSurfaces(plugin, 'theme') : []; }
+function plugThemeFind(pluginId, themeId) {
+  const plugin = USER_PLUGINS.filter(p => p.id === String(pluginId))[0];
+  if (!plugin) return null;
+  const s = plugThemesOf(plugin).filter(x => x.id === String(themeId))[0];
+  return s ? { plugin, surface: s } : null;
+}
+function plugThemeState() {
+  const all = sGet(PLUG_THEME_KEY, {});
+  const out = plugPlainObject(all) ? all : {};
+  if (!plugPlainObject(out.byTask)) out.byTask = {};
+  if (!plugPlainObject(out.global)) out.global = null;
+  return out;
+}
+/** 亮度对比：只对十六进制颜色做，返回 null 表示无法判断。 */
+function plugHexLum(hex) {
+  const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(String(hex || ''));
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  const n = parseInt(h, 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+function plugThemeContrast(tokens) {
+  if (!tokens || !tokens.bg || !tokens.color) return { ok: true, ratio: null };
+  const a = plugHexLum(tokens.bg), b = plugHexLum(tokens.color);
+  if (a == null || b == null) return { ok: true, ratio: null };
+  const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  return { ok: ratio >= 3, ratio: Math.round(ratio * 100) / 100 };
+}
+function plugPaintTheme(theme) {
+  const root = document.documentElement;
+  const app = $('#app');
+  if (!root || !root.style) return;
+  const t = theme && theme.tokens ? theme.tokens : {};
+  if (root.classList) root.classList.toggle('plug-themed', !!theme);
+  root.style.setProperty('--plug-bg', t.bg || '');
+  root.style.setProperty('--plug-msg-bg', t.bg || '');
+  root.style.setProperty('--plug-fg', t.color || '');
+  root.style.setProperty('--plug-radius', t.radius || '');
+  root.style.setProperty('--plug-font', t.fontSize || '');
+  root.style.setProperty('--plug-shadow', t.shadow || '');
+  const img = theme && theme.background ? theme.background : '';
+  if (app && app.style) app.style.backgroundImage = img ? 'url("' + img + '")' : '';
+}
+function plugThemeApply(plugin, themeId, scope, taskId) {
+  if (!plugin) return { ok: false, error: '插件不存在' };
+  const hit = plugThemesOf(plugin).filter(t => t.id === String(themeId))[0];
+  if (!hit) return { ok: false, error: '主题包不存在：' + String(themeId) };
+  if (!plugSurfaceEnabled(plugin, hit)) return { ok: false, error: '主题权限未授权或插件已停用' };
+  const theme = { pluginId: plugin.id, themeId: hit.id, tokens: hit.tokens || null, background: hit.background || '' };
+  const all = plugThemeState();
+  scope = scope === 'session' ? 'session' : 'global';
+  if (scope === 'session' && taskId) all.byTask[String(taskId)] = theme;
+  else all.global = theme;
+  sSet(PLUG_THEME_KEY, all);
+  const contrast = plugThemeContrast(theme.tokens || {});
+  if (!contrast.ok) plugAudit('theme_contrast', plugin, { tool: hit.id + ':' + contrast.ratio });
+  plugAudit('theme_apply', plugin, { tool: hit.id + ':' + scope });
+  plugPaintTheme(theme);
+  return { ok: true, contrast: contrast, themeId: hit.id, scope: scope };
+}
+function plugThemeReset(scope, taskId) {
+  const all = plugThemeState();
+  if (scope === 'session' && taskId) delete all.byTask[String(taskId)];
+  else if (scope === 'session') all.byTask = {};
+  else all.global = null;
+  sSet(PLUG_THEME_KEY, all);
+  plugThemeRestore();
+  return { ok: true };
+}
+function plugThemeRestore() {
+  const all = plugThemeState();
+  const task = String(CURRENT_TASK_ID || '');
+  const theme = (task && all.byTask[task]) || all.global || null;
+  plugPaintTheme(theme);
+  return theme;
+}
+function plugThemeClearPlugin(pluginId) {
+  const all = plugThemeState();
+  let changed = false;
+  if (all.global && all.global.pluginId === pluginId) { all.global = null; changed = true; }
+  Object.keys(all.byTask || {}).forEach(k => {
+    if (all.byTask[k] && all.byTask[k].pluginId === pluginId) { delete all.byTask[k]; changed = true; }
+  });
+  if (changed) { sSet(PLUG_THEME_KEY, all); plugThemeRestore(); }
+}
+
+/* ---------------- 挂载点注册表（E4-001） ---------------- */
+function plugMountEntries(mount) {
+  return plugSurfaceList('entry').filter(e => e.surface.mount === String(mount)).sort((a, b) =>
+    (a.surface.sort - b.surface.sort) || String(a.plugin.id + ':' + a.surface.id).localeCompare(String(b.plugin.id + ':' + b.surface.id)));
+}
+function plugMountVisible(entry) {
+  if (!entry || !entry.surface) return false;
+  const task = (typeof TASKS !== 'undefined' ? TASKS : []).filter(t => t.id === CURRENT_TASK_ID)[0];
+  if (entry.surface.when === 'session') return !!(task && task.pluginSession);
+  if (entry.surface.when === 'chat') return !!(task && task.type === 'chat');
+  return true;
+}
+function plugSurfaceTree(plugin, surface, ctx) {
+  let tree = surface && surface.tree;
+  if (!tree && surface && surface.renderer) {
+    const r = plugPluginSurfaces(plugin, 'renderer').filter(x => x.id === surface.renderer)[0];
+    if (r) tree = r.tree;
+  }
+  return tree ? plugRenderTree(tree, ctx) : '';
+}
+function plugMountHtml(mount, ctx) {
+  const list = plugMountEntries(mount).filter(plugMountVisible);
+  if (!list.length) return '';
+  return list.map(entry => {
+    const plugin = entry.plugin, surface = entry.surface;
+    const c = Object.assign({}, ctx || {}, {
+      plugin: plugHostApi(plugin, surface),
+      pluginInfo: { id: plugin.id, name: plugin.name, version: plugin.version },
+      state: plugStateGet(plugin),
+      config: plugConfigGet(plugin),
+      session: { id: CURRENT_TASK_ID || '', surface: surface.id }
+    });
+    const body = plugSurfaceTree(plugin, surface, c) ||
+      (surface.action ? '<button type="button" class="pc-btn pc-mini"' + plugActionAttr(plugin, surface.action) + '>' +
+        plugEsc(surface.action.label || surface.title) + '</button>' : '');
+    if (!body) return '';
+    return '<div class="plug-mount plug-mount-' + plugEsc(mount).replace(/\./g, '-') + '" data-plug-mount="' +
+      plugEsc(mount) + '">' + body + '</div>';
+  }).join('');
+}
+/** 把入口挂到聊天页的头部/输入区/消息后；容器不存在时静默跳过。 */
+function plugMountRefresh() {
+  const slots = [['chat.header', '#plug-mount-head'], ['chat.footer', '#plug-mount-foot'],
+    ['chat.composer.before', '#plug-mount-composer']];
+  slots.forEach(([mount, sel]) => {
+    const el = $(sel);
+    if (el) el.innerHTML = plugMountHtml(mount);
+  });
+}
+
+/* ---------------- 会话类型引擎（E4-004/005/006） ---------------- */
+function plugSessionOfTask(task) {
+  if (!task || !task.pluginSession) return null;
+  const plugin = USER_PLUGINS.filter(p => p.id === task.pluginSession.pluginId)[0];
+  if (!plugin) return null;
+  const surface = plugPluginSurfaces(plugin, 'sessionType').filter(s => s.id === task.pluginSession.surfaceId)[0];
+  return surface ? { plugin, surface } : null;
+}
+function plugSessionState(plugin, surface) {
+  const data = plugStateGet(plugin);
+  const schema = plugPlainObject(surface.stateSchema) ? surface.stateSchema : {};
+  const props = plugPlainObject(schema.properties) ? schema.properties : {};
+  Object.keys(props).slice(0, 40).forEach(k => {
+    if (Object.prototype.hasOwnProperty.call(data, k)) return;
+    const d = props[k] && props[k].default;
+    data[k] = d === undefined ? null : plugJsonSafe(d, 0);
+  });
+  if (!Object.prototype.hasOwnProperty.call(data, 'round')) data.round = 0;
+  plugStateSave(plugin, data);
+  return data;
+}
+function plugSessionEnded(surface, state) {
+  const m = /^([A-Za-z0-9_.]+)\s*(==|!=|>=|<=|>|<)\s*(.+)$/.exec(String(surface && surface.endWhen || '').trim());
+  if (!m) return false;
+  const left = plugCtxValue({ state: state || {} }, 'state.' + m[1]);
+  const right = String(m[3]).trim().replace(/^['"]|['"]$/g, '');
+  const ln = Number(left), rn = Number(right);
+  const numeric = left !== '' && right !== '' && Number.isFinite(ln) && Number.isFinite(rn);
+  if (m[2] === '==') return numeric ? ln === rn : String(left) === right;
+  if (m[2] === '!=') return numeric ? ln !== rn : String(left) !== right;
+  if (!numeric) return false;
+  if (m[2] === '>') return ln > rn;
+  if (m[2] === '<') return ln < rn;
+  if (m[2] === '>=') return ln >= rn;
+  return ln <= rn;
+}
+function plugAppendCard(html) {
+  const bodyEl = $('#body');
+  if (!bodyEl || !html) return null;
+  const d = document.createElement('div');
+  d.className = 'msg ai plug-card';
+  try { d.innerHTML = html; } catch (e) {}
+  bodyEl.appendChild(d);
+  bodyEl.scrollTop = bodyEl.scrollHeight;
+  return d;
+}
+/** 每轮回复后：渲染命名模板、推进 round、检查结束条件。只影响插件自己的会话。 */
+function plugSessionAfterReply(task) {
+  const hit = plugSessionOfTask(task);
+  if (!hit) return false;
+  const { plugin, surface } = hit;
+  if (task.pluginSession.ended) return false;
+  const state = plugSessionState(plugin, surface);
+  if (plugSessionEnded(surface, state)) {
+    task.pluginSession.ended = true;
+    plugStateSet(plugin, 'round', (parseInt(state.round, 10) || 0));
+    saveTasks();
+    plugEmit('session.delete', { pluginId: plugin.id, surfaceId: surface.id, taskId: task.id, ended: true });
+    const endedHtml = '<div class="pc pc-text pc-muted">这场会话已经结束了。你可以返回聊天，或新建一场。</div>';
+    plugAppendCard(endedHtml);
+    plugAudit('session_end', plugin, { tool: surface.id });
+    return endedHtml;
+  }
+  const ctx = {
+    plugin: plugHostApi(plugin, surface),
+    pluginInfo: { id: plugin.id, name: plugin.name, version: plugin.version },
+    state: state,
+    config: plugConfigGet(plugin),
+    session: { id: task.id, surface: surface.id, vars: (task.pluginSession.vars || {}), round: parseInt(state.round, 10) || 0 }
+  };
+  const html = plugSurfaceTree(plugin, surface, ctx);
+  const next = (parseInt(state.round, 10) || 0) + 1;
+  plugStateSet(plugin, 'round', next);
+  if (html) plugAppendCard(html);
+  return html;
 }
 
 /* ---------------- 动作 ---------------- */
@@ -609,7 +911,13 @@ async function plugRunAction(plugin, action, ctx) {
       const sid = String(action.job || action.target || '');
       return plugJobSchedule(plugin, sid);
     }
-    if (action.type === 'theme.apply') return { ok: false, error: '主题运行时将在 0.11 提供' };
+    if (action.type === 'theme.apply') {
+      return plugThemeApply(plugin, String(action.theme || action.target || ''), String(action.scope || 'global'),
+        String(action.session || ctx.sessionId || CURRENT_TASK_ID || ''));
+    }
+    if (action.type === 'theme.reset') {
+      return plugThemeReset(String(action.scope || 'global'), String(action.session || ctx.sessionId || CURRENT_TASK_ID || ''));
+    }
     if (action.type === 'dependency.install') return { ok: false, error: '依赖安装将在 0.12 提供' };
     if (action.type === 'confirm') return { ok: true };
     if (action.type === 'custom') return { ok: false, error: '0.10 不执行插件自定义代码；请使用通用动作' };
@@ -627,8 +935,9 @@ function plugSessionCreate(plugin, surfaceId, vars) {
   if (!hit) return { ok: false, error: '会话类型不存在：' + String(surfaceId) };
   if (!plugSurfaceEnabled(plugin, hit)) return { ok: false, error: '会话类型权限未授权' };
   const t = taskAdd('chat', hit.title, hit.prompt || hit.title);
-  t.pluginSession = { pluginId: plugin.id, surfaceId: hit.id, vars: plugJsonSafe(vars, 0) || {} };
+  t.pluginSession = { pluginId: plugin.id, surfaceId: hit.id, vars: plugJsonSafe(vars || hit.vars, 0) || {}, round: 0, ended: false };
   t.title = hit.title;
+  plugSessionState(plugin, hit);
   saveTasks();
   if (hit.opening) {
     history.push({ role: 'assistant', content: hit.opening });
@@ -834,7 +1143,8 @@ function plugRuntimeEntriesHtml() {
     const jobs = plugPluginSurfaces(p, 'job');
     const renderers = plugPluginSurfaces(p, 'renderer');
     const adapters = plugPluginSurfaces(p, 'adapter');
-    if (!pages.length && !settings.length && !entries.length && !sessions.length && !commands.length && !jobs.length) return;
+    const themes = plugPluginSurfaces(p, 'theme');
+    if (!pages.length && !settings.length && !entries.length && !sessions.length && !commands.length && !jobs.length && !themes.length) return;
     let block = '<div class="plug-group"><div class="plug-group-hd"><span class="plug-group-ic">' + plugEsc(p.icon) + '</span><span class="plug-group-name">' + plugEsc(p.name) +
       '<span class="plug-sub">v' + plugEsc(p.version) + ' · 开放运行时</span></span>' + (enabled ? '' : '<span class="plug-sub">已停用</span>') + '</div>';
     const nav = (label, pid, sid, disabled) => '<button type="button" class="pc-btn pc-mini" data-plug-open="' + plugEsc(pid + ':' + sid) + '"' + (disabled ? ' disabled' : '') + '>' + plugEsc(label) + '</button>';
@@ -849,6 +1159,14 @@ function plugRuntimeEntriesHtml() {
       const token = plugRegisterAction(p, { type: 'session.create', session: s.id, permissions: s.permissions });
       block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">' + plugEsc(s.title) + '</div><div class="pc-row-d">会话类型 · ' + plugEsc(s.id) + '</div></div>' +
         '<button type="button" class="pc-btn pc-mini" data-plug-act="' + plugEsc(token) + '"' + (enabled ? '' : ' disabled') + '>新建</button></div>';
+    });
+    themes.forEach(s => {
+      const apply = plugRegisterAction(p, { type: 'theme.apply', theme: s.id, scope: 'global', permissions: s.permissions });
+      const reset = plugRegisterAction(p, { type: 'theme.reset', scope: 'global', permissions: s.permissions });
+      const mark = s.background ? ' · 含背景图' : '';
+      block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">' + plugEsc(s.title) + '</div><div class="pc-row-d">主题包 · ' + plugEsc(s.id) + mark + '</div></div>' +
+        '<button type="button" class="pc-btn pc-mini" data-plug-act="' + plugEsc(apply) + '"' + (enabled ? '' : ' disabled') + '>应用</button>' +
+        '<button type="button" class="pc-btn pc-mini" data-plug-act="' + plugEsc(reset) + '"' + (enabled ? '' : ' disabled') + '>重置</button></div>';
     });
     if (commands.length) block += '<div class="pc-row-d">命令：' + plugEsc(commands.map(s => s.command).join(' ')) + '</div>';
     if (jobs.length) block += '<div class="pc-row-d">后台任务：' + plugEsc(jobs.map(s => s.id + '（每 ' + s.every + ' 秒）').join('、')) + '</div>';
@@ -871,6 +1189,17 @@ async function plugHandleUiAction(el) {
     if (!plugin) { toast('插件已不存在'); return true; }
     const r = await plugRunAction(plugin, ref.action, { sessionId: '' });
     if (!r || r.ok === false) toast((r && r.error) || '动作执行失败');
+    return true;
+  }
+  if (el.dataset.plugChoice) {
+    // 选择项只填入输入框，发送仍由用户决定；自定义输入不受限制。
+    const input = $('#input');
+    if (input) { input.value = String(el.dataset.plugChoice); input.focus(); }
+    return true;
+  }
+  if (el.dataset.plugChoiceCustom) {
+    const input = $('#input');
+    if (input) { input.value = ''; input.focus(); }
     return true;
   }
   if (el.dataset.plugOpen) {

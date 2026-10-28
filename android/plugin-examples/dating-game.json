@@ -1,0 +1,44 @@
+{
+  "manifestVersion": 2,
+  "apiVersion": "0.2",
+  "id": "com.example.game.date",
+  "name": "心动线（示例）",
+  "version": "1.0.0",
+  "author": "ElysiaFloat 示例",
+  "desc": "专属会话 + 每轮换模板 + 状态保存 + 结束条件，演示 E4 会话类型引擎。",
+  "permissions": [],
+  "surfaces": [
+    { "type": "theme", "id": "rose", "title": "玫瑰",
+      "tokens": { "bg": "#2a0f1a", "color": "#ffe3ec", "radius": "20px", "fontSize": "15px" } },
+    { "type": "renderer", "id": "scene",
+      "tree": {
+        "type": "layout",
+        "children": [
+          { "type": "text", "text": "第 {{session.round}} 轮 · 好感度 {{state.affinity}}", "muted": true },
+          { "type": "choice", "prompt": "你打算怎么做？", "options": [
+            { "label": "打招呼", "action": { "type": "state.set", "path": "affinity", "value": 1 } },
+            { "label": "送小礼物", "action": { "type": "state.set", "path": "affinity", "value": 2 } }
+          ] }
+        ]
+      } },
+    { "type": "sessionType", "id": "date", "title": "心动线", "opening": "初次见面，她抬头看了你一眼。",
+      "renderer": "scene", "deletable": true,
+      "stateSchema": { "properties": {
+        "round": { "default": 0 },
+        "affinity": { "default": 0 }
+      } },
+      "endWhen": "affinity >= 3" },
+    { "type": "entry", "id": "banner", "title": "心动线进行中", "mount": "chat.message.after", "when": "session", "sort": 10,
+      "tree": { "type": "text", "text": "心动线进行中，随时可以退回聊天或删除这场会话。", "muted": true } },
+    { "type": "page", "id": "status", "title": "心动线状态", "sort": 20,
+      "style": { "bg": "#2a0f1a", "color": "#ffe3ec", "radius": "20px", "padding": "12px" },
+      "tree": {
+        "type": "layout",
+        "children": [
+          { "type": "stat", "label": "好感度", "value": "{{state.affinity}}" },
+          { "type": "stat", "label": "轮次", "value": "{{session.round}}" },
+          { "type": "button", "label": "开始这场会话", "primary": true, "action": { "type": "session.create", "session": "date" } }
+        ]
+      } }
+  ]
+}

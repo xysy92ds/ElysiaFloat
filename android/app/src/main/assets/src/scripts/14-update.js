@@ -448,6 +448,7 @@ function renderUsageBox() {
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
+  const plugSettings = (typeof plugMountHtml === 'function') ? plugMountHtml('settings.section') : '';
   $('#settings').innerHTML = `
 <div class="sec-title">模型中心</div>
 <div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。聊天、识图、向量、语音可分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。</div>
@@ -646,6 +647,7 @@ function renderSettings() {
 <div class="acts" style="margin-top:8px">
   <button id="btn-plug-page" class="btn-p">打开插件与工具</button>
 </div>
+${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plug-mount">' + plugSettings + '</div>' : ''}
 
 <div class="sec-title">检查更新</div>
 <div class="mini-note" style="margin-top:8px">从 GitHub Releases 检测新版本，并下载安装包。</div>
@@ -694,6 +696,8 @@ function renderSettings() {
       e.preventDefault(); e.stopPropagation(); saveSettings(); return false;
     }
     if (actionEl && actionEl.dataset.action === 'settings-back') { showView('chat'); return false; }
+    const plugEl = e.target && e.target.closest ? e.target.closest('[data-plug-act],[data-plug-open],[data-plug-config]') : null;
+    if (plugEl) { plugHandleUiAction(plugEl); return; }
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
     if (b.id === 'btn-provider-add') { providerOpenForm(''); return; }

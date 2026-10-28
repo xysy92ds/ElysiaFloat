@@ -199,6 +199,7 @@ async function toggleUserPlug(id) {
   saveHistory();
   renderPlugins();
   renderPlugPreview();
+  if (typeof plugMountRefresh === 'function') plugMountRefresh();
   toast(p.enabled ? '已启用该插件' : '已停用该插件');
   vibrate(15);
 }
@@ -384,6 +385,7 @@ async function installMarketPlugin(id, source) {
   plugAudit(isUpdate ? 'update' : 'install', m, { source: m.source });
   plugLifecycle(m, 'install');
   renderPlugins(); renderPlugPreview(); renderPlugMarket();
+  if (typeof plugMountRefresh === 'function') plugMountRefresh();
   toast(isUpdate ? '已更新市场插件' : '已安装市场插件');
 }
 function renderPlugPreview() {
@@ -525,6 +527,7 @@ async function plugInstallFromText(text) {
   saveHistory();
   $('#plug-modal').classList.remove('open');
   renderPlugins();
+  if (typeof plugMountRefresh === 'function') plugMountRefresh();
   renderPlugPreview();
   toast('已安装 ' + names);
 }
@@ -532,7 +535,10 @@ async function plugInstallFromText(text) {
 async function plugDelete(id) {
   const p = USER_PLUGINS.filter(x => x.id === id)[0];
   if (!p) return;
-  const ok = await uiConfirm('确定删除插件「' + p.name + '」吗？它的工具会立即从 AI 手里消失。', '删除', '删除插件');
+  const sessions = (typeof TASKS !== 'undefined' ? TASKS : []).filter(t => t.pluginSession && t.pluginSession.pluginId === id).length;
+  const extra = sessions ? '，以及 ' + sessions + ' 个由它创建的会话' : '';
+  const ok = await uiConfirm('确定删除插件「' + p.name + '」吗？它的工具会立即从 AI 手里消失' + extra +
+    '；插件主题、配置和定时任务也会一并清理。', '删除', '删除插件');
   if (!ok) return;
   plugLifecycle(p, 'uninstall');
   USER_PLUGINS = USER_PLUGINS.filter(x => x.id !== id);
@@ -543,6 +549,7 @@ async function plugDelete(id) {
   saveHistory();
   renderPlugins();
   renderPlugPreview();
+  if (typeof plugMountRefresh === 'function') plugMountRefresh();
   toast('已删除插件');
 }
 
