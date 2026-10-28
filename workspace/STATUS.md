@@ -39,6 +39,7 @@
 - 0.13.1 本地离线验证：用 stub 的 mineflayer/pathfinder/minecraft-data/vec3 跑真 `bot.js`，验证 `/status`、`/chat` 的 since 过滤、第 31 条指令起限频、`audit.log` 32 行、SIGTERM 收尾。真机联调（Termux 装 Node、开房间端口、实际进世界）尚未做。
 - 0.13 候选包 SHA-256：`c1902d72d5fcca68c8a8c2797612edb9027be036025c90b42324cf701f3795fe`（2,707,413 字节），`apk/ElysiaFloat-v0.7.2-0.13dev-debug.apk`；内置 `index.html` 已含 R-005/R-006。
 - 0.13.1 候选包 SHA-256：`9252214966179cbbabd346fedabcd8f515a78a45ac71f699857cb5da89b2bfd3`（2,722,494 字节），`apk/ElysiaFloat-v0.7.2-0.13.1dev-debug.apk`（内置 `index.html` = `6cec6892…`）。APK 内置市场新增 Minecraft 条目（由 `tools/build-mc-manifest.js` 从清单生成 `src/scripts/04a-mc-market.js`），远程索引未推送也能在「插件市场」直接安装；`plugMarketEntries` 改为「远程版本更高时才覆盖内置条目」，避免内置版本挡住后续更新。
+- 0.13.1 已推送到私有仓库 `xysy92ds/ElysiaFloat-dev` main（commit `a4d7c9e`），Release `dev-0.13.1-2026-10-29` 已上传 APK + SHA256SUMS：https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.13.1-2026-10-29 。`marketplace/` 含 MC 插件 v0.3.1，也已随仓库推送（公开仓库暂未推送）。
 - 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
 - 当前质量门：`build-html.js --check`、`smoke.js`（含 MC-001/MC-002）、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`plugin-validate.js`、`assembleDebug` 全通过（2026-10-29 复跑，含 0.13.1 内置市场条目）；I-055~I-073 仍待真机复测。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。
