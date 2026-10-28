@@ -536,6 +536,9 @@ function step(name, fn) {
     if (!rule) throw new Error('缺少 #run-status 样式');
     if (/position:\s*(fixed|absolute)/.test(rule)) throw new Error('状态条不应浮在输入区上方遮挡输入');
     if (!/@keyframes runPulse/.test(css)) throw new Error('状态条缺少心跳动画');
+    // I-071：空的插件 composer 插槽不能占满整行，否则输入框被挤成一条缝。
+    if (!/#plug-mount-composer:empty\{display:none\}/.test(css)) throw new Error('composer 插槽为空时没有让位');
+    if (/#plug-mount-composer\{[^}]*width:100%/.test(css)) throw new Error('composer 插槽不应占满整行');
   });
 
   await step('G2：长任务预算和设置保存按钮结构', () => {

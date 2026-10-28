@@ -821,8 +821,10 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
 #plug-mount-head .plug-mount{margin-left:4px}
 #plug-mount-head .pc-btn{padding:4px 9px;font-size:11px}
 #plug-mount-foot{padding:0 10px;max-height:34vh;overflow-y:auto}
-#plug-mount-composer{width:100%;order:-1}
-#plug-mount-composer .plug-mount{width:100%}
+/* 插件 composer 插槽：为空时必须完全让位，否则 width:100% 会把输入框挤成一条缝。 */
+#plug-mount-composer:empty{display:none}
+#plug-mount-composer{flex:0 0 auto;width:auto;max-width:45%;order:0}
+#plug-mount-composer .plug-mount{width:auto}
 .msg.plug-card{background:transparent;border:0;box-shadow:none;padding:2px 0}
 .msg.plug-card .pc{background:var(--card);border:1px solid rgba(255,154,158,.26);
   border-radius:14px;padding:10px 12px}
