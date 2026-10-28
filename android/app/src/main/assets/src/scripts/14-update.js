@@ -400,7 +400,7 @@ function renderProviderCenter() {
   if (!bindBox && !list) return;
   const providers = (CONFIG.providers || []).filter(p => p && p.enabled !== false);
   if (bindBox) {
-    bindBox.innerHTML = ['chat', 'vision', 'embedding', 'tts'].map(purpose => {
+    bindBox.innerHTML = PROVIDER_PURPOSES.map(purpose => {
       const usable = providers.filter(p => (p.capabilities || []).indexOf(purpose) >= 0);
       const cur = (CONFIG.bindings && CONFIG.bindings[purpose] && CONFIG.bindings[purpose].provider) || '';
       return '<div class="sg"><label>' + esc(PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '</label>'
@@ -461,7 +461,7 @@ function renderSettings() {
   const plugSettings = (typeof plugMountHtml === 'function') ? plugMountHtml('settings.section') : '';
   $('#settings').innerHTML = `
 <div class="sec-title">模型中心</div>
-<div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。聊天、识图、向量、语音可分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。</div>
+<div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。对话、识图、生图、视频、向量、语音、语音识别、网页搜索都可以分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。网页搜索可以填 SearXNG 的地址，留空时用内置搜索引擎。</div>
 <div id="provider-bind-box"></div>
 <div id="provider-list" class="provider-list"></div>
 <div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-s">添加 Provider</button></div>

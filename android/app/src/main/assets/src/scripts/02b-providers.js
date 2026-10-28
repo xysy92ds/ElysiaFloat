@@ -13,16 +13,16 @@ const PROVIDER_KINDS = {
   gemini:    { label: 'Gemini',     defaultBase: 'https://generativelanguage.googleapis.com/v1beta' },
   custom:    { label: '自定义',      defaultBase: '' }
 };
-const PROVIDER_CAPS = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr', 'code'];
+const PROVIDER_CAPS = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr', 'code', 'search'];
 const PROVIDER_CAP_LABEL = {
   chat: '对话', vision: '识图', image: '生图', video: '视频',
-  embedding: '向量', tts: '语音', asr: '语音识别', code: '代码'
+  embedding: '向量', tts: '语音', asr: '语音识别', code: '代码', search: '网页搜索'
 };
-/** 可绑定用途；chat / vision / tts 与现有请求路径一一对应。 */
-const PROVIDER_PURPOSES = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr'];
+/** 可绑定用途；每一类都单独绑定，互不影响。 */
+const PROVIDER_PURPOSES = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr', 'search'];
 const PROVIDER_PURPOSE_LABEL = {
   chat: '聊天', vision: '识图', image: '生图', video: '视频',
-  embedding: '向量', tts: '语音', asr: '语音识别'
+  embedding: '向量', tts: '语音', asr: '语音识别', search: '网页搜索'
 };
 
 function providerId(prefix) {
@@ -240,7 +240,8 @@ function providerInferCaps(ids) {
     if (/image|dall-e|imagen|flux|stable-diffusion|sd3/.test(s)) caps.image = 1;
     if (/video|sora|veo|kling|runway/.test(s)) caps.video = 1;
     if (/code|coder|codex/.test(s)) caps.code = 1;
-    if (!/embed|tts|speech|whisper|transcri/.test(s)) caps.chat = 1;
+    if (/search|serper|tavily|bocha|searx|bing|perplex/.test(s)) caps.search = 1;
+    if (!/embed|tts|speech|whisper|transcri|search|serper|tavily|bocha|searx/.test(s)) caps.chat = 1;
   });
   return PROVIDER_CAPS.filter(c => caps[c]);
 }

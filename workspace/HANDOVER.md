@@ -1,10 +1,10 @@
 # 交接说明（Handover）
 
 更新时间：2026-10-28
-当前阶段：**0.12.0 代码完成（E5 依赖 + E6 持久会话 + G8-001 Termux），0.13.0 待启动**——0.8.0 仍等 N1 真机复测（用户暂缓）；0.9.0 / 0.10.0 / 0.11.0 / 0.12.0 冻结项已落地，5 道自动门 + Gradle 全绿
-最新可用包：`apk/ElysiaFloat-v0.7.2-0.12dev-debug.apk`（versionCode 17 / versionName 0.7.2，0.12 开发候选包，可覆盖已装 0.7.x）
-SHA-256：`c5662e24575d7df56e9a07c277bf7c072c8296fc6ee69cc03d00ac9af48c386d`
-上一个候选包：`apk/ElysiaFloat-v0.7.2-0.11dev-debug.apk`（0.11 开发候选，SHA-256 `2d1fbac3…`）；更早为 0.10 / 0.9 开发候选与 N1 修复候选（`634b1af3…` / `8a7dc745…` / `b6e5c1d8…`）
+当前阶段：**0.12.1 补丁完成（清空对话 bug / 联网阅读 / 模型全用途绑定），0.13.0 待启动**——0.8.0 仍等 N1 真机复测（用户暂缓）；0.9.0 / 0.10.0 / 0.11.0 / 0.12.0 / 0.12.1 冻结项已落地，5 道自动门 + Gradle 全绿
+最新可用包：`apk/ElysiaFloat-v0.7.2-0.12.1dev-debug.apk`（versionCode 17 / versionName 0.7.2，0.12.1 补丁候选包，可覆盖已装 0.7.x）
+SHA-256：`4770e2f8412ba948c02953374b3426f76c0dcfa720498a5dfd4943b2a5c85729`
+上一个候选包：`apk/ElysiaFloat-v0.7.2-0.12dev-debug.apk`（0.12 开发候选，SHA-256 `c5662e24…`）；更早为 0.11 / 0.10 / 0.9 开发候选与 N1 修复候选（`2d1fbac3…` / `634b1af3…` / `8a7dc745…` / `b6e5c1d8…`）
 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（公开 Release 资产，SHA-256 `6cf5ff19…`）
 工作转移包：`handoff/ElysiaFloat-handoff-*.zip`（以同目录 `.sha256` 为准）；
 私有仓库归档：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`；

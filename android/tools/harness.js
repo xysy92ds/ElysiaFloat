@@ -29,7 +29,7 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'reqRequest', 'REQ_CODE', 'REQ_RETRY_DELAY', 'reqAuditList', 'reqAuditClear', 'reqToken', 'reqIsRetriable', 'reqHost', 'reqSameHostOnly', 'musicStripVolatile', 'musicRemember', 'M', 'execTool', 'USER_PLUGINS', 'taskAdd', 'taskUpdate', 'taskResume', 'taskCancel', 'errMsg', 'TASKS', 'MEMCFG', 'checkUpdate',  'chatReq', 'memEmbed',  'mGetLyric', 'deviceState', 'deviceSetPhase', 'devicePhaseOf', 'deviceReset', 'deviceOrient', 'canParallelTool', 'isDeviceAction', 'DEVICE_PHASES', 'planToolBatch', 'screenDigest', 'screenFingerprint', 'screenCacheClear', 'deviceWaitChange', 'agentVerifyAction', 'deviceBudget', 'deviceBudgetLeft', 'deviceGrantMore', 'recordDeviceAction', 'closeModal', 'taskEnsureChat', 'chatTasks', 'taskBegin', 'detectModels', 'memAutoTick', 'memAutoState', 'memSummarize', 'taskFinish', 'routeTask', 'taskContinuable', 'cleanAssistantText', 'taskSetCurrent', 'addMsg', 'copyToClipboard', 'pasteIntoField', 'readClipboard', 'bindCtxMenu', 'modelTimeout', 'agentLevelAtLeast', 'previewKindOf', 'openPreview', 'addExportCard', 'prettyIfJson', 'cancelTaskRequests', 'currentTask', 'reqCancelledError',
   'showGuide', 'hideGuide', 'ensureGuideFooterVisible', 'activePermItems', 'PERM_ITEMS',
   'consentGranted', 'consentGrant', 'consentRevokeTask', 'ensureDeviceConsent', 'taskToolsAllowed',
-  'saveHistory', 'taskHistoryKey', 'clearTaskHistory', 'saveTasks',
+  'saveHistory', 'taskHistoryKey', 'clearTaskHistory', 'saveTasks', 'clearCurrentChat',
   'renderGuideSteps', 'webviewLevel', 'loadEnv', 'sdkAtLeast', 'detectCaps', 'send',
   'secretStore', 'secretHydrate', 'secretPersist', 'stripSecretFields', 'SECRET_FIELDS_CFG', 'SECRET_FIELDS_MEM',
   'sSet', 'sGet',
@@ -54,7 +54,9 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'PERSIST_TUNING', 'PERSIST_SNAPSHOT_KEY', 'PERSIST_LOG_KEY',
   'plugNormalizeDependency', 'plugDepPlan', 'plugDepStateOf', 'plugDepInstall', 'plugDepUninstall',
   'plugDepInstallAll', 'plugDepUninstallAll', 'plugDepVerify', 'plugDepPanelHtml', 'plugDepCounts',
-  'plugDepOpen', 'plugDepHandleUi', 'PLUG_DEP_CACHE_KEY', 'PLUG_DEP_ORDER'];
+  'plugDepOpen', 'plugDepHandleUi', 'PLUG_DEP_CACHE_KEY', 'PLUG_DEP_ORDER',
+  'webUrlCheck', 'webHostPrivate', 'htmlToText', 'htmlTitleOf', 'webSearchParseSearx',
+  'webSearchParseDdg', 'webSearchParseBing', 'webFetchTool', 'webSearchTool'];
 const cuts = js.lastIndexOf('})();');
 if (cuts < 0) { console.error('没找到 IIFE 结尾'); process.exit(1); }
 js = js.slice(0, cuts) + '\ntry { window.__T = {' + EXPORTS.join(',') + '}; window.__T.getHistory = function () { return history; }; } catch (e) { console.error("EXPORT FAIL", e); }\n' + js.slice(cuts);

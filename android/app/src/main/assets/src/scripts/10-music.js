@@ -915,6 +915,20 @@ function buildTools(runTask) {
       parameters: { type: 'object', properties: {
         text: { type: 'string', description: '要复制的文字' }
       }, required: ['text'] } } });
+  tools.push({ type: 'function', function: {
+      name: 'fetch_url',
+      description: '读取一个网页的正文（自动去掉脚本和样式，返回标题和文本）。用户给出网址、让你看链接内容、总结网页时调用。只支持 http/https 公网地址。',
+      parameters: { type: 'object', properties: {
+        url: { type: 'string', description: '完整网址，需带 http:// 或 https://' },
+        max_chars: { type: 'integer', description: '最多返回多少字，默认 8000，范围 500-20000' }
+      }, required: ['url'] } } });
+  tools.push({ type: 'function', function: {
+      name: 'web_search',
+      description: '按关键词搜索网页，返回标题、链接和摘要。需要查资料、找官网、确认最新信息时先用它，再用 fetch_url 深读结果。',
+      parameters: { type: 'object', properties: {
+        query: { type: 'string', description: '搜索关键词，最多 200 字' },
+        count: { type: 'integer', description: '返回条数，默认 8，范围 1-10' }
+      }, required: ['query'] } } });
 
   if (agentReadOn()) {
     tools.push({ type: 'function', function: {
@@ -1447,6 +1461,8 @@ async function execTool(name, args, runTask) {
     if (!args.text) return { success: false, error: '缺少文本' };
     return writeClipboard(args.text) ? { success: true } : { success: false, error: '写入剪贴板失败' };
   }
+  if (name === 'fetch_url') return webFetchTool(args);
+  if (name === 'web_search') return webSearchTool(args);
   if (agentActionNames().indexOf(name) >= 0) {
     if (!HAS_PERM) return { success: false, error: '当前环境没有 Agent 原生能力桥' };
     // G5-1：所有设备动作都从这里过相位与计数，保证任何调用方行为一致

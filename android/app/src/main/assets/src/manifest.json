@@ -22,6 +22,7 @@
     "scripts/08-translate.js",
     "scripts/09-ai-request.js",
     "scripts/10-music.js",
+    "scripts/10b-web.js",
     "scripts/11-plugin-engine.js",
     "scripts/12-send-quick.js",
     "scripts/13-settings.js",
@@ -134,6 +135,12 @@
         26
       ],
       "bytes": 59324
+    },
+    {
+      "file": "10b-web.js",
+      "title": "联网阅读（网页抓取与搜索）",
+      "chunks": [0, 0],
+      "bytes": 11311
     },
     {
       "file": "11-plugin-engine.js",

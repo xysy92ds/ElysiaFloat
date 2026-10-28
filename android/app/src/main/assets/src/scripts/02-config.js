@@ -102,6 +102,9 @@ const PLUGINS = [
   { id: 'system', name: '系统操作', icon: '系统',
     desc: '用系统浏览器打开网址、把文字写进剪贴板。',
     tools: ['open_url', 'set_clipboard'] },
+  { id: 'web', name: '联网阅读', icon: '🌐',
+    desc: '抓取你给的网址正文，或按关键词搜索网页。只读网页文本，不执行网页脚本。',
+    tools: ['fetch_url', 'web_search'] },
   { id: 'music', name: '音乐', icon: '🎵',
     desc: '搜歌、播放、暂停、切歌、收藏和管理缓存。需要音乐总开关开启。',
     tools: ['search_and_play_music', 'music_control'] },
@@ -148,6 +151,8 @@ const TOOL_DOC = {
   root_operation: '执行受控 Root 操作；只允许固定白名单操作。',
   open_url: '用系统浏览器打开网址。',
   set_clipboard: '把文字写进系统剪贴板。',
+  fetch_url: '抓取用户给出的网页地址并转成正文文本（含标题），用于阅读、总结和分析网页内容。只读，不执行脚本。',
+  web_search: '按关键词搜索网页，返回标题、链接和摘要。需要查资料或找入口时先用它，再用 fetch_url 深读。',
   search_and_play_music: '找歌并播放。',
   music_control: '暂停 / 继续 / 上一首 / 下一首 / 收藏 / 缓存管理。',
   list_memories: '检索你自己的长期记忆库（返回编号、分类、标题、摘要）。',
@@ -165,6 +170,7 @@ const PLUGIN_TIPS = {
   agent: '先用 find_app 查询设备上的真实应用名和包名，不要凭知识猜包名。launch_app 接受应用名或包名，但解析后仍必须通过白名单。点击、滑动和输入后要验证页面变化。',
   files: '文件工具访问公共存储。读取可以直接执行；工作区内的写入、复制、建目录不需要确认，覆盖前会自动留快照；工作区外的写入、复制、建目录及删除都必须逐次取得用户确认。不要把用户确认理解为永久授权。',
   system: '他说"打开这个链接"时用 open_url。',
+  web: '他给出网址、让你"看看网页里写了什么"、需要联网查资料时，先用 fetch_url 拿真实正文，不要凭记忆猜网页内容；只知道关键词时先用 web_search 找链接，再挑最相关的 fetch_url 深读。抓不到就如实说失败原因，不要编造页面内容。',
   music: '他说“我想听…”的时候直接用 search_and_play_music；需要暂停、切歌、收藏或管理缓存时使用 music_control。',
   memory: '记录长期信息时以 save_memory 新增为默认策略。类别相同不构成合并条件；只要是新的事实、进展或补充，即使类别相同也应新增。只有已有正文与新内容高度相似、明确属于同一事实时，才使用 update_memory；合并必须保留原文，并把补充内容追加在后面，不得缩写、覆盖或删除原有信息。需要修订原文时必须明确使用 replace=true。日常闲聊和一次性问答不要存。\n他问"你记得我什么"时，先 list_memories，再如实回答。删除记忆必须得到用户明确同意。'
 };
@@ -243,7 +249,7 @@ const DC = {
   usageDailyTokens: 0,
 
   workPrompt: '先说明计划，再分阶段执行。读取文件可以直接进行；写入、覆盖、复制、建目录和删除前必须说明目标并等待用户确认。每完成一个阶段就汇报状态，遇到权限拒绝、页面无变化或不可恢复错误时停止并如实说明。',
-  plugins: { screen: true, system: true, music: true, memory: true, agent: true, files: true },
+  plugins: { screen: true, system: true, web: true, music: true, memory: true, agent: true, files: true },
   autoCheckUpdate: true,
   systemPrompt: `爱莉希雅 · 桌面助手
 

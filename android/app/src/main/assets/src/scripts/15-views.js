@@ -370,11 +370,9 @@ function bindHeader() {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };
   bindMinButton();
-  const clearBtn = $('#btn-clr'); if (clearBtn) clearBtn.onclick = async () => {    if (!(await uiConfirm('清空当前对话？（记忆库会保留）', '清空'))) return;
-    history = [{ role: 'system', content: CONFIG.systemPrompt }];
-    saveHistory();
-    renderHistory();
-    toast('已清空对话，记忆还在~');
+  const clearBtn = $('#btn-clr'); if (clearBtn) clearBtn.onclick = async () => {
+    if (!(await uiConfirm('清空当前对话？（记忆库会保留）', '清空'))) return;
+    await clearCurrentChat();
   };
 }
 

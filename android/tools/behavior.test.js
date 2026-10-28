@@ -631,6 +631,71 @@ step('开放式运行时：v2 surface 隔离、私有存储与 secret 不落明�
     } catch (e) { errors.push('插件后台任务调度：失败退避 + 连续失败暂停（E6-005）: ' + e.message); }
   }
 
+  /* ================= 0.12.1 清空对话 / 联网阅读 / 全用途绑定 ================= */
+  {
+    try {
+      const chat = T.taskEnsureChat();
+      T.taskSetCurrent(chat.id);
+      pushMsg('clear-me');
+      T.saveHistory();
+      if (!hasMsg(T.getHistory(), 'clear-me')) throw new Error('测试消息没有写进历史');
+      await T.clearCurrentChat();
+      if (T.getHistory().filter(m => m.role !== 'system').length !== 0) throw new Error('清空后仍留有对话消息');
+      if (hasMsg(json(T.taskHistoryKey(chat.id)), 'clear-me')) throw new Error('清空后任务历史仍保留旧消息');
+      console.log('  ✓ 清空对话：当前任务历史与全局历史一起清空（0.12.1）');
+    } catch (e) { errors.push('清空对话（0.12.1）: ' + e.message); }
+
+    try {
+      if (!T.webUrlCheck('https://example.com/a?b=1').ok) throw new Error('正常公网地址被拒绝');
+      const bad = ['http://127.0.0.1/', 'http://localhost:8080/', 'http://192.168.1.1/', 'http://10.0.0.5/',
+        'file:///etc/passwd', 'ftp://example.com/', 'https://user:pass@example.com/', 'http://[::1]/'];
+      bad.forEach(u => { if (T.webUrlCheck(u).ok) throw new Error('不该放行的地址：' + u); });
+      console.log('  ✓ 联网阅读：拒绝本机 / 内网 / 非 http 地址');
+    } catch (e) { errors.push('联网阅读地址校验: ' + e.message); }
+
+    try {
+      const html = '<html><head><title>测试 &amp; 标题</title><style>p{color:red}</style></head>'
+        + '<body><script>alert(1)</script><h1>你好</h1><p>第一段 &lt;保留&gt;</p><p>第二段</p></body></html>';
+      if (T.htmlTitleOf(html) !== '测试 & 标题') throw new Error('标题提取不正确：' + T.htmlTitleOf(html));
+      const text = T.htmlToText(html);
+      if (/alert|color:red|<h1>|<p>/.test(text)) throw new Error('正文里仍含脚本/样式/标签：' + text);
+      if (text.indexOf('你好') < 0 || text.indexOf('第一段 <保留>') < 0) throw new Error('正文提取不完整：' + text);
+      console.log('  ✓ 联网阅读：HTML 去脚本样式并还原实体');
+    } catch (e) { errors.push('联网阅读正文提取: ' + e.message); }
+
+    try {
+      const searx = T.webSearchParseSearx({ results: [
+        { title: 'A', url: 'https://a.example/', content: '摘要 A' },
+        { title: 'B', url: 'javascript:alert(1)' }
+      ] });
+      if (searx.length !== 1 || searx[0].url !== 'https://a.example/') throw new Error('SearXNG 解析不正确');
+      const ddg = T.webSearchParseDdg('<a rel="nofollow" class="result__a" '
+        + 'href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fb.example%2Fp%3Fx%3D1&amp;rut=abc">B 标题</a>'
+        + '<a class="result__snippet">B 摘要</a>');
+      if (!ddg.length || ddg[0].url !== 'https://b.example/p?x=1') throw new Error('DuckDuckGo 解析不正确：' + JSON.stringify(ddg));
+      const bing = T.webSearchParseBing('<li class="b_algo"><h2><a href="https://c.example/">C</a></h2><p>C 摘要</p></li>');
+      if (!bing.length || bing[0].url !== 'https://c.example/' || bing[0].snippet !== 'C 摘要') throw new Error('Bing 解析不正确：' + JSON.stringify(bing));
+      console.log('  ✓ 联网阅读：三种搜索结果解析');
+    } catch (e) { errors.push('联网阅读搜索结果解析: ' + e.message); }
+
+    try {
+      const cfg = T.CONFIG;
+      T.providerUpsert(cfg, {
+        id: 'beh-search', name: '网页搜索', kind: 'custom',
+        base: 'https://searx.example', capabilities: ['search']
+      }, 'search-secret-xyz');
+      if (!T.providerBind(cfg, 'search', 'beh-search')) throw new Error('网页搜索用途绑定失败');
+      const r = T.providerResolve(cfg, 'search');
+      if (!r || r.provider.id !== 'beh-search') throw new Error('网页搜索用途没有解析到绑定 Provider');
+      ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr', 'search'].forEach(p => {
+        if (T.PROVIDER_PURPOSES.indexOf(p) < 0) throw new Error('缺少用途：' + p);
+      });
+      if (T.PROVIDER_CAPS.indexOf('search') < 0) throw new Error('缺少网页搜索能力标签');
+      T.providerRemove(cfg, 'beh-search');
+      console.log('  ✓ 模型中心：网页搜索与全部用途可独立绑定（0.12.1）');
+    } catch (e) { errors.push('模型中心全用途绑定: ' + e.message); }
+  }
+
   if (errors.length) {
     console.error('\n✗ 行为测试失败 ' + errors.length + ' 项：');
     errors.forEach(e => console.error('  - ' + e));

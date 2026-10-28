@@ -2556,6 +2556,9 @@ const PLUGINS = [
   { id: 'system', name: '系统操作', icon: '系统',
     desc: '用系统浏览器打开网址、把文字写进剪贴板。',
     tools: ['open_url', 'set_clipboard'] },
+  { id: 'web', name: '联网阅读', icon: '🌐',
+    desc: '抓取你给的网址正文，或按关键词搜索网页。只读网页文本，不执行网页脚本。',
+    tools: ['fetch_url', 'web_search'] },
   { id: 'music', name: '音乐', icon: '🎵',
     desc: '搜歌、播放、暂停、切歌、收藏和管理缓存。需要音乐总开关开启。',
     tools: ['search_and_play_music', 'music_control'] },
@@ -2602,6 +2605,8 @@ const TOOL_DOC = {
   root_operation: '执行受控 Root 操作；只允许固定白名单操作。',
   open_url: '用系统浏览器打开网址。',
   set_clipboard: '把文字写进系统剪贴板。',
+  fetch_url: '抓取用户给出的网页地址并转成正文文本（含标题），用于阅读、总结和分析网页内容。只读，不执行脚本。',
+  web_search: '按关键词搜索网页，返回标题、链接和摘要。需要查资料或找入口时先用它，再用 fetch_url 深读。',
   search_and_play_music: '找歌并播放。',
   music_control: '暂停 / 继续 / 上一首 / 下一首 / 收藏 / 缓存管理。',
   list_memories: '检索你自己的长期记忆库（返回编号、分类、标题、摘要）。',
@@ -2619,6 +2624,7 @@ const PLUGIN_TIPS = {
   agent: '先用 find_app 查询设备上的真实应用名和包名，不要凭知识猜包名。launch_app 接受应用名或包名，但解析后仍必须通过白名单。点击、滑动和输入后要验证页面变化。',
   files: '文件工具访问公共存储。读取可以直接执行；工作区内的写入、复制、建目录不需要确认，覆盖前会自动留快照；工作区外的写入、复制、建目录及删除都必须逐次取得用户确认。不要把用户确认理解为永久授权。',
   system: '他说"打开这个链接"时用 open_url。',
+  web: '他给出网址、让你"看看网页里写了什么"、需要联网查资料时，先用 fetch_url 拿真实正文，不要凭记忆猜网页内容；只知道关键词时先用 web_search 找链接，再挑最相关的 fetch_url 深读。抓不到就如实说失败原因，不要编造页面内容。',
   music: '他说“我想听…”的时候直接用 search_and_play_music；需要暂停、切歌、收藏或管理缓存时使用 music_control。',
   memory: '记录长期信息时以 save_memory 新增为默认策略。类别相同不构成合并条件；只要是新的事实、进展或补充，即使类别相同也应新增。只有已有正文与新内容高度相似、明确属于同一事实时，才使用 update_memory；合并必须保留原文，并把补充内容追加在后面，不得缩写、覆盖或删除原有信息。需要修订原文时必须明确使用 replace=true。日常闲聊和一次性问答不要存。\n他问"你记得我什么"时，先 list_memories，再如实回答。删除记忆必须得到用户明确同意。'
 };
@@ -2697,7 +2703,7 @@ const DC = {
   usageDailyTokens: 0,
 
   workPrompt: '先说明计划，再分阶段执行。读取文件可以直接进行；写入、覆盖、复制、建目录和删除前必须说明目标并等待用户确认。每完成一个阶段就汇报状态，遇到权限拒绝、页面无变化或不可恢复错误时停止并如实说明。',
-  plugins: { screen: true, system: true, music: true, memory: true, agent: true, files: true },
+  plugins: { screen: true, system: true, web: true, music: true, memory: true, agent: true, files: true },
   autoCheckUpdate: true,
   systemPrompt: `爱莉希雅 · 桌面助手
 
@@ -2804,16 +2810,16 @@ const PROVIDER_KINDS = {
   gemini:    { label: 'Gemini',     defaultBase: 'https://generativelanguage.googleapis.com/v1beta' },
   custom:    { label: '自定义',      defaultBase: '' }
 };
-const PROVIDER_CAPS = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr', 'code'];
+const PROVIDER_CAPS = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr', 'code', 'search'];
 const PROVIDER_CAP_LABEL = {
   chat: '对话', vision: '识图', image: '生图', video: '视频',
-  embedding: '向量', tts: '语音', asr: '语音识别', code: '代码'
+  embedding: '向量', tts: '语音', asr: '语音识别', code: '代码', search: '网页搜索'
 };
-/** 可绑定用途；chat / vision / tts 与现有请求路径一一对应。 */
-const PROVIDER_PURPOSES = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr'];
+/** 可绑定用途；每一类都单独绑定，互不影响。 */
+const PROVIDER_PURPOSES = ['chat', 'vision', 'image', 'video', 'embedding', 'tts', 'asr', 'search'];
 const PROVIDER_PURPOSE_LABEL = {
   chat: '聊天', vision: '识图', image: '生图', video: '视频',
-  embedding: '向量', tts: '语音', asr: '语音识别'
+  embedding: '向量', tts: '语音', asr: '语音识别', search: '网页搜索'
 };
 
 function providerId(prefix) {
@@ -3031,7 +3037,8 @@ function providerInferCaps(ids) {
     if (/image|dall-e|imagen|flux|stable-diffusion|sd3/.test(s)) caps.image = 1;
     if (/video|sora|veo|kling|runway/.test(s)) caps.video = 1;
     if (/code|coder|codex/.test(s)) caps.code = 1;
-    if (!/embed|tts|speech|whisper|transcri/.test(s)) caps.chat = 1;
+    if (/search|serper|tavily|bocha|searx|bing|perplex/.test(s)) caps.search = 1;
+    if (!/embed|tts|speech|whisper|transcri|search|serper|tavily|bocha|searx/.test(s)) caps.chat = 1;
   });
   return PROVIDER_CAPS.filter(c => caps[c]);
 }
@@ -3628,6 +3635,20 @@ function clearTaskHistory(id) {
   const t = TASKS.find(x => x.id === id);
   if (t) { t.context = { messages: [], taskScoped: true }; t.updatedAt = taskNow(); saveTasks(); }
 }
+/**
+ * 清空当前任务的对话上下文（记忆库保留）。
+ * 0.12.1：快捷面板「清空」和记忆整理后的「清空对话」都调用它；
+ * 旧版只调用、从未定义，运行期直接抛 ReferenceError。
+ */
+async function clearCurrentChat() {
+  const t = currentTask();
+  history = [{ role: 'system', content: CONFIG.systemPrompt }];
+  if (t) clearTaskHistory(t.id);
+  saveHistory();
+  renderHistory();
+  toast('已清空当前对话，记忆还在~');
+  return true;
+}
 async function deleteTask(id) {
   const t = TASKS.find(x => x.id === id); if (!t) return;
   if (t.type === 'chat' && chatTasks().length <= 1) return toast('至少要保留一个聊天，只能清空上下文');
@@ -3872,6 +3893,7 @@ function toolLive(name) {
   }
   if (name === 'run_termux_job' || name === 'root_operation') return plugOn('runtime') && agentActionsOn();
   if (name === 'open_url' || name === 'set_clipboard') return plugOn('system');
+  if (name === 'fetch_url' || name === 'web_search') return plugOn('web');
   if (name === 'search_and_play_music' || name === 'music_control') return plugOn('music') && !!CONFIG.musicEnabled && !(CONFIG.toolOff && CONFIG.toolOff[name]);
   return plugOn('memory');   // 剩下的都是记忆组
 }
@@ -9274,6 +9296,20 @@ function buildTools(runTask) {
       parameters: { type: 'object', properties: {
         text: { type: 'string', description: '要复制的文字' }
       }, required: ['text'] } } });
+  tools.push({ type: 'function', function: {
+      name: 'fetch_url',
+      description: '读取一个网页的正文（自动去掉脚本和样式，返回标题和文本）。用户给出网址、让你看链接内容、总结网页时调用。只支持 http/https 公网地址。',
+      parameters: { type: 'object', properties: {
+        url: { type: 'string', description: '完整网址，需带 http:// 或 https://' },
+        max_chars: { type: 'integer', description: '最多返回多少字，默认 8000，范围 500-20000' }
+      }, required: ['url'] } } });
+  tools.push({ type: 'function', function: {
+      name: 'web_search',
+      description: '按关键词搜索网页，返回标题、链接和摘要。需要查资料、找官网、确认最新信息时先用它，再用 fetch_url 深读结果。',
+      parameters: { type: 'object', properties: {
+        query: { type: 'string', description: '搜索关键词，最多 200 字' },
+        count: { type: 'integer', description: '返回条数，默认 8，范围 1-10' }
+      }, required: ['query'] } } });
 
   if (agentReadOn()) {
     tools.push({ type: 'function', function: {
@@ -9806,6 +9842,8 @@ async function execTool(name, args, runTask) {
     if (!args.text) return { success: false, error: '缺少文本' };
     return writeClipboard(args.text) ? { success: true } : { success: false, error: '写入剪贴板失败' };
   }
+  if (name === 'fetch_url') return webFetchTool(args);
+  if (name === 'web_search') return webSearchTool(args);
   if (agentActionNames().indexOf(name) >= 0) {
     if (!HAS_PERM) return { success: false, error: '当前环境没有 Agent 原生能力桥' };
     // G5-1：所有设备动作都从这里过相位与计数，保证任何调用方行为一致
@@ -10039,6 +10077,278 @@ async function execTool(name, args, runTask) {
   return { success: false, error: '未知工具' };
 }
 
+/* ==========================================================
+ *  联网阅读（0.12.1）
+ *
+ *  两个面向 AI 的只读工具：
+ *   - fetch_url：抓取用户给的网址，去掉脚本/样式后返回标题与正文
+ *   - web_search：按关键词搜索网页，返回标题、链接、摘要
+ *
+ *  安全边界：
+ *   - 只允许 http/https 公网地址，拒绝本机、内网、链路本地地址
+ *   - 不执行网页脚本，不加载网页里的任何代码
+ *   - 响应有大小与字数上限，超时即失败
+ * ========================================================== */
+const WEB_UA = 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36 ElysiaFloat/0.12';
+const WEB_FETCH_MAX_BYTES = 1500000;
+const WEB_SEARCH_MAX_BYTES = 900000;
+const WEB_TEXT_MAX = 20000;
+
+/** 是否为内网 / 本机 / 链路本地地址 */
+function webHostPrivate(host) {
+  let h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!h) return true;
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')) return true;
+  if (h.indexOf(':') >= 0) {
+    if (h === '::1' || h === '::') return true;
+    if (/^f[cd]/.test(h) || /^fe[89ab]/.test(h)) return true;
+    const mapped = h.match(/::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (mapped) return webHostPrivate(mapped[1]);
+    return false;
+  }
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;   // 域名交给 DNS，不在本地判断
+  const p = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+  if (p.some(n => n > 255)) return true;
+  if (p[0] === 0 || p[0] === 10 || p[0] === 127) return true;
+  if (p[0] === 169 && p[1] === 254) return true;
+  if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true;
+  if (p[0] === 192 && p[1] === 168) return true;
+  if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return true;
+  if (p[0] >= 224) return true;
+  return false;
+}
+
+/** 校验网址：返回 { ok, url, error } */
+function webUrlCheck(raw) {
+  const text = String(raw == null ? '' : raw).trim();
+  if (!text) return { ok: false, error: '缺少网址' };
+  let u;
+  try { u = new URL(text); } catch (e) { return { ok: false, error: '网址格式不正确' }; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, error: '只支持 http / https 地址' };
+  if (u.username || u.password) return { ok: false, error: '网址里不能带账号密码' };
+  if (!u.hostname) return { ok: false, error: '网址缺少主机名' };
+  if (webHostPrivate(u.hostname)) return { ok: false, error: '不能访问本机或内网地址' };
+  return { ok: true, url: u.href };
+}
+
+function decodeWebEntities(s) {
+  const map = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', hellip: '…', mdash: '—', ndash: '–', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', middot: '·' };
+  return String(s || '').replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, function (all, g) {
+    if (g.charAt(0) === '#') {
+      const n = g.charAt(1).toLowerCase() === 'x' ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10);
+      return n > 0 && n < 1114112 ? String.fromCodePoint(n) : all;
+    }
+    const v = map[g.toLowerCase()];
+    return v === undefined ? all : v;
+  });
+}
+
+/** HTML → 纯文本：去掉脚本、样式、注释和标签，压缩空白 */
+function htmlToText(html) {
+  let s = String(html || '');
+  s = s.replace(/<!--[\s\S]*?-->/g, ' ');
+  s = s.replace(/<(script|style|noscript|svg|iframe|template|head)[\s\S]*?<\/\1>/gi, ' ');
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/(p|div|section|article|header|footer|li|tr|h[1-6]|blockquote|pre|table)>/gi, '\n');
+  s = s.replace(/<[^>]+>/g, ' ');
+  s = decodeWebEntities(s);
+  s = s.replace(/\r/g, '\n').replace(/[ \t\f\v]+/g, ' ');
+  s = s.replace(/\n[ ]+/g, '\n').replace(/[ ]+\n/g, '\n');
+  s = s.replace(/\n{3,}/g, '\n\n');
+  return s.trim();
+}
+
+function htmlTitleOf(html) {
+  const m = String(html || '').match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return m ? htmlToText(m[1]).slice(0, 200) : '';
+}
+
+/** fetch_url：抓网页正文 */
+async function webFetchTool(args) {
+  const checked = webUrlCheck(args && args.url);
+  if (!checked.ok) return { success: false, errorCode: 'INVALID_URL', error: checked.error };
+  const maxChars = Math.max(500, Math.min(20000, parseInt(args && args.max_chars, 10) || 8000));
+  let r;
+  try {
+    r = await reqRequest({
+      url: checked.url,
+      method: 'GET',
+      headers: {
+        'User-Agent': WEB_UA,
+        'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.6'
+      },
+      timeoutMs: 20000,
+      retries: 0,
+      maxRedirect: 3,
+      maxBytes: WEB_FETCH_MAX_BYTES,
+      expect: 'text',
+      source: 'web:fetch'
+    });
+  } catch (e) {
+    return { success: false, errorCode: (e && e.code) || 'FETCH_FAILED', error: '抓取失败：' + errMsg(e) };
+  }
+  const finalCheck = webUrlCheck(r.url || checked.url);
+  if (!finalCheck.ok) return { success: false, errorCode: 'REDIRECT_BLOCKED', error: '页面跳转到了不允许的地址' };
+  const ct = String(r.contentType || '').toLowerCase();
+  const looksHtml = /html|xml/.test(ct) || /^\s*</.test(String(r.text || ''));
+  if (ct && !looksHtml && !/text\/|json|plain/.test(ct)) {
+    return { success: false, errorCode: 'UNSUPPORTED_CONTENT', error: '这个地址返回的是 ' + ct + '，不是可读的网页正文' };
+  }
+  const raw = String(r.text || '');
+  if (!raw.trim()) return { success: false, errorCode: 'EMPTY_PAGE', error: '页面没有可读内容' };
+  const title = looksHtml ? htmlTitleOf(raw) : '';
+  const full = looksHtml ? htmlToText(raw) : raw;
+  const text = full.slice(0, maxChars);
+  return {
+    success: true,
+    url: finalCheck.url,
+    title: title,
+    chars: full.length,
+    truncated: full.length > text.length,
+    text: text
+  };
+}
+
+/* ---------------- 网页搜索 ---------------- */
+
+function webSearchProviderCfg() {
+  if (typeof providerResolve !== 'function') return null;
+  let r = null;
+  try { r = providerResolve(CONFIG, 'search'); } catch (e) {}
+  if (!r || !String(r.base || '').trim()) return null;
+  return r;
+}
+
+function webSearchParseSearx(data) {
+  const list = data && Array.isArray(data.results) ? data.results : [];
+  const out = [];
+  list.forEach(item => {
+    if (!item || !item.url) return;
+    const url = String(item.url);
+    if (!/^https?:/i.test(url)) return;
+    out.push({
+      title: String(item.title || url).slice(0, 160),
+      url: url,
+      snippet: String(item.content || '').replace(/\s+/g, ' ').slice(0, 280)
+    });
+  });
+  return out;
+}
+
+function webSearchParseDdg(html) {
+  const s = String(html || '');
+  const out = [];
+  const re = /<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = re.exec(s)) && out.length < 12) {
+    let href = decodeWebEntities(m[1]);
+    const uddg = href.match(/[?&]uddg=([^&]+)/);
+    if (uddg) { try { href = decodeURIComponent(uddg[1]); } catch (e) {} }
+    if (href.indexOf('//') === 0) href = 'https:' + href;
+    if (!/^https?:/i.test(href)) continue;
+    const chunk = s.slice(re.lastIndex, re.lastIndex + 4000);
+    const sn = chunk.match(/class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/(a|div|span)>/i);
+    out.push({
+      title: htmlToText(m[2]).slice(0, 160),
+      url: href,
+      snippet: sn ? htmlToText(sn[1]).slice(0, 280) : ''
+    });
+  }
+  return out;
+}
+
+function webSearchParseBing(html) {
+  const blocks = String(html || '').split(/<li class="b_algo"/i).slice(1);
+  const out = [];
+  blocks.forEach(b => {
+    const a = b.match(/<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!a) return;
+    const href = decodeWebEntities(a[1]);
+    if (!/^https?:/i.test(href)) return;
+    const p = b.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    out.push({
+      title: htmlToText(a[2]).slice(0, 160),
+      url: href,
+      snippet: p ? htmlToText(p[1]).slice(0, 280) : ''
+    });
+  });
+  return out;
+}
+
+async function webSearchSearx(provider, query) {
+  let base = String(provider.base || '').replace(/\/+$/, '');
+  if (!/\/search$/.test(base)) base += '/search';
+  const headers = { 'Accept': 'application/json', 'User-Agent': WEB_UA };
+  if (provider.key) headers['Authorization'] = 'Bearer ' + provider.key;
+  const r = await reqRequest({
+    url: base + '?q=' + encodeURIComponent(query) + '&format=json&language=zh-CN&safesearch=1',
+    method: 'GET', headers: headers,
+    timeoutMs: 15000, retries: 0, maxRedirect: 2, maxBytes: WEB_SEARCH_MAX_BYTES,
+    expect: 'json', source: 'web:search'
+  });
+  return webSearchParseSearx(r.json);
+}
+
+async function webSearchDdg(query) {
+  const r = await reqRequest({
+    url: 'https://html.duckduckgo.com/html/',
+    method: 'POST',
+    headers: {
+      'User-Agent': WEB_UA,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'text/html',
+      'Accept-Language': 'zh-CN,zh;q=0.9'
+    },
+    body: 'q=' + encodeURIComponent(query) + '&kl=cn-zh',
+    timeoutMs: 15000, retries: 0, maxRedirect: 3, maxBytes: WEB_SEARCH_MAX_BYTES,
+    expect: 'text', source: 'web:search'
+  });
+  return webSearchParseDdg(r.text);
+}
+
+async function webSearchBing(query) {
+  const r = await reqRequest({
+    url: 'https://www.bing.com/search?q=' + encodeURIComponent(query) + '&setlang=zh-Hans',
+    method: 'GET',
+    headers: { 'User-Agent': WEB_UA, 'Accept': 'text/html', 'Accept-Language': 'zh-CN,zh;q=0.9' },
+    timeoutMs: 15000, retries: 0, maxRedirect: 3, maxBytes: WEB_SEARCH_MAX_BYTES,
+    expect: 'text', source: 'web:search'
+  });
+  return webSearchParseBing(r.text);
+}
+
+/** web_search：先自建 SearXNG，再 DuckDuckGo，最后 Bing */
+async function webSearchTool(args) {
+  const query = String(args && args.query || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+  if (!query) return { success: false, errorCode: 'INVALID_QUERY', error: '缺少搜索关键词' };
+  const count = Math.max(1, Math.min(10, parseInt(args && args.count, 10) || 8));
+  const errors = [];
+  const tried = [];
+  const provider = webSearchProviderCfg();
+  if (provider) {
+    tried.push('searxng');
+    try {
+      const rs = await webSearchSearx(provider, query);
+      if (rs.length) return { success: true, query: query, engine: 'searxng', count: Math.min(rs.length, count), results: rs.slice(0, count) };
+      errors.push('SearXNG：没有结果');
+    } catch (e) { errors.push('SearXNG：' + errMsg(e)); }
+  }
+  tried.push('duckduckgo');
+  try {
+    const rs = await webSearchDdg(query);
+    if (rs.length) return { success: true, query: query, engine: 'duckduckgo', count: Math.min(rs.length, count), results: rs.slice(0, count) };
+    errors.push('DuckDuckGo：没有结果');
+  } catch (e) { errors.push('DuckDuckGo：' + errMsg(e)); }
+  tried.push('bing');
+  try {
+    const rs = await webSearchBing(query);
+    if (rs.length) return { success: true, query: query, engine: 'bing', count: Math.min(rs.length, count), results: rs.slice(0, count) };
+    errors.push('Bing：没有结果');
+  } catch (e) { errors.push('Bing：' + errMsg(e)); }
+  return { success: false, errorCode: 'SEARCH_FAILED', error: '搜索失败：' + errors.join('；'), tried: tried };
+}
 /* ==========================================================
  *  插件执行引擎
  *   - http 类：宿主直接发请求（先做 URL 校验）
@@ -11783,7 +12093,7 @@ function renderProviderCenter() {
   if (!bindBox && !list) return;
   const providers = (CONFIG.providers || []).filter(p => p && p.enabled !== false);
   if (bindBox) {
-    bindBox.innerHTML = ['chat', 'vision', 'embedding', 'tts'].map(purpose => {
+    bindBox.innerHTML = PROVIDER_PURPOSES.map(purpose => {
       const usable = providers.filter(p => (p.capabilities || []).indexOf(purpose) >= 0);
       const cur = (CONFIG.bindings && CONFIG.bindings[purpose] && CONFIG.bindings[purpose].provider) || '';
       return '<div class="sg"><label>' + esc(PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '</label>'
@@ -11844,7 +12154,7 @@ function renderSettings() {
   const plugSettings = (typeof plugMountHtml === 'function') ? plugMountHtml('settings.section') : '';
   $('#settings').innerHTML = `
 <div class="sec-title">模型中心</div>
-<div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。聊天、识图、向量、语音可分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。</div>
+<div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。对话、识图、生图、视频、向量、语音、语音识别、网页搜索都可以分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。网页搜索可以填 SearXNG 的地址，留空时用内置搜索引擎。</div>
 <div id="provider-bind-box"></div>
 <div id="provider-list" class="provider-list"></div>
 <div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-s">添加 Provider</button></div>
@@ -12865,11 +13175,9 @@ function bindHeader() {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };
   bindMinButton();
-  const clearBtn = $('#btn-clr'); if (clearBtn) clearBtn.onclick = async () => {    if (!(await uiConfirm('清空当前对话？（记忆库会保留）', '清空'))) return;
-    history = [{ role: 'system', content: CONFIG.systemPrompt }];
-    saveHistory();
-    renderHistory();
-    toast('已清空对话，记忆还在~');
+  const clearBtn = $('#btn-clr'); if (clearBtn) clearBtn.onclick = async () => {
+    if (!(await uiConfirm('清空当前对话？（记忆库会保留）', '清空'))) return;
+    await clearCurrentChat();
   };
 }
 

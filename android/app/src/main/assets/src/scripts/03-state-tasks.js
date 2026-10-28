@@ -421,6 +421,20 @@ function clearTaskHistory(id) {
   const t = TASKS.find(x => x.id === id);
   if (t) { t.context = { messages: [], taskScoped: true }; t.updatedAt = taskNow(); saveTasks(); }
 }
+/**
+ * 清空当前任务的对话上下文（记忆库保留）。
+ * 0.12.1：快捷面板「清空」和记忆整理后的「清空对话」都调用它；
+ * 旧版只调用、从未定义，运行期直接抛 ReferenceError。
+ */
+async function clearCurrentChat() {
+  const t = currentTask();
+  history = [{ role: 'system', content: CONFIG.systemPrompt }];
+  if (t) clearTaskHistory(t.id);
+  saveHistory();
+  renderHistory();
+  toast('已清空当前对话，记忆还在~');
+  return true;
+}
 async function deleteTask(id) {
   const t = TASKS.find(x => x.id === id); if (!t) return;
   if (t.type === 'chat' && chatTasks().length <= 1) return toast('至少要保留一个聊天，只能清空上下文');
@@ -665,6 +679,7 @@ function toolLive(name) {
   }
   if (name === 'run_termux_job' || name === 'root_operation') return plugOn('runtime') && agentActionsOn();
   if (name === 'open_url' || name === 'set_clipboard') return plugOn('system');
+  if (name === 'fetch_url' || name === 'web_search') return plugOn('web');
   if (name === 'search_and_play_music' || name === 'music_control') return plugOn('music') && !!CONFIG.musicEnabled && !(CONFIG.toolOff && CONFIG.toolOff[name]);
   return plugOn('memory');   // 剩下的都是记忆组
 }
