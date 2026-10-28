@@ -222,6 +222,26 @@ step('用量与限额：达到上限后拦下新请求（E2-008）', () => {
   T.usageReset();
 });
 
+step('会话级自动确认：只在当前任务生效、过期即失效并留审计（E1-003）', () => {
+  const t = T.taskEnsureChat();
+  T.autoConfirmOff('test');
+  if (T.autoConfirmActive(t.id)) throw new Error('默认不应处于自动确认');
+  T.autoConfirmOn(t.id);
+  if (!T.autoConfirmActive(t.id)) throw new Error('开启后当前任务没有生效');
+  const other = T.taskAdd('workspace', '自动确认隔离', '');
+  if (T.autoConfirmActive(other.id)) throw new Error('自动确认串到了另一个任务');
+  T.AUTO_CONFIRM.until = Date.now() - 1;
+  if (T.autoConfirmActive(t.id)) throw new Error('过期后仍生效');
+  const ev = (T.TASKS.find(x => x.id === t.id).events || []).filter(e => e.type === 'auto_confirm_on');
+  if (!ev.length) throw new Error('缺少自动确认开启审计');
+  const scope = ev[ev.length - 1].data && ev[ev.length - 1].data.scope;
+  if (!Array.isArray(scope) || scope.indexOf('device') < 0 || scope.indexOf('external_write') < 0) {
+    throw new Error('审计里没有记录生效范围');
+  }
+  T.autoConfirmOff('test');
+  T.taskSetCurrent(t.id);
+});
+
 (async () => {
   // E2-005：连接测试只探测 /models，不发付费推理请求。
   const calls = require('./harness').calls;

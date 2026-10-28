@@ -184,10 +184,63 @@ function consentRevokeTask(taskId) {
   Object.keys(CONSENTS).forEach(k => { if (k.indexOf(prefix) === 0) delete CONSENTS[k]; });
   try { taskEvent(taskId, 'consent_revoked', {}); } catch (e) {}
 }
+
+/* ==========================================================
+ *  E1-003 会话级自动确认
+ *  只对「设备操作 + 外部写入」两类低风险确认生效；
+ *  密码框、发送消息、支付、卸载、删除、Root/Termux 仍逐次确认。
+ *  仅存内存，跟随当前任务；30 分钟过期，切换任务自动失效。
+ * ========================================================== */
+const AUTO_CONFIRM_SCOPE = ['device', 'external_write'];
+const AUTO_CONFIRM = { taskId: '', until: 0 };
+function autoConfirmActive(taskId) {
+  if (!AUTO_CONFIRM.taskId || !taskId) return false;
+  if (String(AUTO_CONFIRM.taskId) !== String(taskId)) return false;
+  if (AUTO_CONFIRM.until <= Date.now()) { return false; }
+  return true;
+}
+function autoConfirmOn(taskId) {
+  if (!taskId) return false;
+  AUTO_CONFIRM.taskId = String(taskId);
+  AUTO_CONFIRM.until = Date.now() + CONSENT_TTL_MS;
+  try { taskEvent(taskId, 'auto_confirm_on', { scope: AUTO_CONFIRM_SCOPE.slice(), ttlSec: CONSENT_TTL_MS / 1000 }); } catch (e) {}
+  return true;
+}
+function autoConfirmOff(reason) {
+  const tid = AUTO_CONFIRM.taskId;
+  AUTO_CONFIRM.taskId = '';
+  AUTO_CONFIRM.until = 0;
+  if (tid) { try { taskEvent(tid, 'auto_confirm_off', { reason: String(reason || 'user') }); } catch (e) {} }
+  return true;
+}
+/** 头部开关：开 = 本任务 30 分钟内自动通过设备/外部写入确认。 */
+function toggleAutoConfirm() {
+  const t = currentTask();
+  if (!t) return false;
+  if (autoConfirmActive(t.id)) {
+    autoConfirmOff('user');
+    toast('本会话自动确认已关闭');
+  } else {
+    autoConfirmOn(t.id);
+    toast('本会话自动确认已开启：设备操作与外部写入 30 分钟内不再逐次询问');
+  }
+  updateAutoConfirmBtn();
+  return true;
+}
+function updateAutoConfirmBtn() {
+  const b = $('#btn-auto-confirm');
+  if (!b) return;
+  const on = autoConfirmActive(currentTask() && currentTask().id);
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.textContent = on ? '自动确认·开' : '自动确认';
+}
+
 /** 设备类动作：已授权直接过；未授权只问一次，拒绝返回 false */
 async function ensureDeviceConsent(task) {
   if (!task) return false;
   if (consentGranted(task.id, 'device')) return true;
+  if (autoConfirmActive(task.id)) { consentGrant(task.id, 'device'); return true; }
   const ok = await uiConfirm('这一步需要操作手机：读取屏幕、点击或输入。\n\n本次任务 30 分钟内不再重复询问；密码框、发送消息、支付和卸载仍会逐次确认。', '允许操作手机', '手机控制授权');
   if (!ok) return false;
   consentGrant(task.id, 'device');
@@ -197,6 +250,7 @@ async function ensureDeviceConsent(task) {
 async function ensureExternalWriteConsent(task, detail, okText, title) {
   if (!task) return false;
   if (consentGranted(task.id, 'external_write')) return true;
+  if (autoConfirmActive(task.id)) { consentGrant(task.id, 'external_write'); return true; }
   const ok = await uiConfirm(detail + '\n\n本次任务 30 分钟内不再逐次询问；删除仍需单次确认。', okText, title);
   if (!ok) return false;
   consentGrant(task.id, 'external_write');
@@ -320,6 +374,7 @@ function taskCancel(id) { const t = taskUpdate(id, { state: 'cancelled', progres
 function taskSetCurrent(id) {
   const t = TASKS.find(x => x.id === id); if (!t) return;
   taskSaveContext(currentTask());
+  if (AUTO_CONFIRM.taskId && AUTO_CONFIRM.taskId !== String(id)) autoConfirmOff('task_switch');
   CURRENT_TASK_ID = id;
   taskLoadContext(t);
   saveHistory();
@@ -349,7 +404,7 @@ async function deleteTask(id) {
 }
 function taskModeText(t) { return t.type === 'chat' ? '聊天' : TASK_TYPES[t.type] || '任务'; }
 function taskStateText(t) { return TASK_STATES[t.state] || '运行中'; }
-function updateTaskMode() { const t = currentTask(); const mode = $('#mode-label'); if (mode) mode.textContent = taskModeText(t); const name = $('#name'); if (name) name.textContent = CONFIG.assistantName || '爱莉希雅'; }
+function updateTaskMode() { const t = currentTask(); const mode = $('#mode-label'); if (mode) mode.textContent = taskModeText(t); const name = $('#name'); if (name) name.textContent = CONFIG.assistantName || '爱莉希雅'; updateAutoConfirmBtn(); }
 function taskToolsAllowed(type, name, taskId) {
   const device = ['read_screen','screenshot','watch_screen','find_app','tap_screen','click_text','swipe_screen','input_text','press_key','launch_app','get_current_page'];
   const files = ['workspace_status','workspace_create','workspace_list','workspace_read','workspace_write','workspace_mkdir','external_file_list','external_file_read','external_file_write','external_file_copy','external_file_mkdir','external_file_delete'];

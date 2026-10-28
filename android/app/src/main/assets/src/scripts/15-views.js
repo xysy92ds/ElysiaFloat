@@ -256,6 +256,8 @@ function bindHeader() {
   const setBtn = $('#btn-set'); if (setBtn) setBtn.onclick = () => showView('settings');
   const memBtn = $('#btn-mem'); if (memBtn) memBtn.onclick = () => showView('memory');
   const musicBtn = $('#btn-music'); if (musicBtn) musicBtn.onclick = () => { renderMusicTab('search'); showView('music'); };
+  const autoBtn = $('#btn-auto-confirm'); if (autoBtn) autoBtn.onclick = () => toggleAutoConfirm();
+  updateAutoConfirmBtn();
   $('#btn-close').onclick = () => {
     if (HAS_NATIVE && Android.closeFloat) Android.closeFloat();
   };

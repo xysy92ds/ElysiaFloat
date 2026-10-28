@@ -729,3 +729,6 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
   -webkit-user-select:none;user-select:none}
 .cap-chip input{margin:0;accent-color:var(--c1)}
 .sub-title{font-size:12px;font-weight:700;color:var(--accent)}
+
+/* ===== 会话级自动确认开关（0.9 / E1-003）===== */
+#btn-auto-confirm.on{background:linear-gradient(135deg,var(--c1),var(--c2))!important;color:#fff!important;font-weight:700}

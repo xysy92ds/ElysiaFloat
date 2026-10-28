@@ -405,6 +405,11 @@ function step(name, fn) {
     }
     if (!/const quota = usageCheck\(\)/.test(js)) throw new Error('聊天请求没有接入限额拦截');
     if (!/usageRecord\(pid, taskId, d\.usage\)/.test(js)) throw new Error('聊天请求没有记录用量');
+    if (!html.includes('id="btn-auto-confirm"')) throw new Error('会话头部缺少自动确认开关');
+    if (!/function autoConfirmActive\(taskId\)/.test(js)) throw new Error('缺少自动确认状态机');
+    if (!/autoConfirmActive\(task\.id\)/.test(js)) throw new Error('设备/外部写入确认没有接入自动确认');
+    if (!/auto_confirm_on/.test(js) || !/auto_confirm_off/.test(js)) throw new Error('自动确认缺少审计事件');
+    if (!/AUTO_CONFIRM\.taskId !== String\(id\)/.test(js)) throw new Error('切换任务时没有让自动确认失效');
     const css = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
     for (const sel of ['.settings-tabs', '.settings-tab', '.set-group', '.provider-card', '.cap-chip']) {
       if (css.indexOf(sel + '{') < 0) throw new Error('缺少样式：' + sel);
