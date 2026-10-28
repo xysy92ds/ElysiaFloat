@@ -16,7 +16,7 @@
 - 私有 Git：`main` 最新 `97d9c85`（0.8/N1-3 真机反馈修复 + 候选包记录）。
 - 公开 Git：`xysy92ds/ElysiaFloat` `main` = `1b2e09a`（发布提交 `cb10e91`），tag `v0.7.2`。
 - 当前源码：前端已拆为 `android/app/src/main/assets/src/`，构建时重新生成单一 `index.html`。
-- 最新测试包：`apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（N1 修复候选，versionCode 17 / versionName 0.7.2，可覆盖已装 0.7.2）。
+- 最新测试包：`apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（N1 修复候选，versionCode 17 / versionName 0.7.2，可覆盖已装 0.7.2）；已上传私有 Release `n1fix-2026-10-28`，真机复测暂缓。
 - 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`，与公开 Release 资产同一构建）。
 - 已发布包 SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`。
 - N1 修复候选包 SHA-256：`b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e`。
