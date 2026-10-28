@@ -142,7 +142,10 @@ function plugDepTermuxInfo() {
 function plugDepTermuxGuide() {
   return '需要先安装 Termux，并在 Termux 里执行：\n' +
     'pkg install -y termux-am\n' +
-    '并通过 Termux 设置开启 allow-external-apps（或在 termux.properties 里写 allow-external-apps=true）。\n' +
+    'echo allow-external-apps=true >> ~/.termux/termux.properties\n' +
+    '（然后重启 Termux）。\n' +
+    '如果一键安装仍提示「未获得 Termux 命令执行权限」，请先确认 Termux 已安装，' +
+    '再卸载重装本应用（权限只在安装时授予）。\n' +
     '本应用只使用固定命令模板，不会传任意 shell。';
 }
 

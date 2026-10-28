@@ -8,6 +8,8 @@
             <category android:name="android.intent.category.LAUNCHER"/>
         </intent>
         <package android:name="com.termux"/>
+        <package android:name="rikka.shizuku"/>
+        <package android:name="moe.shizuku.privileged.api"/>
     </queries>
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>

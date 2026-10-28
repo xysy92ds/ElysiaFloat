@@ -490,6 +490,18 @@ input.secret.reveal{-webkit-text-security:none}
   font-family:monospace;user-select:text}
 .mini-note{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;user-select:text}
 
+/* ===== 高级权限卡片（Termux / Root / Shizuku） ===== */
+.perm-card{margin-top:10px;padding:10px 12px;border-radius:10px;
+  background:var(--card);border:1px solid var(--border)}
+.perm-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.perm-card-name{font-size:13px;font-weight:600;color:var(--text)}
+.perm-card-status{font-size:11px;padding:2px 8px;border-radius:10px;
+  background:rgba(127,127,127,.15);color:var(--muted);white-space:nowrap}
+.perm-card-status.ok{background:rgba(52,211,153,.18);color:#10b981}
+.perm-card-status.warn{background:rgba(251,191,36,.18);color:#d97706}
+.perm-card-status.bad{background:rgba(251,113,133,.18);color:#e11d48}
+.perm-card-desc{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;user-select:text}
+
 /* ===== 按住边缘缩放窗口 ===== */
 .rz{position:absolute;z-index:60;touch-action:none;user-select:none;-webkit-user-select:none}
 .rz-n{top:0;left:16px;right:16px;height:8px;cursor:ns-resize}
@@ -6267,7 +6279,11 @@ async function plugRuntimeStart(plugin) {
   const r = await execTool('run_termux_job', {
     executor: 'node', args: [rt.entry].concat(rt.args || []), cwd: 'working'
   }, t);
-  if (!r || r.ok === false) return { ok: false, error: (r && (r.error || r.errorCode)) || '启动失败' };
+  if (!r || r.ok === false) {
+    const msg = (r && (r.error || r.errorCode)) || '启动失败';
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 启动失败：' + msg + '\n');
+    return { ok: false, error: msg };
+  }
   const runId = String(r.runId || '');
   plugRuntimeWriteState(plugin, {
     runId, entry: rt.entry, startedAt: new Date().toISOString(), lastError: '',
@@ -6747,7 +6763,10 @@ function plugDepTermuxInfo() {
 function plugDepTermuxGuide() {
   return '需要先安装 Termux，并在 Termux 里执行：\n' +
     'pkg install -y termux-am\n' +
-    '并通过 Termux 设置开启 allow-external-apps（或在 termux.properties 里写 allow-external-apps=true）。\n' +
+    'echo allow-external-apps=true >> ~/.termux/termux.properties\n' +
+    '（然后重启 Termux）。\n' +
+    '如果一键安装仍提示「未获得 Termux 命令执行权限」，请先确认 Termux 已安装，' +
+    '再卸载重装本应用（权限只在安装时授予）。\n' +
     '本应用只使用固定命令模板，不会传任意 shell。';
 }
 
@@ -12555,6 +12574,91 @@ function bindRuntime() {
 }
 
 /* ==========================================================
+ *  高级权限（Termux / Root / Shizuku）
+ * ========================================================== */
+function permSetStatus(id, text, level) {
+  const el = document.getElementById('perm-' + id + '-status');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('ok', 'warn', 'bad');
+  if (level) el.classList.add(level);
+}
+function renderTermuxPerm() {
+  if (!(HAS_PERM && Perm.getTermuxAccessState)) { permSetStatus('termux', '不支持', 'bad'); return; }
+  try {
+    const s = JSON.parse(Perm.getTermuxAccessState() || '{}');
+    if (!s.installed) permSetStatus('termux', '未安装', 'bad');
+    else if (!s.permissionGranted) permSetStatus('termux', '权限未授予', 'warn');
+    else permSetStatus('termux', '已就绪', 'ok');
+  } catch (e) { permSetStatus('termux', '检测失败', 'bad'); }
+}
+function renderRootPerm() {
+  if (!(HAS_PERM && Perm.getAgentRuntimeState)) { permSetStatus('root', '不支持', 'bad'); return; }
+  try {
+    const a = JSON.parse(Perm.getAgentRuntimeState() || '{}');
+    if (!a.rootAvailable) permSetStatus('root', '未检测到 su', 'bad');
+    else permSetStatus('root', '可请求授权', 'warn');
+  } catch (e) { permSetStatus('root', '检测失败', 'bad'); }
+}
+function renderShizukuPerm() {
+  if (!(HAS_PERM && Perm.getShizukuState)) { permSetStatus('shizuku', '不支持', 'bad'); return; }
+  try {
+    const s = JSON.parse(Perm.getShizukuState() || '{}');
+    if (!s.installed) permSetStatus('shizuku', '未安装', 'bad');
+    else if (!s.ready) permSetStatus('shizuku', '服务未启动', 'warn');
+    else permSetStatus('shizuku', '已就绪', 'ok');
+  } catch (e) { permSetStatus('shizuku', '检测失败', 'bad'); }
+}
+function renderAdvancedPerms() {
+  renderTermuxPerm();
+  renderRootPerm();
+  renderShizukuPerm();
+}
+function bindAdvancedPerms() {
+  const tRef = $('#btn-perm-termux-refresh');
+  if (tRef) tRef.onclick = () => { renderTermuxPerm(); renderRuntimeState(); toast('已刷新 Termux 状态'); };
+  const tSetup = $('#btn-perm-termux-setup');
+  if (tSetup) tSetup.onclick = () => {
+    const cmd = (HAS_PERM && Perm.getTermuxSetupCommands) ? Perm.getTermuxSetupCommands()
+      : 'pkg install -y termux-am\necho allow-external-apps=true >> ~/.termux/termux.properties';
+    if (writeClipboard(cmd)) toast('配置命令已复制，去 Termux 粘贴执行');
+    else toast(cmd);
+  };
+  const tOpen = $('#btn-perm-termux-open');
+  if (tOpen) tOpen.onclick = () => {
+    try {
+      if (HAS_NATIVE && Android.openUrl) Android.openUrl('package:com.termux');
+      else if (HAS_PERM && Perm.requestOverlay) { /* noop */ }
+    } catch (e) {}
+    toast('请在桌面打开 Termux 应用');
+  };
+  const rAuth = $('#btn-perm-root-auth');
+  if (rAuth) rAuth.onclick = async () => {
+    if (!(HAS_PERM && Perm.requestRootAuth)) return toast('当前环境不支持 root');
+    permSetStatus('root', '请求中…', 'warn');
+    try {
+      const r = JSON.parse(Perm.requestRootAuth() || '{}');
+      if (r.authorized) { permSetStatus('root', '已授权', 'ok'); toast('Root 授权成功：' + (r.uid || '')); }
+      else { permSetStatus('root', '未授权', 'bad'); toast('Root 授权失败：' + (r.error || '被拒绝')); }
+    } catch (e) { permSetStatus('root', '检测失败', 'bad'); toast('Root 探测异常'); }
+    renderRuntimeState();
+  };
+  const sRef = $('#btn-perm-shizuku-refresh');
+  if (sRef) sRef.onclick = () => { renderShizukuPerm(); toast('已刷新 Shizuku 状态'); };
+  const sOpen = $('#btn-perm-shizuku-open');
+  if (sOpen) sOpen.onclick = () => {
+    if (!(HAS_PERM && Perm.requestShizuku)) return toast('当前环境不支持 Shizuku');
+    try {
+      const r = JSON.parse(Perm.requestShizuku() || '{}');
+      if (!r.ok) toast(r.error || '无法打开 Shizuku');
+      else toast('已打开 Shizuku，请启动服务后回来刷新');
+    } catch (e) { toast('打开 Shizuku 失败'); }
+    setTimeout(renderShizukuPerm, 1500);
+  };
+  renderAdvancedPerms();
+}
+
+/* ==========================================================
  *  模型提供商（独立页面）与模型中心 UI（E2-001/005）
  * ========================================================== */
 let PROVIDER_EDIT_ID = '';
@@ -13114,7 +13218,46 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
 <div class="acts" style="margin-top:8px">
   <button id="btn-perm-guide" class="btn-s">打开权限配置引导</button>
 </div>
-<div class="mini-note">可随时重新打开引导，补充悬浮窗、通知、无障碍等权限。</div>
+<div class="mini-note">可随时重新打开引导，补充悬浮窗、通知、无障碍等基础权限。</div>
+
+<div class="sec-title">高级权限（Termux / Root / Shizuku）</div>
+<div class="mini-note" style="margin-top:8px">这三项是可选的高级能力，用于插件依赖安装、系统级操作等。不开也不影响普通聊天；需要时再按需开启。</div>
+
+<div class="perm-card" data-perm-card="termux">
+  <div class="perm-card-head">
+    <span class="perm-card-name">Termux</span>
+    <span class="perm-card-status" id="perm-termux-status">检测中…</span>
+  </div>
+  <div class="perm-card-desc" id="perm-termux-desc">用于在本机执行 pkg / npm 等命令，安装插件依赖（如 Minecraft 联机的 mineflayer）。</div>
+  <div class="acts" style="margin-top:8px">
+    <button id="btn-perm-termux-refresh" class="btn-s">刷新状态</button>
+    <button id="btn-perm-termux-setup" class="btn-s">复制配置命令</button>
+    <button id="btn-perm-termux-open" class="btn-s">打开 Termux</button>
+  </div>
+</div>
+
+<div class="perm-card" data-perm-card="root">
+  <div class="perm-card-head">
+    <span class="perm-card-name">Root（su）</span>
+    <span class="perm-card-status" id="perm-root-status">检测中…</span>
+  </div>
+  <div class="perm-card-desc" id="perm-root-desc">设备已 root 时可用，用于执行受限的诊断操作（读取系统属性、进程列表等）。所有操作都在白名单内。</div>
+  <div class="acts" style="margin-top:8px">
+    <button id="btn-perm-root-auth" class="btn-s">请求授权 / 检测</button>
+  </div>
+</div>
+
+<div class="perm-card" data-perm-card="shizuku">
+  <div class="perm-card-head">
+    <span class="perm-card-name">Shizuku</span>
+    <span class="perm-card-status" id="perm-shizuku-status">检测中…</span>
+  </div>
+  <div class="perm-card-desc" id="perm-shizuku-desc">无需 root 也能调用部分系统 API。需要先安装 Shizuku 应用并启动服务，再回到此处授权。</div>
+  <div class="acts" style="margin-top:8px">
+    <button id="btn-perm-shizuku-refresh" class="btn-s">刷新状态</button>
+    <button id="btn-perm-shizuku-open" class="btn-s">打开 Shizuku</button>
+  </div>
+</div>
 
 <div class="sec-title">环境信息</div>
 <div class="mini-note" style="margin-top:6px">遇到问题时，可将以下信息提供给开发者以便排查。</div>
@@ -13258,6 +13401,7 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
   bindAgentWhitelist();
   bindWorkspace();
   bindRuntime();
+  bindAdvancedPerms();
   renderProviderCenter();
   renderUsageBox();
   renderEnvBox();

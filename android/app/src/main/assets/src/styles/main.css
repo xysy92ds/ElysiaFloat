@@ -484,6 +484,18 @@ input.secret.reveal{-webkit-text-security:none}
   font-family:monospace;user-select:text}
 .mini-note{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;user-select:text}
 
+/* ===== 高级权限卡片（Termux / Root / Shizuku） ===== */
+.perm-card{margin-top:10px;padding:10px 12px;border-radius:10px;
+  background:var(--card);border:1px solid var(--border)}
+.perm-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.perm-card-name{font-size:13px;font-weight:600;color:var(--text)}
+.perm-card-status{font-size:11px;padding:2px 8px;border-radius:10px;
+  background:rgba(127,127,127,.15);color:var(--muted);white-space:nowrap}
+.perm-card-status.ok{background:rgba(52,211,153,.18);color:#10b981}
+.perm-card-status.warn{background:rgba(251,191,36,.18);color:#d97706}
+.perm-card-status.bad{background:rgba(251,113,133,.18);color:#e11d48}
+.perm-card-desc{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;user-select:text}
+
 /* ===== 按住边缘缩放窗口 ===== */
 .rz{position:absolute;z-index:60;touch-action:none;user-select:none;-webkit-user-select:none}
 .rz-n{top:0;left:16px;right:16px;height:8px;cursor:ns-resize}

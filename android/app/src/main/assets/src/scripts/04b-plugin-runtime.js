@@ -1365,7 +1365,11 @@ async function plugRuntimeStart(plugin) {
   const r = await execTool('run_termux_job', {
     executor: 'node', args: [rt.entry].concat(rt.args || []), cwd: 'working'
   }, t);
-  if (!r || r.ok === false) return { ok: false, error: (r && (r.error || r.errorCode)) || '启动失败' };
+  if (!r || r.ok === false) {
+    const msg = (r && (r.error || r.errorCode)) || '启动失败';
+    plugRuntimeLogAppend(plugin, '[' + plugRuntimeClock() + '] 启动失败：' + msg + '\n');
+    return { ok: false, error: msg };
+  }
   const runId = String(r.runId || '');
   plugRuntimeWriteState(plugin, {
     runId, entry: rt.entry, startedAt: new Date().toISOString(), lastError: '',

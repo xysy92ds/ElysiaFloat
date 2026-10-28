@@ -18,6 +18,35 @@ object RootWorker {
         p.waitFor() == 0
     } catch (_: Exception) { false }
 
+    /**
+     * 探测 root 授权状态：执行 su -c id，能拿到 uid=0 才算真正授权。
+     * 第一次调用会触发 Magisk/KernelSU 等 root 管理器的授权弹窗。
+     */
+    fun authorize(): JSONObject {
+        if (!isRootBinaryAvailable()) return JSONObject().apply {
+            put("ok", false).put("authorized", false)
+            put("error", "未检测到 su 二进制，请先安装 Magisk/KernelSU 等 root 方案")
+        }
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            val finished = p.waitFor(20, TimeUnit.SECONDS)
+            if (!finished) { p.destroyForcibly(); JSONObject().apply {
+                put("ok", false).put("authorized", false).put("error", "root 授权超时")
+            } } else {
+                val out = BufferedReader(InputStreamReader(p.inputStream)).use { it.readText().trim() }
+                val authorized = p.exitValue() == 0 && out.contains("uid=0")
+                JSONObject().apply {
+                    put("ok", authorized)
+                    put("authorized", authorized)
+                    put("uid", out)
+                    if (!authorized) put("error", "root 被拒绝或未授权")
+                }
+            }
+        } catch (e: Exception) { JSONObject().apply {
+            put("ok", false).put("authorized", false).put("error", e.message ?: "root 探测失败")
+        } }
+    }
+
     fun run(ctx: Context, operation: String, taskId: String, extra: JSONObject = JSONObject()): JSONObject {
         if (operation !in operations) return error("ROOT_OPERATION_DENIED", "Root 操作不在白名单中")
         if (!isRootBinaryAvailable()) return error("ROOT_UNAVAILABLE", "未检测到 su")

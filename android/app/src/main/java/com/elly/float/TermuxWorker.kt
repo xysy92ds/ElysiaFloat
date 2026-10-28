@@ -2,6 +2,7 @@ package com.elly.assistant
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -45,6 +46,20 @@ object TermuxWorker {
         "bash" to "/data/data/com.termux/files/usr/bin/bash"
     )
     private const val BASH_PATH = "/data/data/com.termux/files/usr/bin/bash"
+    private const val RUN_PERM = "com.termux.permission.RUN_COMMAND"
+
+    /**
+     * 调用 Termux 之前的体检：包是否安装、RUN_COMMAND 权限是否到手。
+     * 这个权限由 Termux 以普通权限定义，只有「Termux 先于本应用安装」或「重装本应用」
+     * 时才会授予；否则 startService 会抛 SecurityException，用户只看到一串系统报错。
+     */
+    private fun termuxAccessError(ctx: Context): String? {
+        val installed = try { ctx.packageManager.getPackageInfo("com.termux", 0); true } catch (_: Exception) { false }
+        if (!installed) return "Termux 未安装。请先装 Termux，再回到本应用。"
+        val granted = ctx.checkSelfPermission(RUN_PERM) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return "未获得 Termux 命令执行权限。请先确认已安装 Termux，然后重新安装本应用（或卸载重装），让系统授予 com.termux.permission.RUN_COMMAND；并在 Termux 里执行：echo allow-external-apps=true >> ~/.termux/termux.properties 后重启 Termux。"
+        return null
+    }
 
     fun state(ctx: Context): JSONObject = JSONObject().apply {
         put("installed", try { ctx.packageManager.getPackageInfo("com.termux", 0); true } catch (_: Exception) { false })
@@ -54,6 +69,36 @@ object TermuxWorker {
         put("endpoint", "local-authenticated-rpc")
         put("executors", JSONArray().apply { allowedExecutors.forEach { put(it) } })
     }
+
+    /**
+     * Termux 接入体检：安装 / RUN_COMMAND 权限 / 外部应用开关。
+     * allow-external-apps 存在 Termux 私有目录，本应用 UID 读不到，
+     * 所以只能给出「需要手动执行」的提示，无法自动检测。
+     */
+    fun accessState(ctx: Context): JSONObject {
+        val installed = try { ctx.packageManager.getPackageInfo("com.termux", 0); true } catch (_: Exception) { false }
+        val granted = ctx.checkSelfPermission(RUN_PERM) == PackageManager.PERMISSION_GRANTED
+        val ready = installed && granted
+        val message = when {
+            !installed -> "Termux 未安装"
+            !granted -> "RUN_COMMAND 权限未授予（需先装 Termux 再重装本应用）"
+            else -> "已就绪"
+        }
+        return JSONObject().apply {
+            put("ok", true)
+            put("installed", installed)
+            put("permissionGranted", granted)
+            put("allowExternalApps", JSONObject.NULL) // 无法跨 UID 检测
+            put("ready", ready)
+            put("message", message)
+        }
+    }
+
+    /** 把 allow-external-apps 配置命令返回给前端，由用户复制到 Termux 执行。 */
+    fun setupCommands(): String =
+        "pkg install -y termux-am\n" +
+        "echo allow-external-apps=true >> ~/.termux/termux.properties\n" +
+        "# 执行后请重启 Termux，再回到本应用。"
 
     fun createSession(ctx: Context): JSONObject {
         val token = UUID.randomUUID().toString().replace("-", "")
@@ -84,6 +129,7 @@ object TermuxWorker {
     fun dispatch(ctx: Context, job: JSONObject): JSONObject {
         val checked = validateJob(job)
         if (!checked.optBoolean("ok", false)) return checked
+        termuxAccessError(ctx)?.let { return error("TERMUX_NOT_READY", it) }
         val runId = checked.optString("jobId")
         if (!RUN_ID_RE.matches(runId)) return error("INVALID_RUN_ID", "任务 id 不合法")
         val timeoutSec = (job.optLong("timeoutMs", 0L) / 1000L).coerceIn(0L, 24L * 3600L)
@@ -169,7 +215,14 @@ rm -f "${'$'}PIDFILE"
                 .put("timeoutSec", timeoutSec)
                 .put("workdir", cwd.absolutePath)
                 .put("logFile", "$JOBS_DIR/$runId.log")
-        } catch (e: Exception) { error("DISPATCH_FAILED", e.message ?: "Termux 启动失败") }
+        } catch (e: Exception) {
+            if (e is SecurityException) {
+                val reason = termuxAccessError(ctx) ?: e.message ?: "未知"
+                error("TERMUX_PERMISSION_DENIED", "Termux 命令执行权限被系统拒绝：$reason")
+            } else {
+                error("DISPATCH_FAILED", e.message ?: "Termux 启动失败")
+            }
+        }
     }
 
     /**
@@ -183,6 +236,7 @@ rm -f "${'$'}PIDFILE"
         val name = req.optString("name")
         val version = req.optString("version")
         if (kind != "termux-pkg" && kind != "npm") return error("KIND_NOT_ALLOWED", "只支持 termux-pkg / npm")
+        termuxAccessError(ctx)?.let { return error("TERMUX_NOT_READY", it) }
         if (!PKG_NAME_RE.matches(name)) return error("INVALID_PACKAGE", "包名不合法")
         val hasVersion = version.isNotBlank()
         if (hasVersion && !VERSION_RE.matches(version)) return error("INVALID_VERSION", "版本号不合法")
@@ -241,7 +295,14 @@ rm -f "${'$'}PIDFILE"
             audit(ctx, "fixed_dispatch", runId, "$kind:$target")
             JSONObject().put("ok", true).put("runId", runId)
                 .put("kind", kind).put("package", target).put("timeoutSec", 900)
-        } catch (e: Exception) { error("DISPATCH_FAILED", e.message ?: "Termux 启动失败") }
+        } catch (e: Exception) {
+            if (e is SecurityException) {
+                val reason = termuxAccessError(ctx) ?: e.message ?: "未知"
+                error("TERMUX_PERMISSION_DENIED", "Termux 命令执行权限被系统拒绝：$reason")
+            } else {
+                error("DISPATCH_FAILED", e.message ?: "Termux 启动失败")
+            }
+        }
     }
 
     /** 查询任务状态：running / done / failed / not_found */

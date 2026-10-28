@@ -32,6 +32,51 @@ class PermissionBridge(private val ctx: Context) {
         return RootWorker.run(ctx, operation, taskId, extra).toString()
     }
 
+    /** 探测 root 授权：执行 su -c id，会触发 root 管理器弹窗。 */
+    @JavascriptInterface
+    fun requestRootAuth(): String = RootWorker.authorize().toString()
+
+    /** Shizuku 状态：是否安装、服务是否运行。 */
+    @JavascriptInterface
+    fun getShizukuState(): String {
+        val r = ShizukuRuntime()
+        val installed = try {
+            ctx.packageManager.getPackageInfo("rikka.shizuku", 0); true
+        } catch (_: Exception) {
+            try { ctx.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0); true } catch (_: Exception) { false }
+        }
+        val ready = r.available(ctx)
+        return JSONObject().apply {
+            put("ok", true)
+            put("installed", installed)
+            put("ready", ready)
+            put("message", when {
+                !installed -> "Shizuku 未安装"
+                !ready -> "Shizuku 已安装但服务未启动"
+                else -> "Shizuku 已就绪"
+            })
+        }.toString()
+    }
+
+    /** 打开 Shizuku 应用（若已安装），否则提示安装。 */
+    @JavascriptInterface
+    fun requestShizuku(): String {
+        val installed = try {
+            ctx.packageManager.getPackageInfo("rikka.shizuku", 0); true
+        } catch (_: Exception) {
+            try { ctx.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0); true } catch (_: Exception) { false }
+        }
+        if (!installed) return JSONObject().put("ok", false).put("error", "请先安装 Shizuku 应用").toString()
+        return try {
+            val intent = ctx.packageManager.getLaunchIntentForPackage("rikka.shizuku")
+                ?: ctx.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+            if (intent != null) {
+                ctx.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                JSONObject().put("ok", true).toString()
+            } else JSONObject().put("ok", false).put("error", "无法打开 Shizuku").toString()
+        } catch (e: Exception) { JSONObject().put("ok", false).put("error", e.message ?: "打开失败").toString() }
+    }
+
     @JavascriptInterface
     fun getAgentRuntimeCapabilities(): String = JSONArray().apply {
         CapabilityRuntimes.all().forEach { put(JSONObject().put("id", it.id).put("available", it.available(ctx))) }
@@ -39,6 +84,14 @@ class PermissionBridge(private val ctx: Context) {
 
     @JavascriptInterface
     fun getTermuxWorkerState(): String = TermuxWorker.state(ctx).toString()
+
+    /** Termux 接入体检：安装 / RUN_COMMAND 权限 / 就绪状态。 */
+    @JavascriptInterface
+    fun getTermuxAccessState(): String = TermuxWorker.accessState(ctx).toString()
+
+    /** 返回 Termux 需要用户手动执行的配置命令（allow-external-apps）。 */
+    @JavascriptInterface
+    fun getTermuxSetupCommands(): String = TermuxWorker.setupCommands()
 
     @JavascriptInterface
     fun createTermuxSession(): String = TermuxWorker.createSession(ctx).toString()
