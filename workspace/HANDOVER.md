@@ -15,6 +15,7 @@ N1 修复候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/n
 0.12 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12-2026-10-28`（私有，需登录）；
 0.12.1 补丁候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12.1-2026-10-28`（私有，需登录）；
 0.12.2 体验补丁候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12.2-2026-10-28`（私有，需登录）；
+0.12.3 体验补丁候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12.3-2026-10-28`（私有，需登录）；
 
 > 2026-10-28 补：本轮修复粘贴/复制（I-055）、横屏退出跑出屏幕（I-056）、
 > 音乐工具被 `toolsBroken` 毒化（I-057）、设备任务发送（I-058）、任务模式不调工具（I-059）。

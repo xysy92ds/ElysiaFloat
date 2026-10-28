@@ -82,9 +82,8 @@ let RUN_STATUS_TIMER = 0;
 function runStatusLabel() {
   const t = (TASKS || []).find(x => x.id === ACTIVE_RUN_TASK_ID) || currentTask() || {};
   const goal = String(t.goal || t.title || '').trim();
-  const sec = Math.max(0, Math.round((Date.now() - RUN_STATUS_START) / 1000));
   const phase = String(t.progress || '').trim();
-  let s = '运行中 ' + sec + 's';
+  let s = '运行中';
   if (phase) s += ' · ' + phase;
   if (goal) s += ' · ' + goal;
   if (t && t.persist && t.persist.enabled) {
@@ -97,10 +96,12 @@ function runStatusLabel() {
 }
 function updateRunStatus() {
   const box = $('#run-status');
+  const secEl = $('#run-sec');
   if (!box) return;
   const active = typeof sending !== 'undefined' && sending && ACTIVE_RUN_TASK_ID;
   if (!active) {
     box.hidden = true;
+    if (secEl) { secEl.hidden = true; secEl.textContent = ''; }
     RUN_STATUS_START = 0;
     if (RUN_STATUS_TIMER) { clearInterval(RUN_STATUS_TIMER); RUN_STATUS_TIMER = 0; }
     return;
@@ -116,15 +117,14 @@ function updateRunStatus() {
   box.hidden = false;
   const el = $('#run-status-text');
   if (el) el.textContent = runStatusLabel();
+  // 秒数按用户要求放到输入框下面，状态条里不再重复。
+  if (secEl) {
+    secEl.hidden = false;
+    secEl.textContent = '已执行 ' + Math.max(0, Math.round((Date.now() - RUN_STATUS_START) / 1000)) + 's';
+  }
   if (!RUN_STATUS_TIMER) RUN_STATUS_TIMER = setInterval(updateRunStatus, 1000);
 }
 function bindRunStatus() {
-  const stop = $('#run-status-stop');
-  if (stop) stop.onclick = () => {
-    if (typeof sending !== 'undefined' && sending) { send(); return; }
-    try { cancelTaskRequests(ACTIVE_RUN_TASK_ID || currentTask().id); } catch (e) {}
-    updateRunStatus();
-  };
   updateRunStatus();
 }
 

@@ -97,13 +97,16 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   border:1px solid rgba(255,154,158,.3)}
 .tts-btn:active{background:rgba(255,154,158,.25)}
 #foot{display:flex;gap:8px;padding:10px 12px;background:#fff5f7;
-  border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;min-height:56px;align-items:flex-end;
+  border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;
   /* 抬高按钮，避开右下/左下 22px 的窗口缩放热区(.rz)，否则「发送」会被 .rz-se 抢走点击 */
   padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))}
 #input{flex:1;border:1.5px solid rgba(255,154,158,.25);border-radius:18px;
   padding:10px 16px;font-size:14px;outline:none;resize:none;
-  background:var(--card);color:var(--text);min-height:38px;max-height:100px;
+  background:var(--card);color:var(--text);max-height:100px;
   font-family:inherit;user-select:text;line-height:1.4}
+#run-sec{flex:0 0 auto;height:14px;padding:0 14px 2px;text-align:right;
+  font-size:10px;color:var(--muted);pointer-events:none}
+#run-sec[hidden]{display:none!important}
 #input:focus{border-color:var(--c1)}
 #btn-plus{width:38px;height:38px;flex:0 0 auto;align-self:flex-end;border-radius:50%;
   border:1.5px solid rgba(255,154,158,.35);background:var(--card);color:var(--c1);
@@ -154,6 +157,15 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
 .settings-bottom{flex:0 0 auto}
 /* 底部操作条：贴着窗口底部，靠 padding-bottom 把按钮抬出 22px 的缩放热区(.rz, z-index:60)。
    有效点击高度 = bottom(0) + padding-bottom(24) = 24px > 22px，按钮可以再低但不能再低过这里。 */
+/* ===== 设置分区折叠（恢复 0.7.2，箭头 + 记住展开状态）===== */
+.set-overview,.set-fold{flex:0 0 auto;min-width:0;margin-top:10px;border:1px solid rgba(255,154,158,.22);border-radius:14px;background:rgba(255,255,255,.45);overflow:hidden}
+.set-overview{padding:10px 12px}
+.set-fold-head{display:flex;align-items:center;box-sizing:border-box;flex:0 0 auto;width:100%;min-height:44px;padding:12px 13px;border:0;background:rgba(255,255,255,.55);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;line-height:1.3;text-align:left;cursor:pointer}
+.fold-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fold-arrow{flex:0 0 auto;padding-left:10px;color:var(--accent);font-size:12px;font-weight:600}
+.set-fold-body{box-sizing:border-box;min-width:0;padding:0 12px 10px}
+.set-fold.closed .set-fold-body{display:none}
+
 .settings-bottom{display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:sticky;bottom:0;z-index:5;margin-top:18px;padding:10px 12px 24px;border:1px solid rgba(214,51,108,.28);border-radius:14px;background:var(--bg);box-shadow:0 -4px 14px rgba(214,51,108,.10)}
 .settings-bottom .mini-note{text-align:center;margin:0 0 8px;flex:1 0 100%}
 .settings-inline-save{flex:1 1 auto}

@@ -103,13 +103,16 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
   border:1px solid rgba(255,154,158,.3)}
 .tts-btn:active{background:rgba(255,154,158,.25)}
 #foot{display:flex;gap:8px;padding:10px 12px;background:#fff5f7;
-  border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;min-height:56px;align-items:flex-end;
+  border-top:1px solid rgba(255,154,158,.2);flex-shrink:0;
   /* 抬高按钮，避开右下/左下 22px 的窗口缩放热区(.rz)，否则「发送」会被 .rz-se 抢走点击 */
   padding-bottom:calc(26px + env(safe-area-inset-bottom,0px))}
 #input{flex:1;border:1.5px solid rgba(255,154,158,.25);border-radius:18px;
   padding:10px 16px;font-size:14px;outline:none;resize:none;
-  background:var(--card);color:var(--text);min-height:38px;max-height:100px;
+  background:var(--card);color:var(--text);max-height:100px;
   font-family:inherit;user-select:text;line-height:1.4}
+#run-sec{flex:0 0 auto;height:14px;padding:0 14px 2px;text-align:right;
+  font-size:10px;color:var(--muted);pointer-events:none}
+#run-sec[hidden]{display:none!important}
 #input:focus{border-color:var(--c1)}
 #btn-plus{width:38px;height:38px;flex:0 0 auto;align-self:flex-end;border-radius:50%;
   border:1.5px solid rgba(255,154,158,.35);background:var(--card);color:var(--c1);
@@ -160,6 +163,15 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
 .settings-bottom{flex:0 0 auto}
 /* 底部操作条：贴着窗口底部，靠 padding-bottom 把按钮抬出 22px 的缩放热区(.rz, z-index:60)。
    有效点击高度 = bottom(0) + padding-bottom(24) = 24px > 22px，按钮可以再低但不能再低过这里。 */
+/* ===== 设置分区折叠（恢复 0.7.2，箭头 + 记住展开状态）===== */
+.set-overview,.set-fold{flex:0 0 auto;min-width:0;margin-top:10px;border:1px solid rgba(255,154,158,.22);border-radius:14px;background:rgba(255,255,255,.45);overflow:hidden}
+.set-overview{padding:10px 12px}
+.set-fold-head{display:flex;align-items:center;box-sizing:border-box;flex:0 0 auto;width:100%;min-height:44px;padding:12px 13px;border:0;background:rgba(255,255,255,.55);color:var(--text);font-family:inherit;font-size:13px;font-weight:700;line-height:1.3;text-align:left;cursor:pointer}
+.fold-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fold-arrow{flex:0 0 auto;padding-left:10px;color:var(--accent);font-size:12px;font-weight:600}
+.set-fold-body{box-sizing:border-box;min-width:0;padding:0 12px 10px}
+.set-fold.closed .set-fold-body{display:none}
+
 .settings-bottom{display:flex;align-items:center;flex-wrap:wrap;gap:8px;position:sticky;bottom:0;z-index:5;margin-top:18px;padding:10px 12px 24px;border:1px solid rgba(214,51,108,.28);border-radius:14px;background:var(--bg);box-shadow:0 -4px 14px rgba(214,51,108,.10)}
 .settings-bottom .mini-note{text-align:center;margin:0 0 8px;flex:1 0 100%}
 .settings-inline-save{flex:1 1 auto}
@@ -859,7 +871,6 @@ html.plug-themed #body .msg.ai .msg-t,html.plug-themed #body .msg.ai{font-size:v
   <div id="run-status" hidden aria-live="polite">
     <span class="run-dot" aria-hidden="true"></span>
     <span id="run-status-text">运行中</span>
-    <button id="run-status-stop" type="button">停止</button>
   </div>
   <div id="mini-player" aria-label="正在播放">
     <div class="mini-disc">♪</div>
@@ -879,6 +890,7 @@ html.plug-themed #body .msg.ai .msg-t,html.plug-themed #body .msg.ai{font-size:v
     <textarea id="input" rows="1" placeholder="输入消息..."></textarea>
     <button id="send" type="button">发送</button>
   </div>
+  <div id="run-sec" hidden aria-live="off"></div>
 
   <div id="settings"></div>
 
@@ -11803,6 +11815,89 @@ window.__dlCb = function (id, pct, done, err, path) {
   toast('安装包已下载，请按系统提示完成安装');
 };
 
+/**
+ * 设置分区折叠：恢复 0.7.2 的可点开/收起，并记住上次状态。
+ * 只做 DOM 重排，不改变各分区内容与顺序。
+ */
+const SETTINGS_FOLD_KEY = 'via_ai_settings_folds';
+const SETTINGS_FOLD_DEFAULT = { 'AI 与模型': 1, '个性化与聊天风格': 1, '聊天与助手': 1 };
+function settingsFoldState() {
+  const v = sGet(SETTINGS_FOLD_KEY, null);
+  return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+}
+function settingsFoldIsOpen(title) {
+  const s = settingsFoldState();
+  if (Object.prototype.hasOwnProperty.call(s, title)) return !!s[title];
+  return !!SETTINGS_FOLD_DEFAULT[title];
+}
+function settingsFoldSet(title, open) {
+  const s = settingsFoldState();
+  s[title] = open ? 1 : 0;
+  sSet(SETTINGS_FOLD_KEY, s);
+}
+
+function organizeSettingsSections() {
+  const root = $('#settings');
+  if (!root) return;
+  const nodes = Array.from(root.children);
+  const save = root.querySelector('#settings-save-block');
+  const spacer = root.querySelector('#settings-bottom-spacer');
+  const titles = nodes.filter(n => n.classList && n.classList.contains('sec-title'));
+  const fragment = document.createDocumentFragment();
+  const first = titles.length ? nodes.indexOf(titles[0]) : nodes.length;
+  const overviewNodes = nodes.slice(0, first).filter(n => n !== save && n !== spacer);
+  if (overviewNodes.length) {
+    const overview = document.createElement('section');
+    overview.className = 'set-overview';
+    const hd = document.createElement('div');
+    hd.className = 'sec-title';
+    hd.textContent = '总览';
+    hd.style.marginTop = '0';
+    overview.appendChild(hd);
+    overviewNodes.forEach(n => overview.appendChild(n));
+    fragment.appendChild(overview);
+  }
+  let body = null;
+  nodes.slice(first).forEach(n => {
+    if (n === save || n === spacer) return;
+    if (n.classList && n.classList.contains('sec-title')) {
+      const title = String(n.textContent || '').trim() || '设置';
+      const open = settingsFoldIsOpen(title);
+      const section = document.createElement('section');
+      section.className = open ? 'set-fold' : 'set-fold closed';
+      const head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'set-fold-head';
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const name = document.createElement('span');
+      name.className = 'fold-name';
+      name.textContent = title;
+      const arrow = document.createElement('span');
+      arrow.className = 'fold-arrow';
+      arrow.textContent = open ? '▾' : '▸';
+      head.appendChild(name);
+      head.appendChild(arrow);
+      body = document.createElement('div');
+      body.className = 'set-fold-body';
+      head.onclick = () => {
+        const closed = section.classList.toggle('closed');
+        head.setAttribute('aria-expanded', closed ? 'false' : 'true');
+        arrow.textContent = closed ? '▸' : '▾';
+        settingsFoldSet(title, !closed);
+      };
+      section.appendChild(head);
+      section.appendChild(body);
+      fragment.appendChild(section);
+      return;
+    }
+    if (body) body.appendChild(n);
+  });
+  if (save) fragment.appendChild(save);
+  if (spacer) fragment.appendChild(spacer);
+  root.innerHTML = '';
+  root.appendChild(fragment);
+}
+
 function readAgentState() {
   try {
     if (HAS_PERM && Perm.getAgentState) return JSON.parse(Perm.getAgentState() || '{}');
@@ -11940,6 +12035,27 @@ function providerCloseForm() {
   PROVIDER_EDIT_ID = '';
   const f = $('#provider-form'); if (f) f.hidden = true;
 }
+function provKindSync() {
+  const el = $('#prov-kind');
+  const v = (el && el.value) || 'openai';
+  $$('#prov-kind-chips [data-prov-kind]').forEach(b => {
+    if (b && b.classList) b.classList.toggle('on', b.dataset.provKind === v);
+  });
+}
+function bindPurposeChange(purpose, id) {
+  if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
+  if (!id) {
+    delete CONFIG.bindings[purpose];
+    providerEnsure(CONFIG, MEMCFG);
+  } else if (!providerBind(CONFIG, purpose, id)) {
+    toast('绑定失败：Provider 不支持该能力');
+    return;
+  }
+  providerApply(CONFIG, purpose);
+  sSet('via_ai_config', CONFIG);
+  renderProviderCenter();
+  toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
+}
 function providerOpenForm(id) {
   PROVIDER_EDIT_ID = id || '';
   const p = id ? providerFind(CONFIG, id) : null;
@@ -11948,6 +12064,7 @@ function providerOpenForm(id) {
   if (title) title.textContent = p ? '编辑 Provider' : '添加 Provider';
   set('#prov-name', p ? p.name : '');
   set('#prov-kind', p ? p.kind : 'openai');
+  provKindSync();
   set('#prov-base', p ? p.base : '');
   set('#prov-model', p ? p.model : '');
   const key = $('#prov-key');
@@ -12015,9 +12132,10 @@ function renderProviderCenter() {
       const usable = providers.filter(p => (p.capabilities || []).indexOf(purpose) >= 0);
       const cur = (CONFIG.bindings && CONFIG.bindings[purpose] && CONFIG.bindings[purpose].provider) || '';
       return '<div class="sg"><label>' + esc(PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '</label>'
-        + '<select data-bind-purpose="' + purpose + '"><option value="">自动选择</option>'
-        + usable.map(p => '<option value="' + esc(p.id) + '"' + (p.id === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('')
-        + '</select></div>';
+        + '<div class="chips">'
+        + '<button type="button" class="' + (cur ? '' : 'on') + '" data-bind-pick="" data-bind-purpose="' + purpose + '">自动选择</button>'
+        + usable.map(p => '<button type="button" class="' + (p.id === cur ? 'on' : '') + '" data-bind-pick="' + esc(p.id) + '" data-bind-purpose="' + purpose + '">' + esc(p.name) + '</button>').join('')
+        + '</div></div>';
     }).join('');
   }
   if (!list) return;
@@ -12064,9 +12182,9 @@ function renderProvidersPage() {
 <div id="provider-form" hidden>
   <div class="sub-title" id="provider-form-title">添加 Provider</div>
   <div class="sg" style="margin-top:8px"><label>名称</label><input id="prov-name" placeholder="例如 主模型 / 识图 / 备用"></div>
-  <div class="sg"><label>类型</label><select id="prov-kind">
-    ${Object.keys(PROVIDER_KINDS).map(k => '<option value="' + esc(k) + '">' + esc(PROVIDER_KINDS[k].label) + '</option>').join('')}
-  </select></div>
+  <div class="sg"><label>类型</label><div class="chips" id="prov-kind-chips">
+    ${Object.keys(PROVIDER_KINDS).map(k => '<button type="button" data-prov-kind="' + esc(k) + '"' + (k === 'openai' ? ' class="on"' : '') + '>' + esc(PROVIDER_KINDS[k].label) + '</button>').join('')}
+  </div><input id="prov-kind" type="hidden" value="openai"></div>
   <div class="sg"><label>接口地址</label><input id="prov-base" placeholder="https://.../v1"></div>
   <div class="sg"><label>默认模型</label><input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet"></div>
   <div class="sg"><label>API Key</label>
@@ -12092,40 +12210,34 @@ function renderProvidersPage() {
     if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
     if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
     const pa = b.closest('[data-provider-action]');
-    if (!pa) return;
-    const pid = pa.dataset.providerId || '';
-    const act = pa.dataset.providerAction;
-    if (act === 'test') { providerRunTest(pid); return; }
-    if (act === 'edit') { providerOpenForm(pid); return; }
-    if (act === 'remove') {
-      uiConfirm('删除 Provider 会同时移除它的绑定与本地保存的 Key，确定吗？', '删除').then(ok => {
-        if (!ok) return;
-        providerRemove(CONFIG, pid);
-        providerEnsure(CONFIG, MEMCFG);
-        sSet('via_ai_config', CONFIG);
-        providersCountRefresh();
-        renderProviderCenter();
-        toast('已删除 Provider');
-      });
-    }
-  };
-  root.onchange = (e) => {
-    const el = e.target;
-    if (!el || !el.dataset || !el.dataset.bindPurpose) return;
-    const purpose = el.dataset.bindPurpose;
-    const id = String(el.value || '');
-    if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
-    if (!id) {
-      delete CONFIG.bindings[purpose];
-      providerEnsure(CONFIG, MEMCFG);
-    } else if (!providerBind(CONFIG, purpose, id)) {
-      toast('绑定失败：Provider 不支持该能力');
+    if (pa) {
+      const pid = pa.dataset.providerId || '';
+      const act = pa.dataset.providerAction;
+      if (act === 'test') { providerRunTest(pid); return; }
+      if (act === 'edit') { providerOpenForm(pid); return; }
+      if (act === 'remove') {
+        uiConfirm('删除 Provider 会同时移除它的绑定与本地保存的 Key，确定吗？', '删除').then(ok => {
+          if (!ok) return;
+          providerRemove(CONFIG, pid);
+          providerEnsure(CONFIG, MEMCFG);
+          sSet('via_ai_config', CONFIG);
+          providersCountRefresh();
+          renderProviderCenter();
+          toast('已删除 Provider');
+        });
+      }
       return;
     }
-    providerApply(CONFIG, purpose);
-    sSet('via_ai_config', CONFIG);
-    renderProviderCenter();
-    toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
+    const pick = b.closest('[data-bind-pick]');
+    if (pick && pick.dataset.bindPurpose) {
+      bindPurposeChange(pick.dataset.bindPurpose, pick.dataset.bindPick || '');
+      return;
+    }
+    if (b.dataset && b.dataset.provKind) {
+      const k = $('#prov-kind');
+      if (k) k.value = b.dataset.provKind;
+      provKindSync();
+    }
   };
 }
 
@@ -12375,6 +12487,7 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
 </div>
 <div id="settings-bottom-spacer" style="height:96px"></div>`;
 
+  organizeSettingsSections();
   $('#settings').onclick = (e) => {
     const actionEl = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
     if (actionEl && actionEl.dataset.action === 'save-settings') {
@@ -12828,9 +12941,8 @@ let RUN_STATUS_TIMER = 0;
 function runStatusLabel() {
   const t = (TASKS || []).find(x => x.id === ACTIVE_RUN_TASK_ID) || currentTask() || {};
   const goal = String(t.goal || t.title || '').trim();
-  const sec = Math.max(0, Math.round((Date.now() - RUN_STATUS_START) / 1000));
   const phase = String(t.progress || '').trim();
-  let s = '运行中 ' + sec + 's';
+  let s = '运行中';
   if (phase) s += ' · ' + phase;
   if (goal) s += ' · ' + goal;
   if (t && t.persist && t.persist.enabled) {
@@ -12843,10 +12955,12 @@ function runStatusLabel() {
 }
 function updateRunStatus() {
   const box = $('#run-status');
+  const secEl = $('#run-sec');
   if (!box) return;
   const active = typeof sending !== 'undefined' && sending && ACTIVE_RUN_TASK_ID;
   if (!active) {
     box.hidden = true;
+    if (secEl) { secEl.hidden = true; secEl.textContent = ''; }
     RUN_STATUS_START = 0;
     if (RUN_STATUS_TIMER) { clearInterval(RUN_STATUS_TIMER); RUN_STATUS_TIMER = 0; }
     return;
@@ -12862,15 +12976,14 @@ function updateRunStatus() {
   box.hidden = false;
   const el = $('#run-status-text');
   if (el) el.textContent = runStatusLabel();
+  // 秒数按用户要求放到输入框下面，状态条里不再重复。
+  if (secEl) {
+    secEl.hidden = false;
+    secEl.textContent = '已执行 ' + Math.max(0, Math.round((Date.now() - RUN_STATUS_START) / 1000)) + 's';
+  }
   if (!RUN_STATUS_TIMER) RUN_STATUS_TIMER = setInterval(updateRunStatus, 1000);
 }
 function bindRunStatus() {
-  const stop = $('#run-status-stop');
-  if (stop) stop.onclick = () => {
-    if (typeof sending !== 'undefined' && sending) { send(); return; }
-    try { cancelTaskRequests(ACTIVE_RUN_TASK_ID || currentTask().id); } catch (e) {}
-    updateRunStatus();
-  };
   updateRunStatus();
 }
 

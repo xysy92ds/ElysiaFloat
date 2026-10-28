@@ -489,6 +489,16 @@ function step(name, fn) {
     if (!html.includes('data-provider-action="test"')) throw new Error('模型提供商页缺少连接测试入口');
     if (!/showView\('providers'\)/.test(js)) throw new Error('模型提供商入口没有跳转独立页');
     if (!/function renderProvidersPage\(\)/.test(js)) throw new Error('缺少模型提供商页渲染函数');
+    // 0.12.3：设置分区恢复折叠，箭头指示并记住上次状态。
+    if (!/function organizeSettingsSections\(\)/.test(js)) throw new Error('缺少设置分区折叠');
+    if (!/organizeSettingsSections\(\);/.test(js)) throw new Error('设置页没有调用分区折叠');
+    if (!/className = 'fold-arrow'/.test(js) || !/arrow\.textContent = closed \? '▸' : '▾'/.test(js)) throw new Error('折叠标题缺少箭头');
+    if (!/via_ai_settings_folds/.test(js)) throw new Error('折叠状态没有持久化');
+    // 浮窗 WebView 里原生 select 点不动，绑定与类型都必须用 chips。
+    if (/<select data-bind-purpose=/.test(js)) throw new Error('用途绑定不应使用原生 select');
+    if (!/data-bind-pick=/.test(js)) throw new Error('用途绑定缺少可点击的 chips');
+    if (/<select id="prov-kind">/.test(js)) throw new Error('Provider 类型不应使用原生 select');
+    if (!/data-prov-kind=/.test(js)) throw new Error('Provider 类型缺少可点击的 chips');
     if (!/url\.indexOf\('\/models'\) < 0\) url \+= '\/models'/.test(js)) throw new Error('连接测试没有固定探测 /models');
     for (const id of ['usage-box', 'set-usage-calls', 'set-usage-tokens', 'btn-usage-reset']) {
       if (!html.includes('id="' + id + '"')) throw new Error('模型中心缺少用量控件：#' + id);
@@ -510,9 +520,15 @@ function step(name, fn) {
     if (!/const VIEW_STACK = \['chat'\]/.test(js) || !/function viewBack\(\)/.test(js)) throw new Error('缺少返回栈');
     if (!/CURRENT_VIEW !== 'chat'/.test(js)) throw new Error('系统返回没有走返回栈');
     if (!/showView\('chat'\);\s+\/\/ E1-001/.test(js)) throw new Error('启动没有固定落在聊天首页');
-    for (const id of ['run-status', 'run-status-text', 'run-status-stop']) {
+    for (const id of ['run-status', 'run-status-text']) {
       if (!html.includes('id="' + id + '"')) throw new Error('缺少运行状态条结构：#' + id);
     }
+    // 0.12.3：秒数移到输入框下面，状态条不再重复显示；停止键沿用发送键切换。
+    if (html.includes('id="run-status-stop"')) throw new Error('状态条不应再有独立停止键（停止由发送键切换）');
+    if (!html.includes('id="run-sec"')) throw new Error('缺少输入框下方的执行秒数');
+    if (!/secEl\.textContent = '已执行 '.*?'s'/.test(js)) throw new Error('执行秒数没有写到输入框下方');
+    if (/'运行中 ' \+ sec/.test(js)) throw new Error('状态条里不应再显示秒数');
+    if (!/\$\('#send'\)\.textContent = '停止'/.test(js)) throw new Error('发送键运行时没有切换成停止');
     if (!/const active = typeof sending !== 'undefined' && sending && ACTIVE_RUN_TASK_ID/.test(js)) throw new Error('状态条没有跟随运行状态');
     if ((js.match(/updateRunStatus\(\);/g) || []).length < 4) throw new Error('发送/结束/快捷任务没有刷新状态条');
     const css = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
