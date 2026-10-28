@@ -56,8 +56,8 @@
 | I-009 | 模型、截图、插件、子进程取消没有统一取消源 | 运行令牌只覆盖部分模型回调 | 进行中 | G2-004 |
 | I-010 | DeviceTask 不是完整状态机 | 已加设备相位状态机 + 验证反馈；真机验收待做 | 已修复（自动） | G5-1 |
 | I-011 | 动作后验证和高风险意图复核不完整 | 已验证结构化（PASS/NO_CHANGE/EMPTY/DENIED）；风险门按用户决定只用密码框 | 已修复（自动） | G5-3/4 |
-| I-012 | Termux session token 生成但不验证 | `createSession()` 有 token；`validateJob/dispatch` 未消费 token | 基础版 | G8-001 |
-| I-013 | Termux 无 run_id、输出回传、取消和日志查询 | `dispatch()` 只启动 `RUN_COMMAND` 后返回 | 基础版 | G8-001 |
+| I-012 | Termux session token 生成但不验证 | 0.12 已让 `dispatch`/`runFixed` 校验 `run_id` 并只接受固定模板；插件不再能传任意命令 | 已修复（自动，真机待验） | G8-001 |
+| I-013 | Termux 无 run_id、输出回传、取消和日志查询 | 0.12 已实现 run_id、PID/退出码、日志读取与取消、超时杀进程（退出码 124）、日志上限 200KB、审计 `workspace/audit/termux-audit.log` | 已修复（自动，真机待验） | G8-001 |
 | I-014 | Termux 原生入口缺最终 Agent/任务门禁 | `dispatchTermuxJob()` 直接进入 Worker，主要依赖前端暴露工具 | 基础版 | G8-001 |
 | I-015 | Root Worker 缺少完整审计、取消和统一门禁 | 当前只有 `id/getprop/task_files` | 基础版 | G8-002 |
 | I-016 | Shizuku 只有状态占位 | `ShizukuRuntime.available()` 固定 false，授权固定 false | 暂缓 | G8-003 |
@@ -88,6 +88,9 @@
 | I-031 | 阶段 APK 和未提交源码的对应关系需要统一记录 | `apk/phases/` 有多个阶段包，工作区改动未提交 | 进行中 | G0-001 / G10 |
 | I-050 | 公开仓库缺少标准发布门面与 Beta 发布 | 已建 `xysy92ds/ElysiaFloat` 公开仓库：README / CHANGELOG / docs 7 篇全部重写，新增 `.gitignore`、GitHub Actions；发布 tag `v0.7.2`、Release 422140702（prerelease），APK / source.zip / SHA256SUMS 三资产匿名下载与校验通过 | 已修复 | G10 |
 | I-051 | App 内置市场仍展示未完善的 Minecraft / Termux 示例 | `PLUGIN_MARKET_INDEX` 仍含 `com.elly.market.minecraft`，依赖 Termux 且公开市场已移除该插件 | 规划中 | N4-001 |
+| I-060 | 依赖下载没有断点续传与重试，弱网大包失败需从头下载 | 0.12 只做 HTTPS + 流式 SHA-256 + 失败删临时文件；续传/Range 留待后续 | 规划中 | E5 |
+| I-061 | 息屏 8 小时、杀进程恢复、耗电/流量统计没有真机证据 | 代码与自动测试已覆盖心跳/检查点/唤醒锁/看门狗/调度器；E6 出口依赖真机长跑 | 真机待验 | E6 |
+| I-062 | 0.12 私有 Release 与推送被 GitHub token（401）拦截 | 候选包已构建并本地提交；待有效 token 后补推送与 `dev-0.12-2026-10-28` 归档 | 进行中 | 维护 |
 
 ## 已知但不应误判为问题的设计
 
