@@ -8,7 +8,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { T, store } = require('./harness');
+const { T, store, vaultStore } = require('./harness');
 
 const SRC = path.join(__dirname, '..', 'app', 'src', 'main', 'assets', 'src');
 const errors = [];
@@ -90,6 +90,40 @@ step('能力授权：同任务生效、撤销后失效、不跨任务', () => {
   if (T.consentGranted('behavior-b', 'device')) throw new Error('授权串到了其它任务');
   T.consentRevokeTask('behavior-a');
   if (T.consentGranted('behavior-a', 'device')) throw new Error('撤销后仍生效');
+});
+
+step('密钥安全：Key 进密钥仓，普通配置不再存明文（E2-004）', () => {
+  const cfg = { apiBase: 'https://example.invalid/v1', apiKey: 'test-key-123456' };
+  if (T.secretHydrate(cfg, T.SECRET_FIELDS_CFG, 'ai') < 1) throw new Error('迁移没有写入密钥仓');
+  if (vaultStore.get('ai.apiKey') !== 'test-key-123456') throw new Error('密钥仓没有拿到 Key');
+  T.sSet('via_ai_config', cfg);
+  const saved = store.get('via_ai_config') || '';
+  if (saved.indexOf('apiKey') >= 0 || saved.indexOf('test-key-123456') >= 0) {
+    throw new Error('明文 Key 仍写进了 via_ai_config');
+  }
+  const again = T.sGet('via_ai_config', {});
+  if (again.apiKey) throw new Error('sGet 仍能读到明文 Key');
+  const empty = {};
+  if (T.secretHydrate(empty, T.SECRET_FIELDS_CFG, 'ai') < 1 || empty.apiKey !== 'test-key-123456') {
+    throw new Error('重启后没有从密钥仓取回 Key');
+  }
+  cfg.apiKey = '';
+  T.sSet('via_ai_config', cfg);
+  if (vaultStore.has('ai.apiKey')) throw new Error('清空 Key 后密钥仓仍保留旧值');
+});
+
+step('密钥安全：向量 Key 走同一策略（E2-004）', () => {
+  const cfg = { vecBase: 'https://example.invalid/v1', vecKey: 'vec-key-987654' };
+  T.sSet('via_ai_mem_config', cfg);
+  const saved = store.get('via_ai_mem_config') || '';
+  if (saved.indexOf('vecKey') >= 0 || saved.indexOf('vec-key-987654') >= 0) {
+    throw new Error('向量明文 Key 仍落盘');
+  }
+  if (vaultStore.get('mem.vecKey') !== 'vec-key-987654') throw new Error('向量 Key 没进密钥仓');
+  const restore = {};
+  if (T.secretHydrate(restore, T.SECRET_FIELDS_MEM, 'mem') < 1 || restore.vecKey !== 'vec-key-987654') {
+    throw new Error('向量 Key 无法从密钥仓取回');
+  }
 });
 
 if (errors.length) {

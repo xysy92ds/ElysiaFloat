@@ -47,6 +47,26 @@ class JsBridge(private val ctx: Context, private val webView: WebView) {
         } catch (e: Exception) {}
     }
 
+    /* ---------- 密钥仓（0.9 / E2-004） ----------
+     * Key 只走这里：密文存独立 SharedPreferences，主密钥在 AndroidKeyStore。
+     * 任何失败都返回空/false，不回退明文。 */
+    private val vault by lazy { SecretsVault(ctx) }
+
+    @JavascriptInterface
+    fun secretPut(name: String, value: String): Boolean = vault.put(name, value)
+
+    @JavascriptInterface
+    fun secretGet(name: String, def: String?): String? = vault.get(name, def)
+
+    @JavascriptInterface
+    fun secretHas(name: String): Boolean = vault.has(name)
+
+    @JavascriptInterface
+    fun secretDelete(name: String): Boolean = vault.delete(name)
+
+    @JavascriptInterface
+    fun secretList(): String = vault.list()
+
     /* ---------- 音乐离线缓存 ---------- */
     /**
      * 优先使用用户可见的公共 Music/ElysiaFloat/cache；没有公共存储权限时回退到

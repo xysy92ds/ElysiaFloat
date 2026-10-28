@@ -2,6 +2,11 @@
  *  状态
  * ========================================================== */
 let CONFIG = Object.assign({}, DC, sGet('via_ai_config', {}) || {});
+/* E2-004：旧版本把 Key 直接存在 via_ai_config 里。启动时收进 AndroidKeyStore，
+ * 再把剔除 Key 的副本写回，保证明文不再落盘；已迁移的用户则从密钥仓取回内存。 */
+if (secretHydrate(CONFIG, SECRET_FIELDS_CFG, 'ai')) {
+  sSet('via_ai_config', CONFIG);
+}
 if (!sGet('via_ai_task_timeout_v1200', false) && CONFIG.agentTaskTimeout === 90000) {
   CONFIG.agentTaskTimeout = 1200000;
   sSet('via_ai_task_timeout_v1200', true);

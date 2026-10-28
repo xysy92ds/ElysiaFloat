@@ -30,7 +30,9 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'showGuide', 'hideGuide', 'ensureGuideFooterVisible', 'activePermItems', 'PERM_ITEMS',
   'consentGranted', 'consentGrant', 'consentRevokeTask', 'ensureDeviceConsent', 'taskToolsAllowed',
   'saveHistory', 'taskHistoryKey', 'clearTaskHistory', 'saveTasks',
-  'renderGuideSteps', 'webviewLevel', 'loadEnv', 'sdkAtLeast', 'detectCaps', 'send'];
+  'renderGuideSteps', 'webviewLevel', 'loadEnv', 'sdkAtLeast', 'detectCaps', 'send',
+  'secretStore', 'secretHydrate', 'secretPersist', 'stripSecretFields', 'SECRET_FIELDS_CFG', 'SECRET_FIELDS_MEM',
+  'sSet', 'sGet'];
 const cuts = js.lastIndexOf('})();');
 if (cuts < 0) { console.error('没找到 IIFE 结尾'); process.exit(1); }
 js = js.slice(0, cuts) + '\ntry { window.__T = {' + EXPORTS.join(',') + '}; window.__T.getHistory = function () { return history; }; } catch (e) { console.error("EXPORT FAIL", e); }\n' + js.slice(cuts);
@@ -154,6 +156,8 @@ const document = {
 
 /* ======================= 假存储 / 桥接 ======================= */
 const store = new Map();
+/** 假密钥仓：只存内存，模拟 AndroidKeyStore 的密文仓，测试里可断言“明文没进 store”。 */
+const vaultStore = new Map();
 const calls = { mp: [], tts: [], ui: [], net: [], tools: [], ws: [] };
 /** 可被测试改写的假页面：screenW/H + nodes */
 const SCREEN_STUB = {
@@ -211,7 +215,12 @@ function fakeHttpBody(rawUrl) {
 const Android = {
   getValue(k, def) { return store.has(k) ? store.get(k) : (def === undefined ? null : def); },
   setValue(k, v) { store.set(k, String(v)); },
-  clearAll() { store.clear(); },
+  secretPut(k, v) { vaultStore.set(String(k), String(v)); return true; },
+  secretGet(k, def) { return vaultStore.has(String(k)) ? vaultStore.get(String(k)) : (def === undefined ? null : def); },
+  secretHas(k) { return vaultStore.has(String(k)); },
+  secretDelete(k) { return vaultStore.delete(String(k)); },
+  secretList() { return JSON.stringify([...vaultStore.keys()].sort()); },
+  clearAll() { store.clear(); vaultStore.clear(); },
   // 网络：把结果异步回抛给 window.__gmCb
   request(id, method, url, headersJson, body, timeout) {
     calls.net.push({ method, url });
@@ -382,4 +391,4 @@ try {
 
 const T = sandbox.window.__T;
 
-module.exports = { html, js, sandbox, context, T, errors, calls, store, ENVINFO, Android, Perm, document, q1, mkEl, vm, SCREEN_STUB };
+module.exports = { html, js, sandbox, context, T, errors, calls, store, vaultStore, ENVINFO, Android, Perm, document, q1, mkEl, vm, SCREEN_STUB };

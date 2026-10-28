@@ -18,6 +18,10 @@ MEM = MEM.filter(e => e && typeof e === 'object').map(memNormalize);
 let MEMCFG = Object.assign({
   vecEnabled: false, vecBase: '', vecKey: '', vecModel: '', autoSummary: true, summaryEvery: 50
 }, sGet(MEMCFG_KEY, {}) || {});
+/* 向量 Key 同样进密钥仓；旧明文在启动时迁移。 */
+if (secretHydrate(MEMCFG, SECRET_FIELDS_MEM, 'mem')) {
+  sSet(MEMCFG_KEY, MEMCFG);
+}
 const MEM_AUTO_KEY = 'via_ai_mem_auto_state';
 function memAutoState() { const o = sGet(MEM_AUTO_KEY, null); return (o && typeof o === 'object') ? o : { since: 0, lastAt: 0, running: false }; }
 function memAutoSave(o) { sSet(MEM_AUTO_KEY, o || {}); }

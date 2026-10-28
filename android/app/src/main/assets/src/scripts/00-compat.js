@@ -72,6 +72,104 @@ function MP() {
   } catch (e) { return null; }
 }
 
+/* ---------- 密钥仓（0.9 / E2-004） ---------- */
+/**
+ * 明文 Key 不再写进 via_ai_config。原生 SecretsVault 用 AndroidKeyStore 加密，
+ * 这里只按名称存取。桥不可用时（旧 APK / 浏览器）secretStore.ok=false，
+ * 调用方应继续允许旧行为，避免旧版本用户丢 Key。
+ */
+const SECRET_BRIDGE_OK = HAS_NATIVE && typeof Android.secretPut === 'function';
+const secretStore = {
+  ok: SECRET_BRIDGE_OK,
+  put: (name, value) => {
+    try { return !!(SECRET_BRIDGE_OK && Android.secretPut(String(name), String(value == null ? '' : value))); }
+    catch (e) { return false; }
+  },
+  get: (name, def) => {
+    try {
+      if (!SECRET_BRIDGE_OK || typeof Android.secretGet !== 'function') return def === undefined ? '' : def;
+      const v = Android.secretGet(String(name), def === undefined ? '' : String(def));
+      return v == null ? (def === undefined ? '' : def) : String(v);
+    } catch (e) { return def === undefined ? '' : def; }
+  },
+  has: (name) => {
+    try { return !!(SECRET_BRIDGE_OK && Android.secretHas && Android.secretHas(String(name))); }
+    catch (e) { return false; }
+  },
+  del: (name) => {
+    try { return !!(SECRET_BRIDGE_OK && Android.secretDelete && Android.secretDelete(String(name))); }
+    catch (e) { return false; }
+  },
+  list: () => {
+    try {
+      if (!SECRET_BRIDGE_OK || !Android.secretList) return [];
+      const raw = Android.secretList();
+      const arr = JSON.parse(raw || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+};
+
+/** 会进密钥仓的配置字段；持久化配置里必须剔除。 */
+const SECRET_FIELDS_CFG = ['apiKey', 'visionKey', 'ttsApiKey'];
+const SECRET_FIELDS_MEM = ['vecKey'];
+const SECRET_SCOPES = [
+  { key: 'via_ai_config', fields: SECRET_FIELDS_CFG, prefix: 'ai' },
+  { key: 'via_ai_mem_config', fields: SECRET_FIELDS_MEM, prefix: 'mem' }
+];
+function secretScopeOf(key) {
+  for (let i = 0; i < SECRET_SCOPES.length; i++) if (SECRET_SCOPES[i].key === key) return SECRET_SCOPES[i];
+  return null;
+}
+
+/** 把对象里的明文 Key 写进密钥仓；空值表示删除。只处理对象自身确实携带的字段。 */
+function secretPersist(obj, fields, prefix) {
+  if (!secretStore.ok || !obj || typeof obj !== 'object') return 0;
+  let n = 0;
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    if (!Object.prototype.hasOwnProperty.call(obj, f)) continue;
+    const v = obj[f];
+    const name = prefix + '.' + f;
+    if (typeof v === 'string' && v) { if (secretStore.put(name, v)) n++; }
+    else if (secretStore.del(name)) n++;
+  }
+  return n;
+}
+
+/** 启动时把旧明文 Key 收进密钥仓，或者把已保存的 Key 取回内存。 */
+function secretHydrate(obj, fields, prefix) {
+  if (!secretStore.ok || !obj || typeof obj !== 'object') return 0;
+  let n = 0;
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    const name = prefix + '.' + f;
+    const cur = typeof obj[f] === 'string' ? obj[f] : '';
+    if (cur) { if (secretStore.put(name, cur)) n++; }
+    else {
+      const got = secretStore.get(name, '');
+      if (got) { obj[f] = got; n++; }
+    }
+  }
+  return n;
+}
+
+/** 持久化前的副本：剔除 Key 字段，返回新对象；没有变化时返回原对象。 */
+function stripSecretFields(key, value) {
+  const scope = secretScopeOf(key);
+  if (!scope || !secretStore.ok) return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  let out = value;
+  for (let i = 0; i < scope.fields.length; i++) {
+    const f = scope.fields[i];
+    if (Object.prototype.hasOwnProperty.call(out, f)) {
+      if (out === value) out = Object.assign({}, value);
+      delete out[f];
+    }
+  }
+  return out;
+}
+
 /* ---------- 存储 ---------- */
 const sGet = (k, d) => {
   try {
@@ -87,6 +185,14 @@ const sGet = (k, d) => {
   catch (e) { return d; }
 };
 const sSet = (k, v) => {
+  try {
+    const scope = secretScopeOf(k);
+    if (scope && secretStore.ok && v && typeof v === 'object') {
+      // 先落密钥仓，再写剔除 Key 的副本；顺序不能反，否则崩在中途会丢 Key。
+      secretPersist(v, scope.fields, scope.prefix);
+      v = stripSecretFields(k, v);
+    }
+  } catch (e) {}
   try {
     if (HAS_NATIVE && Android.setValue) { Android.setValue(k, JSON.stringify(v)); return; }
   } catch (e) {}

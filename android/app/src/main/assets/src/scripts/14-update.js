@@ -766,7 +766,8 @@ async function detectModels() {
 function exportData() {
   try {
     const c = Object.assign({}, CONFIG);
-    delete c.apiKey;
+    // 导出一律不含 Key：即使密钥仓不可用也不外泄
+    SECRET_FIELDS_CFG.forEach(k => { delete c[k]; });
     if (c.avatarUrl && c.avatarUrl.indexOf('data:') === 0) c.avatarUrl = '';
     const payload = { config: c, history, transCache, favorites, v: 1 };
     const code = b64e(JSON.stringify(payload));
