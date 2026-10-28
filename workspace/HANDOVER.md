@@ -8,7 +8,8 @@ SHA-256：`8a7dc745cb235443de254609fb890a5e9f556a5443f050baf82ddbc1f22455bc`
 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（公开 Release 资产，SHA-256 `6cf5ff19…`）
 工作转移包：`handoff/ElysiaFloat-handoff-*.zip`（以同目录 `.sha256` 为准）；
 私有仓库归档：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`；
-N1 修复候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/n1fix-2026-10-28`（私有，需登录）。
+N1 修复候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/n1fix-2026-10-28`（私有，需登录）；
+0.9 开发候选包：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.9-2026-10-28`（私有，需登录）。
 
 > 2026-10-28 补：本轮修复粘贴/复制（I-055）、横屏退出跑出屏幕（I-056）、
 > 音乐工具被 `toolsBroken` 毒化（I-057）、设备任务发送（I-058）、任务模式不调工具（I-059）。

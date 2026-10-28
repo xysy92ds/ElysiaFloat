@@ -21,7 +21,7 @@
 - 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（同时归档于 `release/0.7.2/`，与公开 Release 资产同一构建）。
 - 已发布包 SHA-256：`6cf5ff194090e1827ee053db340665a3a43a4e3bcca914f159b7845fd3356b03`。
 - N1 修复候选包 SHA-256：`b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e`。
-- 0.9 开发候选包 SHA-256：`8a7dc745cb235443de254609fb890a5e9f556a5443f050baf82ddbc1f22455bc`（2,648,457 字节）。
+- 0.9 开发候选包 SHA-256：`8a7dc745cb235443de254609fb890a5e9f556a5443f050baf82ddbc1f22455bc`（2,648,457 字节）；私有归档 `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.9-2026-10-28`。
 - 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
 - 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js` 全通过（2026-10-28 复跑）；I-055~I-059 修复仍待真机复测。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。
