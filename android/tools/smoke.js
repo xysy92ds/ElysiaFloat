@@ -274,6 +274,44 @@ function step(name, fn) {
     T.refreshSystemPrompt(false);
   });
 
+  await step('E3-001~003：Manifest v2、surface 注册、组件树与未知组件降级', async () => {
+    const raw = {
+      manifestVersion: 2, apiVersion: '0.2', id: 'com.test.v2', name: '开放插件', icon: '🧪',
+      permissions: ['files.public.write'],
+      config: { schemaVersion: 2, fields: [
+        { key: 'name', type: 'string', label: '称呼', default: '朋友' },
+        { key: 'token', type: 'secret', label: '密钥' }
+      ] },
+      surfaces: [
+        { type: 'page', id: 'home', title: '首页', tree: { type: 'layout', children: [
+          { type: 'text', text: '你好 {{config.name}}' }, { type: 'nope' }] } },
+        { type: 'command', id: 'go', command: '/open', title: '打开', action: { type: 'navigate', page: 'home' } },
+        { type: 'settings', id: 'cfg', title: '设置' },
+        { type: 'job', id: 'tick', every: 60, action: { type: 'state.set', path: 'n', value: 1 } }
+      ]
+    };
+    if (T.plugManifestV2Error(raw)) throw new Error('合法 v2 清单被拒：' + T.plugManifestV2Error(raw));
+    if (!T.plugManifestError(Object.assign({}, raw, { surfaces: [] }))) throw new Error('空 surfaces 的 v2 清单应被拒');
+    if (!T.plugManifestError(Object.assign({}, raw, { surfaces: [{ type: 'nope', id: 'x' }] }))) throw new Error('未知 surface 应被拒');
+    const m = T.plugNormalize(Object.assign({}, raw, { grantedPermissions: ['files.public.write'] }));
+    if (!m || m.surfaces.length !== 4) throw new Error('v2 surface 没有注册');
+    if (m.configVersion !== 2 || m.configFields.length !== 2) throw new Error('配置 Schema 没有规整');
+    T.USER_PLUGINS.push(m);
+    if (!T.plugSurfaceFind('page', 'home', m.id)) throw new Error('page 没有进入注册表');
+    if (!T.plugCommandFind('/open')) throw new Error('命令没有进入分发');
+    const page = m.surfaces.filter(s => s.type === 'page')[0];
+    const h = T.plugRenderTree(page.tree, { config: { name: '小明' }, state: {}, session: {} });
+    if (!/小明/.test(h)) throw new Error('数据绑定没有生效');
+    if (!/未知组件/.test(h)) throw new Error('未知组件没有降级渲染');
+    const denied = await T.plugRunAction(m, { type: 'navigate', page: 'home' }, {});
+    if (denied.ok !== true) throw new Error('同插件页面导航应成功：' + JSON.stringify(denied));
+    const noPerm = await T.plugRunAction(m, { type: 'openUrl', url: 'https://example.com', permissions: ['system.open_url'] }, {});
+    if (noPerm.ok !== false) throw new Error('未声明的动作权限没有被拒绝');
+    T.showView('chat');
+    T.USER_PLUGINS.length = 0;
+    T.refreshSystemPrompt(false);
+  });
+
   await step('插件权限声明、授权和本地市场结构', () => {
     const safe = { manifestVersion: 1, apiVersion: '0.1', id: 'com.test.safe', name: '安全插件', permissions: [], tools: [{ name: 'safe_tool', description: '安全工具', permissions: [], kind: 'js', code: 'async function run(a){return a;}' }] };
     const dangerous = { manifestVersion: 1, apiVersion: '0.1', id: 'com.test.danger', name: '危险插件', permissions: ['files.public.write'], tools: [{ name: 'danger_tool', description: '写文件', permissions: ['files.public.write'], kind: 'js', code: 'async function run(a){return a;}' }] };

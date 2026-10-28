@@ -9,7 +9,7 @@ function showView(v, opts) {
   const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
   const settings = $('#settings'), music = $('#music'), mini = $('#mini-player'),
     memory = $('#memory'), memEdit = $('#mem-edit'), trans = $('#trans'),
-    plugins = $('#plugins'), plugMarketPage = $('#plug-market-page');
+    plugins = $('#plugins'), plugMarketPage = $('#plug-market-page'), plugPage = $('#plug-page');
   const attachEl = $('#attach-bar');
   bodyEl.style.display = 'none';
   footEl.style.display = 'none';
@@ -19,6 +19,7 @@ function showView(v, opts) {
   music.classList.remove('open');
   if (plugins) plugins.classList.remove('open');
   if (plugMarketPage) plugMarketPage.classList.remove('open');
+  if (plugPage) plugPage.classList.remove('open');
   if (memory) memory.classList.remove('open');
   if (memEdit) memEdit.classList.remove('open');
   if (trans) trans.classList.remove('open');
@@ -33,6 +34,7 @@ function showView(v, opts) {
   } else if (v === 'settings') settings.classList.add('open');
   else if (v === 'plugins' && plugins) { plugins.classList.add('open'); renderPlugins(); }
   else if (v === 'plug-market' && plugMarketPage) { plugMarketPage.classList.add('open'); renderPlugMarket(); }
+  else if (v === 'plug-page' && plugPage) { plugPage.classList.add('open'); plugRenderPage(); }
   else if (v === 'music') music.classList.add('open');
   else if (v === 'memory' && memory) {
     memory.classList.add('open');
@@ -142,7 +144,23 @@ function bindPluginsPage() {
     if (b.dataset.cplugSw) { toggleUserPlug(b.dataset.cplugSw); return; }
     if (b.dataset.toolSw) { toggleTool(b.dataset.toolSw); return; }
     if (b.dataset.plugDel) { plugDelete(b.dataset.plugDel); return; }
+    if (b.dataset.plugAct || b.dataset.plugOpen || b.dataset.plugConfig) { plugHandleUiAction(b); return; }
   };
+
+  // 插件自注册页面：返回 + 通用动作/配置表单事件（全部走宿主校验）。
+  const pageBack = $('#plug-page-back');
+  if (pageBack) pageBack.onclick = () => viewBack();
+  const pageBody = $('#plug-page-body');
+  if (pageBody) {
+    pageBody.onclick = (e) => {
+      const el = e.target && e.target.closest ? e.target.closest('[data-plug-act],[data-plug-open],[data-plug-config]') : null;
+      if (el) plugHandleUiAction(el);
+    };
+    pageBody.onchange = (e) => {
+      const el = e.target && e.target.closest ? e.target.closest('[data-plug-cfg]') : null;
+      if (el) plugHandleConfigChange(el);
+    };
+  }
 
   const market = $('#plug-market');
   if (market) market.onclick = () => showView('plug-market');

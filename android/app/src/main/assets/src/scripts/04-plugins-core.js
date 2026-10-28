@@ -131,15 +131,21 @@ function plugNormalize(m) {
   const declared = Array.isArray(m.permissions) ? plugNormalizePermissions(m.permissions) : [];
   const tools = (Array.isArray(m.tools) ? m.tools : [])
     .map(t => plugNormalizeTool(t, declared)).filter(Boolean);
-  if (!tools.length) return null;
+  // v2：功能由 surfaces 描述；v1：沿用 tools。二者都空才算无效清单。
+  const manifestVersion = parseInt(m.manifestVersion, 10) || 1;
+  const surfaces = manifestVersion === 2
+    ? (Array.isArray(m.surfaces) ? m.surfaces : []).map(s => plugNormalizeSurface(s, declared)).filter(Boolean)
+    : [];
+  if (!tools.length && !surfaces.length) return null;
+  const config = manifestVersion === 2 ? plugNormalizeConfig(m.config) : { version: 1, fields: [] };
   // 有权限的插件永远默认未授权；旧版未保存授权字段时也不能把声明当成授权。
   const hasPermissionState = Array.isArray(m.grantedPermissions);
   const granted = hasPermissionState
     ? plugNormalizePermissions(m.grantedPermissions).filter(p => declared.indexOf(p) >= 0)
     : [];
   return {
-    manifestVersion: parseInt(m.manifestVersion, 10) || 1,
-    apiVersion: String(m.apiVersion || '0.1').slice(0, 24),
+    manifestVersion: manifestVersion,
+    apiVersion: String(m.apiVersion || (manifestVersion === 2 ? '0.2' : '0.1')).slice(0, 24),
     id, name,
     pluginType: ['chat', 'quick', 'device', 'workspace'].indexOf(String(m.pluginType || '').toLowerCase()) >= 0 ? String(m.pluginType).toLowerCase() : (declared.some(p => p.indexOf('workspace') === 0 || p.indexOf('files.') === 0) ? 'workspace' : (declared.some(p => p.indexOf('device.') === 0) ? 'device' : 'chat')),
     icon: String(m.icon || '🧩').slice(0, 4),
@@ -160,7 +166,17 @@ function plugNormalize(m) {
     updatedAt: m.updatedAt || m.installedAt || new Date().toISOString(),
     invokedAt: m.invokedAt || '',
     invokeCount: Math.max(0, parseInt(m.invokeCount, 10) || 0),
-    tools
+    tools,
+    surfaces,
+    configVersion: config.version,
+    configFields: config.fields,
+    dependencies: Array.isArray(m.dependencies) ? m.dependencies.slice(0, 40).map(d => ({
+      id: String((d && d.id) || '').slice(0, 64),
+      kind: String((d && d.kind) || '').slice(0, 24),
+      version: String((d && d.version) || '').slice(0, 32),
+      sha256: String((d && d.sha256) || '').toLowerCase().slice(0, 64)
+    })).filter(d => d.id) : [],
+    models: plugPlainObject(m.models) ? plugJsonSafe(m.models, 0) : {}
   };
 }
 function plugPermissionDeclared(plugin, permission) {
@@ -187,7 +203,8 @@ function plugPluginCanCall(plugin, name) {
 }
 function plugManifestError(raw) {
   if (!raw || typeof raw !== 'object') return '插件清单必须是对象';
-  if (raw.manifestVersion !== 1) return '只支持 manifestVersion=1（数字）';
+  if (raw.manifestVersion === 2) return plugManifestV2Error(raw);
+  if (raw.manifestVersion !== 1) return '只支持 manifestVersion=1 或 2（数字）';
   if (typeof raw.apiVersion !== 'string' || !raw.apiVersion.trim()) return '缺少 apiVersion';
   if (!Array.isArray(raw.permissions)) return '必须显式声明 permissions 数组；无危险能力也请填写 []';
   if (plugHasUnknownPermissions(raw.permissions)) return 'permissions 含有未知能力';

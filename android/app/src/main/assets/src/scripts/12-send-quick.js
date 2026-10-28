@@ -28,6 +28,17 @@ async function send() {
     t = inputEl.value.trim();
   }
   if (!t && !att) return;
+  // E3-002：插件命令（/cmd）由注册表分发；未注册的斜杠文本仍按普通聊天处理。
+  const cmdHit = plugCommandFind(t);
+  if (cmdHit) {
+    inputEl.value = ''; inputEl.style.height = 'auto';
+    addMsg('user', t);
+    const cr = await plugCommandRun(cmdHit, cmdHit.args);
+    if (!cr || cr.ok === false) addMsg('assistant', '命令执行失败：' + ((cr && cr.error) || '未知错误'));
+    else if (cr.data && cr.data.result) addMsg('assistant', String(cr.data.result).slice(0, 4000));
+    saveHistory();
+    return;
+  }
   // 正在某个持久任务（工作/手机）里时，普通文字继续留在该任务；
   // 只有明确的快捷屏幕指令或其它任务类型关键词才切换。
   // 之前所有普通句子都被归类成 chat，导致一发消息就跳回聊天页、工作任务里发不出东西。

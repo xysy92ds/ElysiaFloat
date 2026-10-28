@@ -135,6 +135,8 @@ function renderPlugins() {
   }).join('');
 
   html += plugCustomHtml();
+  // E3-002：插件自己在清单里声明的页面/入口/命令/任务，宿主不写死类型。
+  html += plugRuntimeEntriesHtml();
   box.innerHTML = html;
 }
 
@@ -191,6 +193,7 @@ async function toggleUserPlug(id) {
   if (!next) p.grantedPermissions = [];
   plugSaveList();
   plugAudit(next ? 'enable' : 'disable', p);
+  plugLifecycle(p, next ? 'enable' : 'disable');
   refreshSystemPrompt();
   toolsBroken = false;
   saveHistory();
@@ -379,6 +382,7 @@ async function installMarketPlugin(id, source) {
   USER_PLUGINS.push(m);
   plugSaveList();
   plugAudit(isUpdate ? 'update' : 'install', m, { source: m.source });
+  plugLifecycle(m, 'install');
   renderPlugins(); renderPlugPreview(); renderPlugMarket();
   toast(isUpdate ? '已更新市场插件' : '已安装市场插件');
 }
@@ -486,7 +490,7 @@ async function plugInstallFromText(text) {
     const manifestError = plugManifestError(raw);
     if (manifestError) return plugInstallError('插件清单不符合规范：' + manifestError);
     const m = plugNormalize(raw);
-    if (!m) return plugInstallError('插件清单不完整：需要合法的 id、name、版本协议和至少一个工具。');
+    if (!m) return plugInstallError('插件清单不完整：需要合法的 id、name、版本协议，以及至少一个工具或 surface。');
     if (USER_PLUGINS.some(p => p.id === m.id)) return plugInstallError('插件 id 已存在：' + m.id);
     for (const t of m.tools) {
       if (BUILTIN_TOOL_NAMES[t.name]) return plugInstallError('工具名与内置工具冲突：' + t.name);
@@ -499,9 +503,9 @@ async function plugInstallFromText(text) {
   if (!accepted.length) return plugInstallError('没有可安装的插件。');
 
   const names = accepted.map(p => '「' + p.name + '」').join('、');
-  const tools = accepted.reduce((n, p) => n + p.tools.length, 0);
+  const tools = accepted.reduce((n, p) => n + p.tools.length + (p.surfaces || []).length, 0);
   const ok = await uiConfirm(
-    '即将安装 ' + names + '，共 ' + tools + ' 个工具。\n\n'
+    '即将安装 ' + names + '，共 ' + tools + ' 个工具/扩展点。\n\n'
     + '声明能力：' + accepted.map(p => p.name + '：' + plugPermissionSummary(p)).join('；') + '\n\n'
     + '安装只保存清单，不代表永久授权。启用插件或调用危险能力时仍会按用户权限和每次操作确认执行。\n\n'
     + '请只安装你信任来源的插件。确认安装吗？',
@@ -513,6 +517,7 @@ async function plugInstallFromText(text) {
     // 有能力声明的插件先安装为停用状态；启用按钮会逐次展示授权说明。
     if (p.permissions.length) p.enabled = false;
     USER_PLUGINS.push(p);
+    plugLifecycle(p, 'install');
   });
   plugSaveList();
   refreshSystemPrompt();
@@ -529,6 +534,7 @@ async function plugDelete(id) {
   if (!p) return;
   const ok = await uiConfirm('确定删除插件「' + p.name + '」吗？它的工具会立即从 AI 手里消失。', '删除', '删除插件');
   if (!ok) return;
+  plugLifecycle(p, 'uninstall');
   USER_PLUGINS = USER_PLUGINS.filter(x => x.id !== id);
   plugSaveList();
   plugAudit('uninstall', p);

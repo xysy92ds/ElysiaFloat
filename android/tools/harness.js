@@ -37,7 +37,13 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'providerTest', 'providerFind', 'providerMigrate', 'providerSyncLegacy', 'providerKeyOf', 'providerInferCaps', 'PROVIDER_KINDS',
   'usageRecord', 'usageCheck', 'usageSummary', 'usageReset', 'usageLoad', 'usageLimits', 'USAGE_KEY',
   'autoConfirmActive', 'autoConfirmOn', 'autoConfirmOff', 'AUTO_CONFIRM', 'AUTO_CONFIRM_SCOPE', 'toggleAutoConfirm', 'updateAutoConfirmBtn',
-  'showView', 'viewBack', 'currentViewId', 'VIEW_STACK', 'handleNativeBack', 'updateRunStatus'];
+  'showView', 'viewBack', 'currentViewId', 'VIEW_STACK', 'handleNativeBack', 'updateRunStatus',
+  'plugManifestV2Error', 'plugNormalizeSurface', 'plugSurfaceList', 'plugSurfaceFind', 'plugNormalizeConfig',
+  'plugRenderTree', 'plugBindString', 'plugRunAction', 'plugConfigSet', 'plugConfigGet', 'plugConfigFormHTML',
+  'plugStateGet', 'plugStateSet', 'plugStateClear', 'plugLifecycle', 'plugEmit', 'plugHostApi',
+  'plugRuntimeEntriesHtml', 'plugOpenPage', 'plugOpenConfig', 'plugCommandFind', 'plugCommandRun',
+  'plugRunJob', 'plugSessionCreate', 'plugSessionDelete', 'PLUG_SURFACE_TYPES', 'PLUG_ACTION_TYPES',
+  'PLUG_CONFIG_TYPES', 'PLUG_COMPONENT_TYPES', 'PLUG_STATE_KEY', 'PLUG_CONFIG_KEY', 'PLUG_EVENT_NAMES'];
 const cuts = js.lastIndexOf('})();');
 if (cuts < 0) { console.error('没找到 IIFE 结尾'); process.exit(1); }
 js = js.slice(0, cuts) + '\ntry { window.__T = {' + EXPORTS.join(',') + '}; window.__T.getHistory = function () { return history; }; } catch (e) { console.error("EXPORT FAIL", e); }\n' + js.slice(cuts);

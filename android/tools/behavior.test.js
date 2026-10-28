@@ -256,7 +256,89 @@ step('聊天首页与返回栈：次级页逐层退回聊天（E1-001/002）', (
   if (T.handleNativeBack() !== false) throw new Error('聊天首页不应再拦截系统返回');
 });
 
+step('开放式运行时：v2 surface 隔离、私有存储与 secret 不落明文（E3-002/006/009）', () => {
+  const raw = {
+    manifestVersion: 2, apiVersion: '0.2', id: 'com.beh.runtime', name: '行为运行', version: '1.0.0',
+    permissions: ['files.public.write'],
+    config: { schemaVersion: 3, fields: [
+      { key: 'name', type: 'string', label: '名称', default: '默认' },
+      { key: 'token', type: 'secret', label: '密钥' }
+    ] },
+    surfaces: [
+      { type: 'page', id: 'home', title: '首页', tree: { type: 'layout', children: [
+        { type: 'text', text: '值：{{config.name}}' },
+        { type: 'text', text: '<img src=x onerror=alert(1)>' }
+      ] } },
+      { type: 'command', id: 'cmd', command: '/beh', action: { type: 'state.set', path: 'hit', value: true } },
+      { type: 'event', id: 'ev', on: 'task.update', action: { type: 'state.set', path: 'events', value: 1 } },
+      { type: 'job', id: 'job1', every: 30, action: { type: 'state.set', path: 'job', value: 1 } }
+    ]
+  };
+  if (T.plugManifestV2Error(raw)) throw new Error('v2 清单被拒：' + T.plugManifestV2Error(raw));
+  const m = T.plugNormalize(Object.assign({}, raw, { grantedPermissions: ['files.public.write'] }));
+  if (!m || m.surfaces.length !== 4) throw new Error('surface 未注册');
+  T.USER_PLUGINS.push(m);
+  if (!T.plugSurfaceFind('page', 'home', m.id)) throw new Error('启用插件未进入注册表');
+  m.enabled = false; m.state = 'disabled';
+  if (T.plugSurfaceFind('page', 'home', m.id)) throw new Error('停用插件仍出现在注册表');
+  m.enabled = true; m.state = 'installed';
+  T.plugStateSet(m, 'a.b', 2);
+  if (T.plugStateGet(m).a.b !== 2) throw new Error('私有存储没有按命名空间写入');
+  const savedState = store.get(T.PLUG_STATE_KEY) || '';
+  if (savedState.indexOf('com.beh.runtime') < 0) throw new Error('私有存储没有命名空间');
+  const cfg = T.plugConfigSet(m, 'name', '测试');
+  if (!cfg.ok || T.plugConfigGet(m).name !== '测试') throw new Error('配置没有保存');
+  const sec = T.plugConfigSet(m, 'token', 'beh-secret-xyz');
+  if (!sec.ok) throw new Error('secret 配置保存失败');
+  if ((store.get(T.PLUG_CONFIG_KEY) || '').indexOf('beh-secret-xyz') >= 0) throw new Error('secret 明文进了普通配置');
+  if (vaultStore.get('plugin.com.beh.runtime.token') !== 'beh-secret-xyz') throw new Error('secret 没有进密钥仓');
+  if (T.plugConfigGet(m).token !== '••••••') throw new Error('配置读取没有脱敏');
+  const htmlForm = T.plugConfigFormHTML(m, null);
+  if (htmlForm.indexOf('beh-secret-xyz') >= 0) throw new Error('配置表单泄露了 secret');
+  const page = m.surfaces.filter(s => s.type === 'page')[0];
+  const treeHtml = T.plugRenderTree(page.tree, { config: T.plugConfigGet(m), state: {}, session: {} });
+  if (!/测试/.test(treeHtml)) throw new Error('页面绑定没有取到配置');
+  if (/<img src=x/.test(treeHtml)) throw new Error('组件树注入了未转义的 HTML');
+  const protoAttack = T.plugBindString('{{config.__proto__.polluted}}', { config: {} });
+  if (protoAttack) throw new Error('数据绑定允许访问原型链');
+  T.plugLifecycle(m, 'uninstall');
+  if (JSON.stringify(T.plugStateGet(m)) !== '{}') throw new Error('卸载没有清理私有状态');
+  if (vaultStore.has('plugin.com.beh.runtime.token')) throw new Error('卸载没有清理 secret');
+  T.USER_PLUGINS.length = 0;
+});
+
 (async () => {
+  // E3-004/007：动作权限、事件总线、限流与生命周期。
+  try {
+    const raw = {
+      manifestVersion: 2, apiVersion: '0.2', id: 'com.beh.act', name: '动作插件', permissions: [],
+      surfaces: [
+        { type: 'page', id: 'home', title: '首页', tree: { type: 'text', text: 'hi' } },
+        { type: 'event', id: 'ev', on: 'task.update', action: { type: 'state.set', path: 'ev', value: 1 } },
+        { type: 'job', id: 'j', every: 30, action: { type: 'state.set', path: 'job', value: 1 } }
+      ]
+    };
+    const m = T.plugNormalize(raw);
+    T.USER_PLUGINS.push(m);
+    const deny = await T.plugRunAction(m, { type: 'openUrl', url: 'https://example.com', permissions: ['system.open_url'] }, {});
+    if (deny.ok !== false) throw new Error('未声明权限的动作没有被拒绝');
+    const before = T.plugStateGet(m).ev || 0;
+    T.plugEmit('task.update', { taskId: 'x' });
+    await new Promise(r => setTimeout(r, 0));
+    if ((T.plugStateGet(m).ev || 0) <= before) throw new Error('事件总线没有触发订阅动作');
+    const jr = await T.plugRunJob(m.id, 'j');
+    if (!jr.ok || T.plugStateGet(m).job !== 1) throw new Error('后台任务没有执行');
+    let last = null;
+    for (let i = 0; i < 31; i++) last = await T.plugRunAction(m, { type: 'state.set', path: 'n', value: i }, {});
+    if (last.ok !== false) throw new Error('动作没有限流');
+    T.plugLifecycle(m, 'uninstall');
+    T.USER_PLUGINS.length = 0;
+    if (T.plugSurfaceList('page').length) throw new Error('卸载后 surface 仍在');
+    console.log('  ✓ 开放式运行时：动作权限、事件、后台任务、限流与卸载（E3-004/007）');
+  } catch (e) {
+    errors.push('开放式运行时：动作权限、事件、后台任务、限流与卸载（E3-004/007）: ' + e.message);
+  }
+
   // E2-005：连接测试只探测 /models，不发付费推理请求。
   const calls = require('./harness').calls;
   try {

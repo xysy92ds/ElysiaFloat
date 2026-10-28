@@ -12,9 +12,9 @@
 
 | 项 | 值 |
 |---|---|
-| 当前阶段 | **0.8.0 稳定收口进行中**：N2/N3/N4/N5 已完成并由 CI 守护，只剩 N1 真机回归与 0.8.0 发布 |
-| 代码版本 | build.gradle 仍为 versionCode 17 / versionName 0.7.2（0.8.0 尚未升版） |
-| 下一阶段 | 做完 N1 → 发 0.8.0 → 0.9.0（核心体验 + 模型中心） |
+| 当前阶段 | **0.10.0 代码完成**：E3 开放式插件运行时（manifest v2 / surface / 组件树 / 动作 / 配置 / 事件 / 私有存储）自动门全绿；0.8.0 的 N1 真机回归仍暂缓 |
+| 代码版本 | build.gradle 仍为 versionCode 17 / versionName 0.7.2（N1 通过前不升版） |
+| 下一阶段 | 0.11.0（E4 插件 UI 运行时：挂载点、样式白名单、主题包、会话类型引擎） |
 | 包名 | `com.elly.assistant` |
 | 前端形态 | 模块化源码 → 构建时拼成单文件 `index.html`（WebView 加载） |
 | 原生形态 | 纯 Android Framework + Kotlin，**零第三方依赖** |
@@ -187,8 +187,9 @@ Root（仅 3 个诊断操作）、Shizuku（仅状态占位）、外部 Agent（
    结果写到 `workspace/work-logs/<日期>-0.8.0-n1-device.md`。
 2. **发布 0.8.0**：versionCode 18 / versionName 0.8.0 → 构建 → `SHA256SUMS`
    → tag / Release → 匿名下载验证 → `tools/handoff.sh --version 0.8.0` 打包。
-3. **0.9.0（E1 + E2）**：会话级自动确认、设置拆分、Provider 注册表、密钥加密、能力路由。
-4. 然后才是 0.10 开放插件运行时；**不要提前动插件沙箱 HTML**（0.15 才开放）。
+3. **0.9.0（E1 + E2）**：会话级自动确认、设置拆分、Provider 注册表、密钥加密、能力路由。（已完成）
+4. **0.10.0（E3）**：开放式插件运行时（manifest v2、surface、组件树、动作、配置、事件、私有存储）。（已完成）
+5. 接下来是 0.11 插件 UI 运行时；**不要提前动插件沙箱 HTML**（0.15 才开放）。
 
 **动手前**：先把新发现的问题登记进 `issues/ISSUE-REGISTER.md`，再改代码；
 每改一处跑一次第 4 节的 5 条命令；完成后写 `work-logs/YYYY-MM-DD-<主题>.md`；

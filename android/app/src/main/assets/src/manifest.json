@@ -13,6 +13,7 @@
     "scripts/02c-usage.js",
     "scripts/03-state-tasks.js",
     "scripts/04-plugins-core.js",
+    "scripts/04b-plugin-runtime.js",
     "scripts/05-memory.js",
     "scripts/06-ui-render.js",
     "scripts/07-media-tts.js",
@@ -71,6 +72,12 @@
         13
       ],
       "bytes": 17548
+    },
+    {
+      "file": "04b-plugin-runtime.js",
+      "title": "开放式插件运行时（surface/组件/动作/存储）",
+      "chunks": [13, 13],
+      "bytes": 30000
     },
     {
       "file": "05-memory.js",
