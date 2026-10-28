@@ -1,9 +1,10 @@
 # 交接说明（Handover）
 
 更新时间：2026-10-28
-当前阶段：**0.8.0 Beta 进行中**——N2/N3/N4/N5 已完成并由 CI 守护；N1 真机反馈的 5 个问题（I-055~I-059）已修复并通过自动测试，剩真机复测与 0.8.0 发布
-最新可用包：`apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（versionCode 17 / versionName 0.7.2，N1 修复候选包）
-SHA-256：`b6e5c1d8ef02f74850be6e4877d6fd438216b810731d742e97a3574e5324a14e`
+当前阶段：**0.9.0 代码完成（E1 体验 + E2 模型中心），0.10.0 待启动**——0.8.0 仍等 N1 真机复测（用户暂缓）；0.9.0 全部冻结项已落地，5 道自动门 + Gradle 全绿
+最新可用包：`apk/ElysiaFloat-v0.7.2-0.9dev-debug.apk`（versionCode 17 / versionName 0.7.2，0.9 开发候选包，可覆盖已装 0.7.x）
+SHA-256：`8a7dc745cb235443de254609fb890a5e9f556a5443f050baf82ddbc1f22455bc`
+上一个候选包：`apk/ElysiaFloat-v0.7.2-n1fix-debug.apk`（N1 修复候选，SHA-256 `b6e5c1d8…`）
 已发布包：`apk/ElysiaFloat-v0.7.2-debug.apk`（公开 Release 资产，SHA-256 `6cf5ff19…`）
 工作转移包：`handoff/ElysiaFloat-handoff-*.zip`（以同目录 `.sha256` 为准）；
 私有仓库归档：`https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/handoff-2026-10-28`；
@@ -47,8 +48,8 @@ commit `cb10e91`（索引更新 `1b2e09a`）、tag `v0.7.2`、Release 422140702�
 |---|---|---|---|---|
 | 0.7.2 | 安全确认精简 / 长按粘贴 | G2-005、I-048 | 已发布，真机待验 | 公开仓库 Latest |
 | **0.8.0** | 稳定收口（不加功能） | N1~N5 | **进行中**：N2/N3/N4/N5 完成，N1 待做 | 核心回归全绿 + 测试全绿 + 0.8.0 可覆盖安装 |
-| 0.9.0 | 核心体验 + 模型中心 | E1 + E2 | 规划中 | 首页永远是聊天；密钥不出日志；加 Provider 不改聊天代码 |
-| 0.10.0 | 开放式插件运行时 | E3 | 规划中 | 插件注册宿主没写过的新页面/入口/会话/命令/任务，宿主零改动 |
+| 0.9.0 | 核心体验 + 模型中心 | E1 + E2 | **代码完成**：E2-001~005/008、E1-001~004/006 已落地并通过自动门；真机待验；候选包已归档 | 首页永远是聊天；密钥不出日志；加 Provider 不改聊天代码 |
+| 0.10.0 | 开放式插件运行时 | E3 | **待启动**（下一步） | 插件注册宿主没写过的新页面/入口/会话/命令/任务，宿主零改动 |
 | 0.11.0 | 插件 UI 运行时 | E4 | 规划中 | 主题/恋爱游戏/番茄钟三个验收场景通过 |
 | 0.12.0 | 依赖 + 持久会话 + Termux | E5 + E6 + G8-001 | 规划中 | 息屏 8 小时会话存活可恢复；Node/Mineflayer/NapCat 可安装卸载 |
 | 0.13.0 | MC 插件（无面板） | E7 | 规划中 | 30 分钟连续任务稳定、断线重连 |
@@ -127,6 +128,24 @@ CI（`.github/workflows/ci.yml`）跑前 5 条 + Gradle 构建。
 5. **N5**：新增 `DEC-004`（AstrBot 对齐取舍）、`DEC-005`（开放插件运行时）。
 6. **工程**：新增 `tools/handoff.sh` 与 10 步版本流程（第 9 步固定打包）；CI 新增 `checks`/`build` 两个 job。
 
+### 6.1 0.9.0（E1 + E2）代码完成清单
+
+| 编号 | 内容 | 落点 |
+|---|---|---|
+| E2-001~003 | Provider 注册表（openai/anthropic/gemini/custom）、8 种能力标签、用途绑定并回填旧扁平字段 | `scripts/02b-providers.js`；`chatReq()` 未改 |
+| E2-005 | 连接测试（`GET /models`、延迟、错误码） | `02b-providers.js` + 设置 → 模型中心按钮 |
+| E2-008 | 本地用量统计（按天/Provider/任务）、限额拦截、重置 | `scripts/02c-usage.js`、`09-ai-request.js`、`02-config.js` |
+| E2-004 | 密钥安全沿用 0.8 的 Keystore 密钥仓；`sSet` 剔除 Key 字段、先写密钥仓 | `SecretsVault.kt`、`02-config.js` |
+| E1-004 | 设置五分组页签：AI 与模型 / 外观 / 权限 / 工作区 / 高级 | `scripts/14-update.js`、`template.html`、`main.css` |
+| E1-003 | 会话级自动确认：同任务 30 分钟、切任务失效、审计事件 | `scripts/03-state-tasks.js` |
+| E1-001/002 | 聊天首页固定 + 返回栈逐层回退 + 原生返回优先收抽屉 | `scripts/15-views.js`、`16-permission-boot.js` |
+| E1-006 | 运行状态条（心跳秒数、当前目标、停止按钮，不遮挡输入） | `15-views.js`、`12-send-quick.js`、`template.html` |
+| 守护 | smoke 新增 2 组断言、behavior 新增 4 组用例；`harness.js` 导出新符号 | `tools/` |
+
+未做（按用户指令/范围冻结）：E2-006 插件配置档、E2-007 主 AI 调度子模型、E2-009 回退链 → 随 0.10/0.11 插件运行时一起做。
+Kotlin 单测（I-025 纯函数拆分）仍未开始。
+
+
 ## 7. 已知红线
 
 1. 不把 Debug 包当正式发布包；发布必须有签名、SHA-256、真机记录。
@@ -144,7 +163,9 @@ CI（`.github/workflows/ci.yml`）跑前 5 条 + Gradle 构建。
    结果写到 `workspace/work-logs/<日期>-0.8.0-n1-device.md`。
 4. N1 通过后：升 versionCode 18 / versionName 0.8.0 → 构建 → `SHA256SUMS` → tag/Release
    → 匿名下载验证 → `tools/handoff.sh --version 0.8.0` 打包。
-5. 然后才开 0.9（E1 + E2），不要提前动插件运行时。
+5. 0.9.0 已代码完成，下一步直接开 0.10.0（E3 开放式插件运行时），
+   按 `plans/PLATFORM-0.8-0.15.md` 10.3 节与 10 步流程推进；不要回头改 0.8 已冻结的 N2~N5。
+   真机验证仍等用户方便时统一做（0.8 N1 与 0.9 E1/E2 一起验）。
 
 ## 9. 已收敛的遗留（此前登记，现已修复）
 
