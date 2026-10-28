@@ -704,6 +704,19 @@ function doSaveSettings(val) {
   if ($('#set-vec-model')) MEMCFG.vecModel = val('#set-vec-model').trim();
   memSaveCfg();
 
+  // E2-001~003：旧字段 → Provider 同步，Key 先进密钥仓，再回填绑定并持久化。
+  providerSyncLegacy(CONFIG, MEMCFG);
+  secretPersist(CONFIG, SECRET_FIELDS_CFG, 'ai');
+  secretPersist(MEMCFG, SECRET_FIELDS_MEM, 'mem');
+  providerEnsure(CONFIG, MEMCFG);
+  const embedUse = providerResolve(CONFIG, 'embedding');
+  if (embedUse) {
+    MEMCFG.vecBase = embedUse.base;
+    MEMCFG.vecModel = embedUse.model;
+    if (secretStore.ok) MEMCFG.vecKey = embedUse.key;
+  }
+  sSet('via_ai_config', CONFIG);
+
   applyTheme();
   renderHistory();
   toast('已保存~');

@@ -22,6 +22,16 @@ let MEMCFG = Object.assign({
 if (secretHydrate(MEMCFG, SECRET_FIELDS_MEM, 'mem')) {
   sSet(MEMCFG_KEY, MEMCFG);
 }
+/* 向量用途绑定：如果模型中心已有 embedding Provider，就用它回填旧字段。 */
+(function bindEmbeddingProvider() {
+  providerEnsure(CONFIG, MEMCFG);
+  const r = providerResolve(CONFIG, 'embedding');
+  if (!r) return;
+  MEMCFG.vecBase = r.base;
+  MEMCFG.vecModel = r.model;
+  if (secretStore.ok) MEMCFG.vecKey = r.key;
+  sSet('via_ai_config', CONFIG);
+})();
 const MEM_AUTO_KEY = 'via_ai_mem_auto_state';
 function memAutoState() { const o = sGet(MEM_AUTO_KEY, null); return (o && typeof o === 'object') ? o : { since: 0, lastAt: 0, running: false }; }
 function memAutoSave(o) { sSet(MEM_AUTO_KEY, o || {}); }

@@ -9,6 +9,7 @@
     "scripts/00b-request.js",
     "scripts/01-ui-dialog.js",
     "scripts/02-config.js",
+    "scripts/02b-providers.js",
     "scripts/03-state-tasks.js",
     "scripts/04-plugins-core.js",
     "scripts/05-memory.js",

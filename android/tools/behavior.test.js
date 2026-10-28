@@ -126,6 +126,63 @@ step('密钥安全：向量 Key 走同一策略（E2-004）', () => {
   }
 });
 
+step('模型中心：旧扁平配置迁移成固定 Provider 且可重复执行（E2-001）', () => {
+  const cfg = T.CONFIG;
+  const n = (cfg.providers || []).length;
+  T.providerEnsure(cfg);
+  T.providerEnsure(cfg);
+  if ((cfg.providers || []).length !== n) throw new Error('迁移重复执行后 Provider 数量变化');
+  const chat = T.providerResolve(cfg, 'chat');
+  if (!chat || !chat.provider) throw new Error('聊天用途没有解析到 Provider');
+  if (!cfg.bindings || !cfg.bindings.chat || cfg.bindings.chat.provider !== chat.provider.id) {
+    throw new Error('聊天绑定缺失');
+  }
+  const ids = cfg.providers.map(p => p.id);
+  if (ids.indexOf('legacy-chat') < 0) throw new Error('缺少 legacy-chat');
+});
+
+step('模型中心：新 Provider 的 Key 只进密钥仓，配置不含明文（E2-002/003）', () => {
+  const cfg = T.CONFIG;
+  const p = T.providerUpsert(cfg, {
+    id: 'beh-custom', name: '行为测试', kind: 'openai',
+    base: 'https://example.invalid/v1', model: 'beh-model',
+    capabilities: ['chat', 'vision']
+  }, 'provider-secret-abc');
+  if (!p) throw new Error('新增 Provider 失败');
+  T.sSet('via_ai_config', cfg);
+  const saved = store.get('via_ai_config') || '';
+  if (saved.indexOf('provider-secret-abc') >= 0) throw new Error('Provider Key 写进了普通配置');
+  if (vaultStore.get('ai.provider.beh-custom') !== 'provider-secret-abc') throw new Error('Provider Key 未进密钥仓');
+  const sum = T.providerSummary(cfg).filter(x => x.id === 'beh-custom')[0];
+  if (!sum || !sum.hasKey) throw new Error('摘要没有识别到已保存的 Key');
+  if (JSON.stringify(sum).indexOf('provider-secret-abc') >= 0) throw new Error('摘要泄露了明文 Key');
+});
+
+step('模型中心：绑定备用 Provider 不改请求层代码（E2-003）', () => {
+  const cfg = T.CONFIG;
+  if (!T.providerBind(cfg, 'chat', 'beh-custom')) throw new Error('绑定失败');
+  if (cfg.apiBase !== 'https://example.invalid/v1' || cfg.model !== 'beh-model') {
+    throw new Error('绑定后旧字段没有回填：' + cfg.apiBase + ' / ' + cfg.model);
+  }
+  if (cfg.apiKey !== 'provider-secret-abc') throw new Error('绑定后没有从密钥仓取回 Key');
+  T.sSet('via_ai_config', cfg);
+  const saved = JSON.parse(store.get('via_ai_config') || '{}');
+  if (!saved.bindings || !saved.bindings.chat || saved.bindings.chat.provider !== 'beh-custom') {
+    throw new Error('绑定没有持久化');
+  }
+  if (saved.apiKey) throw new Error('持久化配置仍含 Key');
+});
+
+step('模型中心：删除 Provider 会清理绑定与专属密钥（E2-001）', () => {
+  const cfg = T.CONFIG;
+  if (!T.providerRemove(cfg, 'beh-custom')) throw new Error('删除失败');
+  if (T.providerResolve(cfg, 'chat') == null) throw new Error('删除后没有回退到可用 Provider');
+  if (cfg.bindings && cfg.bindings.chat && cfg.bindings.chat.provider === 'beh-custom') {
+    throw new Error('删除后仍指向已删 Provider');
+  }
+  if (vaultStore.has('ai.provider.beh-custom')) throw new Error('专属密钥没有清理');
+});
+
 if (errors.length) {
   console.error('\n✗ 行为测试失败 ' + errors.length + ' 项：');
   errors.forEach(e => console.error('  - ' + e));

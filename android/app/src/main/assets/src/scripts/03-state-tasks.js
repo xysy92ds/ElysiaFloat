@@ -7,6 +7,9 @@ let CONFIG = Object.assign({}, DC, sGet('via_ai_config', {}) || {});
 if (secretHydrate(CONFIG, SECRET_FIELDS_CFG, 'ai')) {
   sSet('via_ai_config', CONFIG);
 }
+/* E2-001~003：旧扁平配置迁移成 Provider 注册表，并把绑定回填到旧字段。 */
+providerEnsure(CONFIG);
+sSet('via_ai_config', CONFIG);
 if (!sGet('via_ai_task_timeout_v1200', false) && CONFIG.agentTaskTimeout === 90000) {
   CONFIG.agentTaskTimeout = 1200000;
   sSet('via_ai_task_timeout_v1200', true);
