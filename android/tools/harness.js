@@ -33,7 +33,8 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'renderGuideSteps', 'webviewLevel', 'loadEnv', 'sdkAtLeast', 'detectCaps', 'send',
   'secretStore', 'secretHydrate', 'secretPersist', 'stripSecretFields', 'SECRET_FIELDS_CFG', 'SECRET_FIELDS_MEM',
   'sSet', 'sGet',
-  'providerEnsure', 'providerSummary', 'providerUpsert', 'providerBind', 'providerRemove', 'providerResolve', 'providerApply', 'PROVIDER_CAPS', 'PROVIDER_PURPOSES'];
+  'providerEnsure', 'providerSummary', 'providerUpsert', 'providerBind', 'providerRemove', 'providerResolve', 'providerApply', 'PROVIDER_CAPS', 'PROVIDER_PURPOSES',
+  'providerTest', 'providerFind', 'providerMigrate', 'providerSyncLegacy', 'providerKeyOf', 'providerInferCaps', 'PROVIDER_KINDS'];
 const cuts = js.lastIndexOf('})();');
 if (cuts < 0) { console.error('没找到 IIFE 结尾'); process.exit(1); }
 js = js.slice(0, cuts) + '\ntry { window.__T = {' + EXPORTS.join(',') + '}; window.__T.getHistory = function () { return history; }; } catch (e) { console.error("EXPORT FAIL", e); }\n' + js.slice(cuts);

@@ -7,7 +7,7 @@
  */
 'use strict';
 
-const { html, sandbox, T, errors, calls, store, ENVINFO, Android, Perm, vm, SCREEN_STUB } = require('./harness');
+const { html, js, sandbox, T, errors, calls, store, ENVINFO, Android, Perm, vm, SCREEN_STUB } = require('./harness');
 const h_perm = Perm;
 
 
@@ -388,6 +388,22 @@ function step(name, fn) {
     if (ids.length < 10) throw new Error('保存函数解析异常');
     const missing = ids.filter(id => !have.has(id));
     if (missing.length) throw new Error('保存时会读到不存在的控件：' + missing.join(', '));
+  });
+
+  await step('设置五分组页签与模型中心入口（E1-004 / E2-005）', () => {
+    if (!html.includes("const SETTINGS_GROUPS = [")) throw new Error('缺少设置分组定义');
+    for (const g of ['ai', 'appearance', 'permission', 'workspace', 'advanced']) {
+      if (!new RegExp("id: '" + g + "'").test(html)) throw new Error('缺少分组：' + g);
+    }
+    if (!html.includes("nav.className = 'settings-tabs'") || !html.includes("btn.className = 'settings-tab'") || !html.includes('data-settings-group')) throw new Error('分组页签没有渲染结构');
+    if (!html.includes('id="provider-bind-box"') || !html.includes('id="provider-list"')) throw new Error('模型中心缺少绑定/列表容器');
+    if (!html.includes('id="btn-provider-add"') || !html.includes('id="btn-provider-save"')) throw new Error('模型中心缺少新增/保存按钮');
+    if (!html.includes('data-provider-action="test"')) throw new Error('模型中心缺少连接测试入口');
+    if (!/url\.indexOf\('\/models'\) < 0\) url \+= '\/models'/.test(js)) throw new Error('连接测试没有固定探测 /models');
+    const css = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
+    for (const sel of ['.settings-tabs', '.settings-tab', '.set-group', '.provider-card', '.cap-chip']) {
+      if (css.indexOf(sel + '{') < 0) throw new Error('缺少样式：' + sel);
+    }
   });
 
   await step('G2：长任务预算和设置保存按钮结构', () => {

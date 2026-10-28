@@ -695,6 +695,46 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
 .export-card b{color:var(--accent);font-weight:600}
 .export-card button{border:1px solid rgba(214,51,108,.4);background:transparent;color:var(--accent);
   border-radius:9px;padding:3px 9px;font:11px inherit;cursor:pointer}
+
+/* ===== 设置分组页签（0.9 / E1-004）===== */
+.settings-tabs{display:flex;gap:6px;flex:0 0 auto;position:sticky;top:0;z-index:6;
+  margin:-15px -15px 10px;padding:10px 15px;overflow-x:auto;background:#fff5f7;
+  border-bottom:1px solid rgba(255,154,158,.25);box-shadow:0 4px 10px rgba(214,51,108,.06);
+  -webkit-overflow-scrolling:touch}
+.settings-tab{flex:0 0 auto;padding:7px 12px;border:1px solid rgba(255,154,158,.35);
+  border-radius:12px;background:var(--card);color:var(--muted);font:12px inherit;cursor:pointer;white-space:nowrap}
+.settings-tab.on{background:var(--c1);border-color:var(--c1);color:#fff;font-weight:700}
+.set-group{flex:0 0 auto;min-width:0}
+.set-group[hidden]{display:none!important}
+.set-group>.sec-title:first-child{margin-top:0;border-top:0;padding-top:0}
+
+/* ===== 模型中心（0.9 / E2-001~005）===== */
+.provider-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.provider-card{display:flex;flex-direction:column;gap:4px;padding:9px 11px;
+  border:1px solid rgba(255,154,158,.28);border-radius:12px;background:#fff}
+.provider-card.off{opacity:.55}
+.provider-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;color:var(--text)}
+.provider-head b{font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.provider-kind{padding:1px 7px;border-radius:9px;background:rgba(255,154,158,.16);color:var(--accent);font-size:10px}
+.provider-key{margin-left:auto;padding:1px 7px;border-radius:9px;background:rgba(160,160,160,.16);color:var(--muted);font-size:10px}
+.provider-key.ok{background:rgba(96,190,140,.16);color:#2e8b5e}
+.provider-meta{font-size:11px;color:var(--muted);word-break:break-all}
+.provider-caps{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+.provider-caps i{font-style:normal;padding:1px 7px;border-radius:8px;background:rgba(255,154,158,.12);color:var(--accent);font-size:10px}
+.provider-acts{display:flex;gap:6px;margin-top:6px}
+.provider-acts .btn-s{padding:6px 0;font-size:12px}
+.provider-result{margin-top:6px;padding:6px 8px;border-radius:9px;background:rgba(255,154,158,.1);
+  color:var(--text);font-size:11px;line-height:1.45;word-break:break-all}
+.provider-result[hidden]{display:none!important}
+#provider-form{margin-top:8px;padding:10px 11px;border:1px dashed rgba(214,51,108,.4);
+  border-radius:12px;background:rgba(255,255,255,.6)}
+#provider-form[hidden]{display:none!important}
+.cap-list{display:flex;flex-wrap:wrap;gap:6px}
+.cap-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border:1px solid rgba(255,154,158,.3);
+  border-radius:9px;background:var(--card);font-size:11px;color:var(--text);cursor:pointer;
+  -webkit-user-select:none;user-select:none}
+.cap-chip input{margin:0;accent-color:var(--c1)}
+.sub-title{font-size:12px;font-weight:700;color:var(--accent)}
 </style>
 </head>
 <body>
@@ -2859,6 +2899,75 @@ function providerSummary(cfg) {
     enabled: p.enabled !== false,
     hasKey: !!providerKeyOf(p),
     legacy: p.id.indexOf('legacy-') === 0
+  }));
+}
+
+/** 从模型名推断能力；只做提示，不写回配置。 */
+function providerInferCaps(ids) {
+  const caps = {};
+  const list = Array.isArray(ids) ? ids : [];
+  list.forEach(raw => {
+    const s = String(raw || '').toLowerCase();
+    if (!s) return;
+    if (/embed/.test(s)) caps.embedding = 1;
+    if (/tts|speech|audio/.test(s)) caps.tts = 1;
+    if (/whisper|transcri|asr/.test(s)) caps.asr = 1;
+    if (/vision|(^|[-_/])vl([-_/]|$)|4o|omni|gemini|claude|glm-4v|qwen.*vl/.test(s)) caps.vision = 1;
+    if (/image|dall-e|imagen|flux|stable-diffusion|sd3/.test(s)) caps.image = 1;
+    if (/video|sora|veo|kling|runway/.test(s)) caps.video = 1;
+    if (/code|coder|codex/.test(s)) caps.code = 1;
+    if (!/embed|tts|speech|whisper|transcri/.test(s)) caps.chat = 1;
+  });
+  return PROVIDER_CAPS.filter(c => caps[c]);
+}
+
+function providerTestHeaders(p, key) {
+  const h = { 'Accept': 'application/json', 'User-Agent': 'ElysiaFloat' };
+  if (p.kind === 'anthropic') {
+    if (key) h['x-api-key'] = key;
+    h['anthropic-version'] = '2023-06-01';
+  } else if (p.kind !== 'gemini' && key) {
+    h['Authorization'] = 'Bearer ' + key;
+  }
+  return h;
+}
+
+/**
+ * E2-005：连接测试 + 能力探测。只 GET /models，不发起付费推理。
+ * 返回 Promise<{ ok, latencyMs, status, error, models, capabilities }>。
+ */
+function providerTest(cfg, id) {
+  const p = providerFind(cfg, id);
+  if (!p) return Promise.reject(new Error('Provider 不存在'));
+  if (!String(p.base || '').trim()) return Promise.reject(new Error('还没填接口地址'));
+  const key = providerKeyOf(p);
+  let url = String(p.base).replace(/\/+$/, '');
+  if (url.indexOf('/models') < 0) url += '/models';
+  if (p.kind === 'gemini' && key) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(key);
+  const t0 = Date.now();
+  return reqRequest({
+    method: 'GET', url: url,
+    headers: providerTestHeaders(p, key),
+    timeoutMs: 15000, expect: 'json', retries: 0, source: 'system:provider-test'
+  }).then(r => {
+    const d = r.json || {};
+    const raw = Array.isArray(d.data) ? d.data : (Array.isArray(d.models) ? d.models : []);
+    const ids = raw.map(x => (x && (x.id || x.name)) || '').filter(Boolean);
+    return {
+      ok: true,
+      latencyMs: Date.now() - t0,
+      status: r.status || 200,
+      error: '',
+      models: ids.slice(0, 200),
+      capabilities: providerInferCaps(ids)
+    };
+  }).catch(e => ({
+    ok: false,
+    latencyMs: Date.now() - t0,
+    status: (e && e.status) || 0,
+    error: errMsg(e),
+    models: [],
+    capabilities: []
   }));
 }
 /* ==========================================================
@@ -8870,47 +8979,53 @@ function organizeSettingsSections() {
   const nodes = Array.from(root.children);
   const save = root.querySelector('#settings-save-block');
   const spacer = root.querySelector('#settings-bottom-spacer');
-  const titles = nodes.filter(n => n.classList && n.classList.contains('sec-title'));
-  const fragment = document.createDocumentFragment();
-  const first = titles.length ? nodes.indexOf(titles[0]) : nodes.length;
-  const overviewNodes = nodes.slice(0, first).filter(n => n !== save && n !== spacer);
-  if (overviewNodes.length) {
-    const overview = document.createElement('section');
-    overview.className = 'set-overview';
-    const hd = document.createElement('div');
-    hd.className = 'sec-title';
-    hd.textContent = '总览';
-    hd.style.marginTop = '0';
-    overview.appendChild(hd);
-    overviewNodes.forEach(n => overview.appendChild(n));
-    fragment.appendChild(overview);
-  }
-  let section = null, body = null;
-  nodes.slice(first).forEach(n => {
+
+  // E1-004：五个分组页签；每节归入固定分组，进入设置先看「AI 与模型」。
+  const panels = {};
+  const nav = document.createElement('div');
+  nav.className = 'settings-tabs';
+  SETTINGS_GROUPS.forEach(g => {
+    const panel = document.createElement('div');
+    panel.className = 'set-group';
+    panel.dataset.group = g.id;
+    panels[g.id] = panel;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'settings-tab';
+    btn.dataset.settingsGroup = g.id;
+    btn.textContent = g.label;
+    if (g.id === SETTINGS_GROUP) btn.classList.add('on');
+    nav.appendChild(btn);
+  });
+
+  let current = panels['ai'];
+  nodes.forEach(n => {
     if (n === save || n === spacer) return;
     if (n.classList && n.classList.contains('sec-title')) {
-      section = document.createElement('section');
-      const expanded = false;
-      section.className = expanded ? 'set-fold' : 'set-fold closed';
-      const head = document.createElement('button');
-      head.type = 'button';
-      head.className = 'set-fold-head';
-      head.textContent = n.textContent || '设置';
-      head.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-      body = document.createElement('div');
-      body.className = 'set-fold-body';
-      const panel = section;
-      head.onclick = () => {
-        const closed = panel.classList.toggle('closed');
-        head.setAttribute('aria-expanded', closed ? 'false' : 'true');
-      };
-      section.appendChild(head);
-      section.appendChild(body);
-      fragment.appendChild(section);
+      const title = String(n.textContent || '').trim();
+      const gid = SETTINGS_SECTION_GROUP[title] || 'advanced';
+      current = panels[gid] || panels['ai'];
+      current.appendChild(n);
       return;
     }
-    if (body) body.appendChild(n);
+    current.appendChild(n);
   });
+  Object.keys(panels).forEach(k => { panels[k].hidden = k !== SETTINGS_GROUP; });
+
+  nav.onclick = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-settings-group]') : null;
+    if (!b) return;
+    SETTINGS_GROUP = b.dataset.settingsGroup || 'ai';
+    Object.keys(panels).forEach(k => { panels[k].hidden = k !== SETTINGS_GROUP; });
+    Array.from(nav.children).forEach(x => {
+      if (x.classList) x.classList.toggle('on', x.dataset && x.dataset.settingsGroup === SETTINGS_GROUP);
+    });
+    if (root.scrollTop !== undefined) root.scrollTop = 0;
+  };
+
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(nav);
+  SETTINGS_GROUPS.forEach(g => fragment.appendChild(panels[g.id]));
   if (save) fragment.appendChild(save);
   if (spacer) fragment.appendChild(spacer);
   root.innerHTML = '';
@@ -9030,10 +9145,179 @@ function bindRuntime() {
   renderRuntimeState();
 }
 
+/* ==========================================================
+ *  设置分组（E1-004）与模型中心 UI（E2-001/005）
+ * ========================================================== */
+let SETTINGS_GROUP = 'ai';
+const SETTINGS_GROUPS = [
+  { id: 'ai', label: 'AI 与模型' },
+  { id: 'appearance', label: '外观' },
+  { id: 'permission', label: '权限' },
+  { id: 'workspace', label: '工作区' },
+  { id: 'advanced', label: '高级' }
+];
+const SETTINGS_SECTION_GROUP = {
+  '模型中心': 'ai',
+  'AI 与模型': 'ai',
+  '语音合成': 'ai',
+  '屏幕翻译': 'ai',
+  '长期记忆': 'ai',
+  '个性化与聊天风格': 'appearance',
+  '音乐功能': 'appearance',
+  'Agent 与工作台': 'permission',
+  '应用白名单': 'permission',
+  '权限': 'permission',
+  '文件访问与工作区': 'workspace',
+  '高级运行时': 'advanced',
+  '插件与工具': 'advanced',
+  '检查更新': 'advanced',
+  '环境信息': 'advanced',
+  '数据管理': 'advanced'
+};
+
+let PROVIDER_EDIT_ID = '';
+function providerCapsHtml(caps) {
+  return PROVIDER_CAPS.map(c =>
+    '<label class="cap-chip"><input type="checkbox" value="' + esc(c) + '"'
+    + (caps && caps.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(PROVIDER_CAP_LABEL[c] || c) + '</label>'
+  ).join('');
+}
+function providerCloseForm() {
+  PROVIDER_EDIT_ID = '';
+  const f = $('#provider-form'); if (f) f.hidden = true;
+}
+function providerOpenForm(id) {
+  PROVIDER_EDIT_ID = id || '';
+  const p = id ? providerFind(CONFIG, id) : null;
+  const set = (sel, v) => { const el = $(sel); if (el) el.value = v == null ? '' : String(v); };
+  const title = $('#provider-form-title');
+  if (title) title.textContent = p ? '编辑 Provider' : '添加 Provider';
+  set('#prov-name', p ? p.name : '');
+  set('#prov-kind', p ? p.kind : 'openai');
+  set('#prov-base', p ? p.base : '');
+  set('#prov-model', p ? p.model : '');
+  const key = $('#prov-key');
+  if (key) {
+    key.value = '';
+    key.placeholder = (p && providerKeyOf(p)) ? '已保存，留空表示不修改' : 'sk-...';
+  }
+  const caps = $('#prov-caps');
+  if (caps) caps.innerHTML = providerCapsHtml(p ? p.capabilities : ['chat']);
+  const form = $('#provider-form');
+  if (form) {
+    form.hidden = false;
+    const anchor = $('#provider-form-title');
+    if (anchor && anchor.scrollIntoView) anchor.scrollIntoView({ block: 'nearest' });
+  }
+}
+function providerSaveForm() {
+  const val = (sel) => { const el = $(sel); return el && el.value != null ? String(el.value).trim() : ''; };
+  const name = val('#prov-name');
+  if (!name) { toast('先给 Provider 起个名字'); return; }
+  const base = val('#prov-base');
+  if (base && !/^https?:\/\//i.test(base)) { toast('接口地址要以 http(s):// 开头'); return; }
+  const existing = PROVIDER_EDIT_ID ? providerFind(CONFIG, PROVIDER_EDIT_ID) : null;
+  const caps = $$('#prov-caps input').filter(x => x.checked).map(x => String(x.value));
+  const id = PROVIDER_EDIT_ID || providerId('prov');
+  const p = providerUpsert(CONFIG, {
+    id: id,
+    name: name,
+    kind: val('#prov-kind') || 'openai',
+    base: base,
+    model: val('#prov-model'),
+    capabilities: caps,
+    secretRef: existing ? existing.secretRef : ('ai.provider.' + id),
+    enabled: existing ? existing.enabled !== false : true
+  }, val('#prov-key'));
+  if (!p) { toast('Provider 保存失败'); return; }
+  sSet('via_ai_config', CONFIG);
+  providerCloseForm();
+  renderProviderCenter();
+  toast(existing ? 'Provider 已更新' : 'Provider 已添加');
+}
+async function providerRunTest(id) {
+  const card = $$('[data-provider-result="' + id + '"]')[0];
+  if (card) { card.hidden = false; card.textContent = '正在测试…'; }
+  let r;
+  try { r = await providerTest(CONFIG, id); }
+  catch (e) { r = { ok: false, latencyMs: 0, status: 0, error: errMsg(e), models: [], capabilities: [] }; }
+  const el = $$('[data-provider-result="' + id + '"]')[0];
+  if (!el) return;
+  el.hidden = false;
+  if (!r.ok) {
+    el.textContent = '测试失败：' + (r.error || ('HTTP ' + r.status)) + (r.latencyMs ? '（' + r.latencyMs + 'ms）' : '');
+    return;
+  }
+  const capText = (r.capabilities || []).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未从模型名推断出';
+  el.textContent = '连接正常 · ' + r.latencyMs + 'ms · ' + r.models.length + ' 个模型 · 可用能力：' + capText;
+}
+function renderProviderCenter() {
+  const bindBox = $('#provider-bind-box');
+  const list = $('#provider-list');
+  if (!bindBox && !list) return;
+  const providers = (CONFIG.providers || []).filter(p => p && p.enabled !== false);
+  if (bindBox) {
+    bindBox.innerHTML = ['chat', 'vision', 'embedding', 'tts'].map(purpose => {
+      const usable = providers.filter(p => (p.capabilities || []).indexOf(purpose) >= 0);
+      const cur = (CONFIG.bindings && CONFIG.bindings[purpose] && CONFIG.bindings[purpose].provider) || '';
+      return '<div class="sg"><label>' + esc(PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '</label>'
+        + '<select data-bind-purpose="' + purpose + '"><option value="">自动选择</option>'
+        + usable.map(p => '<option value="' + esc(p.id) + '"' + (p.id === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('')
+        + '</select></div>';
+    }).join('');
+  }
+  if (!list) return;
+  const sum = providerSummary(CONFIG);
+  if (!sum.length) {
+    list.innerHTML = '<div class="mini-note">还没有 Provider。</div>';
+    return;
+  }
+  list.innerHTML = sum.map(s =>
+    '<div class="provider-card' + (s.enabled ? '' : ' off') + '">'
+    + '<div class="provider-head"><b>' + esc(s.name) + '</b>'
+    + '<span class="provider-kind">' + esc(s.kindLabel) + '</span>'
+    + (s.hasKey ? '<span class="provider-key ok">已存 Key</span>' : '<span class="provider-key">未存 Key</span>')
+    + '</div>'
+    + '<div class="provider-meta">' + esc(s.base || '未填接口地址') + (s.model ? ' · ' + esc(s.model) : '') + '</div>'
+    + '<div class="provider-caps">' + (s.capabilities.length
+      ? s.capabilities.map(c => '<i>' + esc(PROVIDER_CAP_LABEL[c] || c) + '</i>').join('')
+      : '<i>未标注能力</i>') + '</div>'
+    + '<div class="provider-acts">'
+    + '<button type="button" class="btn-s" data-provider-action="test" data-provider-id="' + esc(s.id) + '">测试连接</button>'
+    + '<button type="button" class="btn-s" data-provider-action="edit" data-provider-id="' + esc(s.id) + '">编辑</button>'
+    + '<button type="button" class="btn-s" data-provider-action="remove" data-provider-id="' + esc(s.id) + '">删除</button>'
+    + '</div>'
+    + '<div class="provider-result" data-provider-result="' + esc(s.id) + '" hidden></div>'
+    + '</div>'
+  ).join('');
+}
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
   $('#settings').innerHTML = `
+<div class="sec-title">模型中心</div>
+<div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。聊天、识图、向量、语音可分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。</div>
+<div id="provider-bind-box"></div>
+<div id="provider-list" class="provider-list"></div>
+<div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-s">添加 Provider</button></div>
+<div id="provider-form" hidden>
+  <div class="sub-title" id="provider-form-title">添加 Provider</div>
+  <div class="sg" style="margin-top:8px"><label>名称</label><input id="prov-name" placeholder="例如 主模型 / 识图 / 备用"></div>
+  <div class="sg"><label>类型</label><select id="prov-kind">
+    ${Object.keys(PROVIDER_KINDS).map(k => '<option value="' + esc(k) + '">' + esc(PROVIDER_KINDS[k].label) + '</option>').join('')}
+  </select></div>
+  <div class="sg"><label>接口地址</label><input id="prov-base" placeholder="https://.../v1"></div>
+  <div class="sg"><label>默认模型</label><input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet"></div>
+  <div class="sg"><label>API Key</label>
+    <div class="pin-row">
+      <input id="prov-key" type="password" autocomplete="off" placeholder="sk-...">
+      <button type="button" id="btn-paste-prov-key" class="btn-paste">粘贴</button>
+    </div></div>
+  <div class="sg"><label>能力</label><div id="prov-caps" class="cap-list"></div></div>
+  <div class="acts"><button type="button" id="btn-provider-save" class="btn-p">保存 Provider</button><button type="button" id="btn-provider-cancel" class="btn-s">取消</button></div>
+</div>
+
 <div class="sec-title">AI 与模型</div>
 <div class="sg"><label>模型预设</label>${chipGroup('preset', presetKey(), presetOpts)}</div>
 <div class="sg"><label>API 地址</label><input id="set-apibase" value="${esc(CONFIG.apiBase)}"></div>
@@ -9253,6 +9537,28 @@ function renderSettings() {
     if (actionEl && actionEl.dataset.action === 'settings-back') { showView('chat'); return false; }
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
+    if (b.id === 'btn-provider-add') { providerOpenForm(''); return; }
+    if (b.id === 'btn-provider-save') { providerSaveForm(); return; }
+    if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
+    if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    const pa = b.closest('[data-provider-action]');
+    if (pa) {
+      const pid = pa.dataset.providerId || '';
+      const act = pa.dataset.providerAction;
+      if (act === 'test') { providerRunTest(pid); return; }
+      if (act === 'edit') { providerOpenForm(pid); return; }
+      if (act === 'remove') {
+        uiConfirm('删除 Provider 会同时移除它的绑定与本地保存的 Key，确定吗？', '删除').then(ok => {
+          if (!ok) return;
+          providerRemove(CONFIG, pid);
+          providerEnsure(CONFIG, MEMCFG);
+          sSet('via_ai_config', CONFIG);
+          renderProviderCenter();
+          toast('已删除 Provider');
+        });
+        return;
+      }
+    }
     if (b.id === 'btn-plug-page') { showView('plugins'); return; }
     if (b.id === 'btn-chat-mode') { taskSetCurrent(taskEnsureChat().id); return; }
     if (b.id === 'btn-detect-models') { detectModels().catch(e => toast('检测失败：' + errMsg(e))); return; }
@@ -9342,9 +9648,28 @@ function renderSettings() {
     try { if (HAS_NATIVE && Android.openUrl) Android.openUrl(UPDATE_RELEASES); } catch (e) {}
   };
 
+  $('#settings').onchange = (e) => {
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.bindPurpose) return;
+    const purpose = el.dataset.bindPurpose;
+    const id = String(el.value || '');
+    if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
+    if (!id) {
+      delete CONFIG.bindings[purpose];
+      providerEnsure(CONFIG, MEMCFG);
+    } else if (!providerBind(CONFIG, purpose, id)) {
+      toast('绑定失败：Provider 不支持该能力');
+      return;
+    }
+    providerApply(CONFIG, purpose);
+    sSet('via_ai_config', CONFIG);
+    renderProviderCenter();
+    toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
+  };
   bindAgentWhitelist();
   bindWorkspace();
   bindRuntime();
+  renderProviderCenter();
   renderEnvBox();
   const ceBtn = $('#btn-copy-env');
   if (ceBtn) ceBtn.onclick = () => {

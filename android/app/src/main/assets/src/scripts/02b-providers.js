@@ -225,3 +225,72 @@ function providerSummary(cfg) {
     legacy: p.id.indexOf('legacy-') === 0
   }));
 }
+
+/** 从模型名推断能力；只做提示，不写回配置。 */
+function providerInferCaps(ids) {
+  const caps = {};
+  const list = Array.isArray(ids) ? ids : [];
+  list.forEach(raw => {
+    const s = String(raw || '').toLowerCase();
+    if (!s) return;
+    if (/embed/.test(s)) caps.embedding = 1;
+    if (/tts|speech|audio/.test(s)) caps.tts = 1;
+    if (/whisper|transcri|asr/.test(s)) caps.asr = 1;
+    if (/vision|(^|[-_/])vl([-_/]|$)|4o|omni|gemini|claude|glm-4v|qwen.*vl/.test(s)) caps.vision = 1;
+    if (/image|dall-e|imagen|flux|stable-diffusion|sd3/.test(s)) caps.image = 1;
+    if (/video|sora|veo|kling|runway/.test(s)) caps.video = 1;
+    if (/code|coder|codex/.test(s)) caps.code = 1;
+    if (!/embed|tts|speech|whisper|transcri/.test(s)) caps.chat = 1;
+  });
+  return PROVIDER_CAPS.filter(c => caps[c]);
+}
+
+function providerTestHeaders(p, key) {
+  const h = { 'Accept': 'application/json', 'User-Agent': 'ElysiaFloat' };
+  if (p.kind === 'anthropic') {
+    if (key) h['x-api-key'] = key;
+    h['anthropic-version'] = '2023-06-01';
+  } else if (p.kind !== 'gemini' && key) {
+    h['Authorization'] = 'Bearer ' + key;
+  }
+  return h;
+}
+
+/**
+ * E2-005：连接测试 + 能力探测。只 GET /models，不发起付费推理。
+ * 返回 Promise<{ ok, latencyMs, status, error, models, capabilities }>。
+ */
+function providerTest(cfg, id) {
+  const p = providerFind(cfg, id);
+  if (!p) return Promise.reject(new Error('Provider 不存在'));
+  if (!String(p.base || '').trim()) return Promise.reject(new Error('还没填接口地址'));
+  const key = providerKeyOf(p);
+  let url = String(p.base).replace(/\/+$/, '');
+  if (url.indexOf('/models') < 0) url += '/models';
+  if (p.kind === 'gemini' && key) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'key=' + encodeURIComponent(key);
+  const t0 = Date.now();
+  return reqRequest({
+    method: 'GET', url: url,
+    headers: providerTestHeaders(p, key),
+    timeoutMs: 15000, expect: 'json', retries: 0, source: 'system:provider-test'
+  }).then(r => {
+    const d = r.json || {};
+    const raw = Array.isArray(d.data) ? d.data : (Array.isArray(d.models) ? d.models : []);
+    const ids = raw.map(x => (x && (x.id || x.name)) || '').filter(Boolean);
+    return {
+      ok: true,
+      latencyMs: Date.now() - t0,
+      status: r.status || 200,
+      error: '',
+      models: ids.slice(0, 200),
+      capabilities: providerInferCaps(ids)
+    };
+  }).catch(e => ({
+    ok: false,
+    latencyMs: Date.now() - t0,
+    status: (e && e.status) || 0,
+    error: errMsg(e),
+    models: [],
+    capabilities: []
+  }));
+}

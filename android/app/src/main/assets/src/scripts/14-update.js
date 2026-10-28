@@ -112,47 +112,53 @@ function organizeSettingsSections() {
   const nodes = Array.from(root.children);
   const save = root.querySelector('#settings-save-block');
   const spacer = root.querySelector('#settings-bottom-spacer');
-  const titles = nodes.filter(n => n.classList && n.classList.contains('sec-title'));
-  const fragment = document.createDocumentFragment();
-  const first = titles.length ? nodes.indexOf(titles[0]) : nodes.length;
-  const overviewNodes = nodes.slice(0, first).filter(n => n !== save && n !== spacer);
-  if (overviewNodes.length) {
-    const overview = document.createElement('section');
-    overview.className = 'set-overview';
-    const hd = document.createElement('div');
-    hd.className = 'sec-title';
-    hd.textContent = '总览';
-    hd.style.marginTop = '0';
-    overview.appendChild(hd);
-    overviewNodes.forEach(n => overview.appendChild(n));
-    fragment.appendChild(overview);
-  }
-  let section = null, body = null;
-  nodes.slice(first).forEach(n => {
+
+  // E1-004：五个分组页签；每节归入固定分组，进入设置先看「AI 与模型」。
+  const panels = {};
+  const nav = document.createElement('div');
+  nav.className = 'settings-tabs';
+  SETTINGS_GROUPS.forEach(g => {
+    const panel = document.createElement('div');
+    panel.className = 'set-group';
+    panel.dataset.group = g.id;
+    panels[g.id] = panel;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'settings-tab';
+    btn.dataset.settingsGroup = g.id;
+    btn.textContent = g.label;
+    if (g.id === SETTINGS_GROUP) btn.classList.add('on');
+    nav.appendChild(btn);
+  });
+
+  let current = panels['ai'];
+  nodes.forEach(n => {
     if (n === save || n === spacer) return;
     if (n.classList && n.classList.contains('sec-title')) {
-      section = document.createElement('section');
-      const expanded = false;
-      section.className = expanded ? 'set-fold' : 'set-fold closed';
-      const head = document.createElement('button');
-      head.type = 'button';
-      head.className = 'set-fold-head';
-      head.textContent = n.textContent || '设置';
-      head.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-      body = document.createElement('div');
-      body.className = 'set-fold-body';
-      const panel = section;
-      head.onclick = () => {
-        const closed = panel.classList.toggle('closed');
-        head.setAttribute('aria-expanded', closed ? 'false' : 'true');
-      };
-      section.appendChild(head);
-      section.appendChild(body);
-      fragment.appendChild(section);
+      const title = String(n.textContent || '').trim();
+      const gid = SETTINGS_SECTION_GROUP[title] || 'advanced';
+      current = panels[gid] || panels['ai'];
+      current.appendChild(n);
       return;
     }
-    if (body) body.appendChild(n);
+    current.appendChild(n);
   });
+  Object.keys(panels).forEach(k => { panels[k].hidden = k !== SETTINGS_GROUP; });
+
+  nav.onclick = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('[data-settings-group]') : null;
+    if (!b) return;
+    SETTINGS_GROUP = b.dataset.settingsGroup || 'ai';
+    Object.keys(panels).forEach(k => { panels[k].hidden = k !== SETTINGS_GROUP; });
+    Array.from(nav.children).forEach(x => {
+      if (x.classList) x.classList.toggle('on', x.dataset && x.dataset.settingsGroup === SETTINGS_GROUP);
+    });
+    if (root.scrollTop !== undefined) root.scrollTop = 0;
+  };
+
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(nav);
+  SETTINGS_GROUPS.forEach(g => fragment.appendChild(panels[g.id]));
   if (save) fragment.appendChild(save);
   if (spacer) fragment.appendChild(spacer);
   root.innerHTML = '';
@@ -272,10 +278,179 @@ function bindRuntime() {
   renderRuntimeState();
 }
 
+/* ==========================================================
+ *  设置分组（E1-004）与模型中心 UI（E2-001/005）
+ * ========================================================== */
+let SETTINGS_GROUP = 'ai';
+const SETTINGS_GROUPS = [
+  { id: 'ai', label: 'AI 与模型' },
+  { id: 'appearance', label: '外观' },
+  { id: 'permission', label: '权限' },
+  { id: 'workspace', label: '工作区' },
+  { id: 'advanced', label: '高级' }
+];
+const SETTINGS_SECTION_GROUP = {
+  '模型中心': 'ai',
+  'AI 与模型': 'ai',
+  '语音合成': 'ai',
+  '屏幕翻译': 'ai',
+  '长期记忆': 'ai',
+  '个性化与聊天风格': 'appearance',
+  '音乐功能': 'appearance',
+  'Agent 与工作台': 'permission',
+  '应用白名单': 'permission',
+  '权限': 'permission',
+  '文件访问与工作区': 'workspace',
+  '高级运行时': 'advanced',
+  '插件与工具': 'advanced',
+  '检查更新': 'advanced',
+  '环境信息': 'advanced',
+  '数据管理': 'advanced'
+};
+
+let PROVIDER_EDIT_ID = '';
+function providerCapsHtml(caps) {
+  return PROVIDER_CAPS.map(c =>
+    '<label class="cap-chip"><input type="checkbox" value="' + esc(c) + '"'
+    + (caps && caps.indexOf(c) >= 0 ? ' checked' : '') + '> ' + esc(PROVIDER_CAP_LABEL[c] || c) + '</label>'
+  ).join('');
+}
+function providerCloseForm() {
+  PROVIDER_EDIT_ID = '';
+  const f = $('#provider-form'); if (f) f.hidden = true;
+}
+function providerOpenForm(id) {
+  PROVIDER_EDIT_ID = id || '';
+  const p = id ? providerFind(CONFIG, id) : null;
+  const set = (sel, v) => { const el = $(sel); if (el) el.value = v == null ? '' : String(v); };
+  const title = $('#provider-form-title');
+  if (title) title.textContent = p ? '编辑 Provider' : '添加 Provider';
+  set('#prov-name', p ? p.name : '');
+  set('#prov-kind', p ? p.kind : 'openai');
+  set('#prov-base', p ? p.base : '');
+  set('#prov-model', p ? p.model : '');
+  const key = $('#prov-key');
+  if (key) {
+    key.value = '';
+    key.placeholder = (p && providerKeyOf(p)) ? '已保存，留空表示不修改' : 'sk-...';
+  }
+  const caps = $('#prov-caps');
+  if (caps) caps.innerHTML = providerCapsHtml(p ? p.capabilities : ['chat']);
+  const form = $('#provider-form');
+  if (form) {
+    form.hidden = false;
+    const anchor = $('#provider-form-title');
+    if (anchor && anchor.scrollIntoView) anchor.scrollIntoView({ block: 'nearest' });
+  }
+}
+function providerSaveForm() {
+  const val = (sel) => { const el = $(sel); return el && el.value != null ? String(el.value).trim() : ''; };
+  const name = val('#prov-name');
+  if (!name) { toast('先给 Provider 起个名字'); return; }
+  const base = val('#prov-base');
+  if (base && !/^https?:\/\//i.test(base)) { toast('接口地址要以 http(s):// 开头'); return; }
+  const existing = PROVIDER_EDIT_ID ? providerFind(CONFIG, PROVIDER_EDIT_ID) : null;
+  const caps = $$('#prov-caps input').filter(x => x.checked).map(x => String(x.value));
+  const id = PROVIDER_EDIT_ID || providerId('prov');
+  const p = providerUpsert(CONFIG, {
+    id: id,
+    name: name,
+    kind: val('#prov-kind') || 'openai',
+    base: base,
+    model: val('#prov-model'),
+    capabilities: caps,
+    secretRef: existing ? existing.secretRef : ('ai.provider.' + id),
+    enabled: existing ? existing.enabled !== false : true
+  }, val('#prov-key'));
+  if (!p) { toast('Provider 保存失败'); return; }
+  sSet('via_ai_config', CONFIG);
+  providerCloseForm();
+  renderProviderCenter();
+  toast(existing ? 'Provider 已更新' : 'Provider 已添加');
+}
+async function providerRunTest(id) {
+  const card = $$('[data-provider-result="' + id + '"]')[0];
+  if (card) { card.hidden = false; card.textContent = '正在测试…'; }
+  let r;
+  try { r = await providerTest(CONFIG, id); }
+  catch (e) { r = { ok: false, latencyMs: 0, status: 0, error: errMsg(e), models: [], capabilities: [] }; }
+  const el = $$('[data-provider-result="' + id + '"]')[0];
+  if (!el) return;
+  el.hidden = false;
+  if (!r.ok) {
+    el.textContent = '测试失败：' + (r.error || ('HTTP ' + r.status)) + (r.latencyMs ? '（' + r.latencyMs + 'ms）' : '');
+    return;
+  }
+  const capText = (r.capabilities || []).map(c => PROVIDER_CAP_LABEL[c] || c).join('、') || '未从模型名推断出';
+  el.textContent = '连接正常 · ' + r.latencyMs + 'ms · ' + r.models.length + ' 个模型 · 可用能力：' + capText;
+}
+function renderProviderCenter() {
+  const bindBox = $('#provider-bind-box');
+  const list = $('#provider-list');
+  if (!bindBox && !list) return;
+  const providers = (CONFIG.providers || []).filter(p => p && p.enabled !== false);
+  if (bindBox) {
+    bindBox.innerHTML = ['chat', 'vision', 'embedding', 'tts'].map(purpose => {
+      const usable = providers.filter(p => (p.capabilities || []).indexOf(purpose) >= 0);
+      const cur = (CONFIG.bindings && CONFIG.bindings[purpose] && CONFIG.bindings[purpose].provider) || '';
+      return '<div class="sg"><label>' + esc(PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '</label>'
+        + '<select data-bind-purpose="' + purpose + '"><option value="">自动选择</option>'
+        + usable.map(p => '<option value="' + esc(p.id) + '"' + (p.id === cur ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('')
+        + '</select></div>';
+    }).join('');
+  }
+  if (!list) return;
+  const sum = providerSummary(CONFIG);
+  if (!sum.length) {
+    list.innerHTML = '<div class="mini-note">还没有 Provider。</div>';
+    return;
+  }
+  list.innerHTML = sum.map(s =>
+    '<div class="provider-card' + (s.enabled ? '' : ' off') + '">'
+    + '<div class="provider-head"><b>' + esc(s.name) + '</b>'
+    + '<span class="provider-kind">' + esc(s.kindLabel) + '</span>'
+    + (s.hasKey ? '<span class="provider-key ok">已存 Key</span>' : '<span class="provider-key">未存 Key</span>')
+    + '</div>'
+    + '<div class="provider-meta">' + esc(s.base || '未填接口地址') + (s.model ? ' · ' + esc(s.model) : '') + '</div>'
+    + '<div class="provider-caps">' + (s.capabilities.length
+      ? s.capabilities.map(c => '<i>' + esc(PROVIDER_CAP_LABEL[c] || c) + '</i>').join('')
+      : '<i>未标注能力</i>') + '</div>'
+    + '<div class="provider-acts">'
+    + '<button type="button" class="btn-s" data-provider-action="test" data-provider-id="' + esc(s.id) + '">测试连接</button>'
+    + '<button type="button" class="btn-s" data-provider-action="edit" data-provider-id="' + esc(s.id) + '">编辑</button>'
+    + '<button type="button" class="btn-s" data-provider-action="remove" data-provider-id="' + esc(s.id) + '">删除</button>'
+    + '</div>'
+    + '<div class="provider-result" data-provider-result="' + esc(s.id) + '" hidden></div>'
+    + '</div>'
+  ).join('');
+}
+
 function renderSettings() {
   const presetOpts = Object.keys(PRESETS).map(k => ({ v: k, t: PRESETS[k].label }));
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
   $('#settings').innerHTML = `
+<div class="sec-title">模型中心</div>
+<div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。聊天、识图、向量、语音可分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。</div>
+<div id="provider-bind-box"></div>
+<div id="provider-list" class="provider-list"></div>
+<div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-s">添加 Provider</button></div>
+<div id="provider-form" hidden>
+  <div class="sub-title" id="provider-form-title">添加 Provider</div>
+  <div class="sg" style="margin-top:8px"><label>名称</label><input id="prov-name" placeholder="例如 主模型 / 识图 / 备用"></div>
+  <div class="sg"><label>类型</label><select id="prov-kind">
+    ${Object.keys(PROVIDER_KINDS).map(k => '<option value="' + esc(k) + '">' + esc(PROVIDER_KINDS[k].label) + '</option>').join('')}
+  </select></div>
+  <div class="sg"><label>接口地址</label><input id="prov-base" placeholder="https://.../v1"></div>
+  <div class="sg"><label>默认模型</label><input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet"></div>
+  <div class="sg"><label>API Key</label>
+    <div class="pin-row">
+      <input id="prov-key" type="password" autocomplete="off" placeholder="sk-...">
+      <button type="button" id="btn-paste-prov-key" class="btn-paste">粘贴</button>
+    </div></div>
+  <div class="sg"><label>能力</label><div id="prov-caps" class="cap-list"></div></div>
+  <div class="acts"><button type="button" id="btn-provider-save" class="btn-p">保存 Provider</button><button type="button" id="btn-provider-cancel" class="btn-s">取消</button></div>
+</div>
+
 <div class="sec-title">AI 与模型</div>
 <div class="sg"><label>模型预设</label>${chipGroup('preset', presetKey(), presetOpts)}</div>
 <div class="sg"><label>API 地址</label><input id="set-apibase" value="${esc(CONFIG.apiBase)}"></div>
@@ -495,6 +670,28 @@ function renderSettings() {
     if (actionEl && actionEl.dataset.action === 'settings-back') { showView('chat'); return false; }
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
+    if (b.id === 'btn-provider-add') { providerOpenForm(''); return; }
+    if (b.id === 'btn-provider-save') { providerSaveForm(); return; }
+    if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
+    if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    const pa = b.closest('[data-provider-action]');
+    if (pa) {
+      const pid = pa.dataset.providerId || '';
+      const act = pa.dataset.providerAction;
+      if (act === 'test') { providerRunTest(pid); return; }
+      if (act === 'edit') { providerOpenForm(pid); return; }
+      if (act === 'remove') {
+        uiConfirm('删除 Provider 会同时移除它的绑定与本地保存的 Key，确定吗？', '删除').then(ok => {
+          if (!ok) return;
+          providerRemove(CONFIG, pid);
+          providerEnsure(CONFIG, MEMCFG);
+          sSet('via_ai_config', CONFIG);
+          renderProviderCenter();
+          toast('已删除 Provider');
+        });
+        return;
+      }
+    }
     if (b.id === 'btn-plug-page') { showView('plugins'); return; }
     if (b.id === 'btn-chat-mode') { taskSetCurrent(taskEnsureChat().id); return; }
     if (b.id === 'btn-detect-models') { detectModels().catch(e => toast('检测失败：' + errMsg(e))); return; }
@@ -584,9 +781,28 @@ function renderSettings() {
     try { if (HAS_NATIVE && Android.openUrl) Android.openUrl(UPDATE_RELEASES); } catch (e) {}
   };
 
+  $('#settings').onchange = (e) => {
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.bindPurpose) return;
+    const purpose = el.dataset.bindPurpose;
+    const id = String(el.value || '');
+    if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
+    if (!id) {
+      delete CONFIG.bindings[purpose];
+      providerEnsure(CONFIG, MEMCFG);
+    } else if (!providerBind(CONFIG, purpose, id)) {
+      toast('绑定失败：Provider 不支持该能力');
+      return;
+    }
+    providerApply(CONFIG, purpose);
+    sSet('via_ai_config', CONFIG);
+    renderProviderCenter();
+    toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
+  };
   bindAgentWhitelist();
   bindWorkspace();
   bindRuntime();
+  renderProviderCenter();
   renderEnvBox();
   const ceBtn = $('#btn-copy-env');
   if (ceBtn) ceBtn.onclick = () => {

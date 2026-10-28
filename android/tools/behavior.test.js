@@ -183,10 +183,36 @@ step('模型中心：删除 Provider 会清理绑定与专属密钥（E2-001）'
   if (vaultStore.has('ai.provider.beh-custom')) throw new Error('专属密钥没有清理');
 });
 
-if (errors.length) {
-  console.error('\n✗ 行为测试失败 ' + errors.length + ' 项：');
-  errors.forEach(e => console.error('  - ' + e));
-  process.exit(1);
-}
-console.log('\n✓ 行为测试全部通过');
-process.exit(0);
+(async () => {
+  // E2-005：连接测试只探测 /models，不发付费推理请求。
+  const calls = require('./harness').calls;
+  try {
+    const cfg = T.CONFIG;
+    T.providerUpsert(cfg, {
+      id: 'beh-test', name: '连接测试', kind: 'openai',
+      base: 'https://example.invalid/v1', capabilities: ['chat']
+    }, 'test-secret-xyz');
+    calls.net.length = 0;
+    const r = await T.providerTest(cfg, 'beh-test');
+    if (!r || r.ok !== true) throw new Error('测试请求没有成功：' + JSON.stringify(r));
+    const hit = calls.net.filter(c => /\/models$/.test(c.url));
+    if (!hit.length) throw new Error('没有请求 /models：' + JSON.stringify(calls.net));
+    if (!hit.every(c => c.method === 'GET')) throw new Error('连接测试应为 GET');
+    if (calls.net.some(c => /completions|embeddings|audio\/speech/.test(c.url))) {
+      throw new Error('连接测试发起了付费推理请求：' + JSON.stringify(calls.net));
+    }
+    const bad = await T.providerTest(cfg, 'missing-provider').then(() => null, e => e);
+    if (!bad) throw new Error('不存在的 Provider 应拒绝');
+    console.log('  ✓ 模型中心：连接测试只 GET /models（E2-005）');
+  } catch (e) {
+    errors.push('模型中心：连接测试只 GET /models（E2-005）: ' + e.message);
+  }
+
+  if (errors.length) {
+    console.error('\n✗ 行为测试失败 ' + errors.length + ' 项：');
+    errors.forEach(e => console.error('  - ' + e));
+    process.exit(1);
+  }
+  console.log('\n✓ 行为测试全部通过');
+  process.exit(0);
+})();
