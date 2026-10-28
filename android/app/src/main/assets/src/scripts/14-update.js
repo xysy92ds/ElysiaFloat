@@ -106,65 +106,6 @@ window.__dlCb = function (id, pct, done, err, path) {
   toast('安装包已下载，请按系统提示完成安装');
 };
 
-function organizeSettingsSections() {
-  const root = $('#settings');
-  if (!root) return;
-  const nodes = Array.from(root.children);
-  const save = root.querySelector('#settings-save-block');
-  const spacer = root.querySelector('#settings-bottom-spacer');
-
-  // E1-004：五个分组页签；每节归入固定分组，进入设置先看「AI 与模型」。
-  const panels = {};
-  const nav = document.createElement('div');
-  nav.className = 'settings-tabs';
-  SETTINGS_GROUPS.forEach(g => {
-    const panel = document.createElement('div');
-    panel.className = 'set-group';
-    panel.dataset.group = g.id;
-    panels[g.id] = panel;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'settings-tab';
-    btn.dataset.settingsGroup = g.id;
-    btn.textContent = g.label;
-    if (g.id === SETTINGS_GROUP) btn.classList.add('on');
-    nav.appendChild(btn);
-  });
-
-  let current = panels['ai'];
-  nodes.forEach(n => {
-    if (n === save || n === spacer) return;
-    if (n.classList && n.classList.contains('sec-title')) {
-      const title = String(n.textContent || '').trim();
-      const gid = SETTINGS_SECTION_GROUP[title] || 'advanced';
-      current = panels[gid] || panels['ai'];
-      current.appendChild(n);
-      return;
-    }
-    current.appendChild(n);
-  });
-  Object.keys(panels).forEach(k => { panels[k].hidden = k !== SETTINGS_GROUP; });
-
-  nav.onclick = (e) => {
-    const b = e.target && e.target.closest ? e.target.closest('[data-settings-group]') : null;
-    if (!b) return;
-    SETTINGS_GROUP = b.dataset.settingsGroup || 'ai';
-    Object.keys(panels).forEach(k => { panels[k].hidden = k !== SETTINGS_GROUP; });
-    Array.from(nav.children).forEach(x => {
-      if (x.classList) x.classList.toggle('on', x.dataset && x.dataset.settingsGroup === SETTINGS_GROUP);
-    });
-    if (root.scrollTop !== undefined) root.scrollTop = 0;
-  };
-
-  const fragment = document.createDocumentFragment();
-  fragment.appendChild(nav);
-  SETTINGS_GROUPS.forEach(g => fragment.appendChild(panels[g.id]));
-  if (save) fragment.appendChild(save);
-  if (spacer) fragment.appendChild(spacer);
-  root.innerHTML = '';
-  root.appendChild(fragment);
-}
-
 function readAgentState() {
   try {
     if (HAS_PERM && Perm.getAgentState) return JSON.parse(Perm.getAgentState() || '{}');
@@ -289,35 +230,8 @@ function bindRuntime() {
 }
 
 /* ==========================================================
- *  设置分组（E1-004）与模型中心 UI（E2-001/005）
+ *  模型提供商（独立页面）与模型中心 UI（E2-001/005）
  * ========================================================== */
-let SETTINGS_GROUP = 'ai';
-const SETTINGS_GROUPS = [
-  { id: 'ai', label: 'AI 与模型' },
-  { id: 'appearance', label: '外观' },
-  { id: 'permission', label: '权限' },
-  { id: 'workspace', label: '工作区' },
-  { id: 'advanced', label: '高级' }
-];
-const SETTINGS_SECTION_GROUP = {
-  '模型中心': 'ai',
-  'AI 与模型': 'ai',
-  '语音合成': 'ai',
-  '屏幕翻译': 'ai',
-  '长期记忆': 'ai',
-  '个性化与聊天风格': 'appearance',
-  '音乐功能': 'appearance',
-  'Agent 与工作台': 'permission',
-  '应用白名单': 'permission',
-  '权限': 'permission',
-  '文件访问与工作区': 'workspace',
-  '高级运行时': 'advanced',
-  '插件与工具': 'advanced',
-  '检查更新': 'advanced',
-  '环境信息': 'advanced',
-  '数据管理': 'advanced'
-};
-
 let PROVIDER_EDIT_ID = '';
 function providerCapsHtml(caps) {
   return PROVIDER_CAPS.map(c =>
@@ -435,6 +349,89 @@ function renderProviderCenter() {
   ).join('');
 }
 
+function providersCountRefresh() {
+  const cnt = $('#prov-count');
+  if (cnt) cnt.textContent = (CONFIG.providers || []).length + ' 个';
+}
+
+function renderProvidersPage() {
+  const box = $('#providers-scroll');
+  if (!box) return;
+  box.innerHTML = `
+<div class="mini-note" style="margin:0 0 4px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。对话、识图、生图、视频、向量、语音、语音识别、网页搜索都可以分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。网页搜索可以填 SearXNG 的地址，留空时用内置搜索引擎。</div>
+<div class="sub-title" style="margin-top:12px">用途绑定</div>
+<div id="provider-bind-box"></div>
+<div class="sub-title" style="margin-top:12px">已添加的 Provider</div>
+<div id="provider-list" class="provider-list"></div>
+<div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-p">＋ 添加 Provider</button></div>
+<div id="provider-form" hidden>
+  <div class="sub-title" id="provider-form-title">添加 Provider</div>
+  <div class="sg" style="margin-top:8px"><label>名称</label><input id="prov-name" placeholder="例如 主模型 / 识图 / 备用"></div>
+  <div class="sg"><label>类型</label><select id="prov-kind">
+    ${Object.keys(PROVIDER_KINDS).map(k => '<option value="' + esc(k) + '">' + esc(PROVIDER_KINDS[k].label) + '</option>').join('')}
+  </select></div>
+  <div class="sg"><label>接口地址</label><input id="prov-base" placeholder="https://.../v1"></div>
+  <div class="sg"><label>默认模型</label><input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet"></div>
+  <div class="sg"><label>API Key</label>
+    <div class="pin-row">
+      <input id="prov-key" type="password" autocomplete="off" placeholder="sk-...">
+      <button type="button" id="btn-paste-prov-key" class="btn-paste">粘贴</button>
+    </div></div>
+  <div class="sg"><label>能力</label><div id="prov-caps" class="cap-list"></div></div>
+  <div class="acts"><button type="button" id="btn-provider-save" class="btn-p">保存 Provider</button><button type="button" id="btn-provider-cancel" class="btn-s">取消</button></div>
+</div>`;
+  providersCountRefresh();
+  renderProviderCenter();
+
+  const back = $('#prov-back');
+  if (back) back.onclick = () => showView('settings');
+
+  const root = $('#providers');
+  root.onclick = (e) => {
+    const b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!b) return;
+    if (b.id === 'btn-provider-add') { providerOpenForm(''); return; }
+    if (b.id === 'btn-provider-save') { providerSaveForm(); providersCountRefresh(); return; }
+    if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
+    if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    const pa = b.closest('[data-provider-action]');
+    if (!pa) return;
+    const pid = pa.dataset.providerId || '';
+    const act = pa.dataset.providerAction;
+    if (act === 'test') { providerRunTest(pid); return; }
+    if (act === 'edit') { providerOpenForm(pid); return; }
+    if (act === 'remove') {
+      uiConfirm('删除 Provider 会同时移除它的绑定与本地保存的 Key，确定吗？', '删除').then(ok => {
+        if (!ok) return;
+        providerRemove(CONFIG, pid);
+        providerEnsure(CONFIG, MEMCFG);
+        sSet('via_ai_config', CONFIG);
+        providersCountRefresh();
+        renderProviderCenter();
+        toast('已删除 Provider');
+      });
+    }
+  };
+  root.onchange = (e) => {
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.bindPurpose) return;
+    const purpose = el.dataset.bindPurpose;
+    const id = String(el.value || '');
+    if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
+    if (!id) {
+      delete CONFIG.bindings[purpose];
+      providerEnsure(CONFIG, MEMCFG);
+    } else if (!providerBind(CONFIG, purpose, id)) {
+      toast('绑定失败：Provider 不支持该能力');
+      return;
+    }
+    providerApply(CONFIG, purpose);
+    sSet('via_ai_config', CONFIG);
+    renderProviderCenter();
+    toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
+  };
+}
+
 function renderUsageBox() {
   const box = $('#usage-box');
   if (!box) return;
@@ -460,34 +457,6 @@ function renderSettings() {
   const showAvatar = (CONFIG.avatarUrl || '').indexOf('data:') === 0 ? AV_LOCAL : (CONFIG.avatarUrl || '');
   const plugSettings = (typeof plugMountHtml === 'function') ? plugMountHtml('settings.section') : '';
   $('#settings').innerHTML = `
-<div class="sec-title">模型中心</div>
-<div class="mini-note" style="margin-top:8px">每个 Provider 是一个接口地址 + 一个密钥 + 一组能力标签。对话、识图、生图、视频、向量、语音、语音识别、网页搜索都可以分别绑定；Key 只保存在 AndroidKeyStore，导出与日志都不含 Key。网页搜索可以填 SearXNG 的地址，留空时用内置搜索引擎。</div>
-<div id="provider-bind-box"></div>
-<div id="provider-list" class="provider-list"></div>
-<div class="acts" style="margin-top:8px"><button type="button" id="btn-provider-add" class="btn-s">添加 Provider</button></div>
-<div id="provider-form" hidden>
-  <div class="sub-title" id="provider-form-title">添加 Provider</div>
-  <div class="sg" style="margin-top:8px"><label>名称</label><input id="prov-name" placeholder="例如 主模型 / 识图 / 备用"></div>
-  <div class="sg"><label>类型</label><select id="prov-kind">
-    ${Object.keys(PROVIDER_KINDS).map(k => '<option value="' + esc(k) + '">' + esc(PROVIDER_KINDS[k].label) + '</option>').join('')}
-  </select></div>
-  <div class="sg"><label>接口地址</label><input id="prov-base" placeholder="https://.../v1"></div>
-  <div class="sg"><label>默认模型</label><input id="prov-model" placeholder="如 gpt-4o / claude-3-5-sonnet"></div>
-  <div class="sg"><label>API Key</label>
-    <div class="pin-row">
-      <input id="prov-key" type="password" autocomplete="off" placeholder="sk-...">
-      <button type="button" id="btn-paste-prov-key" class="btn-paste">粘贴</button>
-    </div></div>
-  <div class="sg"><label>能力</label><div id="prov-caps" class="cap-list"></div></div>
-  <div class="acts"><button type="button" id="btn-provider-save" class="btn-p">保存 Provider</button><button type="button" id="btn-provider-cancel" class="btn-s">取消</button></div>
-</div>
-
-<div class="sub-title" style="margin-top:14px">用量与限额</div>
-<div id="usage-box" class="mini-note">今天还没有调用记录。</div>
-<div class="sg" style="margin-top:8px"><label>今日调用上限（0 = 不限）</label><input id="set-usage-calls" type="number" min="0" step="1" value="${esc(String(CONFIG.usageDailyCalls || 0))}"></div>
-<div class="sg"><label>今日 Token 上限（0 = 不限）</label><input id="set-usage-tokens" type="number" min="0" step="100" value="${esc(String(CONFIG.usageDailyTokens || 0))}"></div>
-<div class="acts"><button type="button" id="btn-usage-reset" class="btn-s">重置今日用量</button></div>
-
 <div class="sec-title">AI 与模型</div>
 <div class="sg"><label>模型预设</label>${chipGroup('preset', presetKey(), presetOpts)}</div>
 <div class="sg"><label>API 地址</label><input id="set-apibase" value="${esc(CONFIG.apiBase)}"></div>
@@ -508,6 +477,14 @@ function renderSettings() {
 <div class="sg" style="margin-top:8px"><label>识图 API 地址</label><input id="set-vision-base" value="${esc(CONFIG.visionBase || '')}" placeholder="https://.../v1"></div>
 <div class="sg"><label>识图 API Key</label><div class="pin-row"><input id="set-vision-key" class="secret" type="text" autocomplete="off" value="${esc(CONFIG.visionKey || '')}"><button type="button" id="btn-paste-vkey" class="btn-paste">粘贴</button></div></div>
 <div class="sg"><label>识图模型</label><input id="set-vision-model" value="${esc(CONFIG.visionModel || '')}" placeholder="如 gpt-4o / qwen-vl-max"></div>
+<div class="acts" style="margin-top:10px"><button type="button" id="btn-models-page" class="btn-p">模型提供商 ›</button></div>
+<div class="mini-note">管理多个模型接口与用途绑定：对话、识图、生图、视频、向量、语音、语音识别、网页搜索可分别指定 Provider。插件申请 AI 能力时也从这些绑定里选。</div>
+
+<div class="sub-title" style="margin-top:14px">用量与限额</div>
+<div id="usage-box" class="mini-note">今天还没有调用记录。</div>
+<div class="sg" style="margin-top:8px"><label>今日调用上限（0 = 不限）</label><input id="set-usage-calls" type="number" min="0" step="1" value="${esc(String(CONFIG.usageDailyCalls || 0))}"></div>
+<div class="sg"><label>今日 Token 上限（0 = 不限）</label><input id="set-usage-tokens" type="number" min="0" step="100" value="${esc(String(CONFIG.usageDailyTokens || 0))}"></div>
+<div class="acts"><button type="button" id="btn-usage-reset" class="btn-s">重置今日用量</button></div>
 <div class="sec-title">个性化与聊天风格</div>
 <div class="mini-note" style="margin-top:8px">头像、名称和聊天人设只影响普通聊天表达，不会覆盖 Agent 安全规则。</div>
 <div class="sg"><label>助手名</label><input id="set-name" value="${esc(CONFIG.assistantName)}"></div>
@@ -699,9 +676,8 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
   <button id="set-back" type="button" class="settings-return" data-action="settings-back">← 返回对话</button>
   <button id="set-save" type="button" class="settings-inline-save" data-action="save-settings">保存设置</button>
 </div>
-<div id="settings-bottom-spacer" style="height:26px"></div>`;
+<div id="settings-bottom-spacer" style="height:96px"></div>`;
 
-  organizeSettingsSections();
   $('#settings').onclick = (e) => {
     const actionEl = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
     if (actionEl && actionEl.dataset.action === 'save-settings') {
@@ -712,10 +688,7 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
     if (plugEl) { plugHandleUiAction(plugEl); return; }
     const b = e.target && e.target.closest ? e.target.closest('button') : null;
     if (!b) return;
-    if (b.id === 'btn-provider-add') { providerOpenForm(''); return; }
-    if (b.id === 'btn-provider-save') { providerSaveForm(); return; }
-    if (b.id === 'btn-provider-cancel') { providerCloseForm(); return; }
-    if (b.id === 'btn-paste-prov-key') { pasteIntoInput($('#prov-key')); return; }
+    if (b.id === 'btn-models-page') { showView('providers'); renderProvidersPage(); return; }
     if (b.id === 'btn-usage-reset') {
       uiConfirm('重置后今日统计清零，确定吗？', '重置').then(ok => {
         if (!ok) return;
@@ -724,24 +697,6 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
         toast('今日用量已重置');
       });
       return;
-    }
-    const pa = b.closest('[data-provider-action]');
-    if (pa) {
-      const pid = pa.dataset.providerId || '';
-      const act = pa.dataset.providerAction;
-      if (act === 'test') { providerRunTest(pid); return; }
-      if (act === 'edit') { providerOpenForm(pid); return; }
-      if (act === 'remove') {
-        uiConfirm('删除 Provider 会同时移除它的绑定与本地保存的 Key，确定吗？', '删除').then(ok => {
-          if (!ok) return;
-          providerRemove(CONFIG, pid);
-          providerEnsure(CONFIG, MEMCFG);
-          sSet('via_ai_config', CONFIG);
-          renderProviderCenter();
-          toast('已删除 Provider');
-        });
-        return;
-      }
     }
     if (b.id === 'btn-plug-page') { showView('plugins'); return; }
     if (b.id === 'btn-chat-mode') { taskSetCurrent(taskEnsureChat().id); return; }
@@ -832,24 +787,6 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
     try { if (HAS_NATIVE && Android.openUrl) Android.openUrl(UPDATE_RELEASES); } catch (e) {}
   };
 
-  $('#settings').onchange = (e) => {
-    const el = e.target;
-    if (!el || !el.dataset || !el.dataset.bindPurpose) return;
-    const purpose = el.dataset.bindPurpose;
-    const id = String(el.value || '');
-    if (!CONFIG.bindings || typeof CONFIG.bindings !== 'object') CONFIG.bindings = {};
-    if (!id) {
-      delete CONFIG.bindings[purpose];
-      providerEnsure(CONFIG, MEMCFG);
-    } else if (!providerBind(CONFIG, purpose, id)) {
-      toast('绑定失败：Provider 不支持该能力');
-      return;
-    }
-    providerApply(CONFIG, purpose);
-    sSet('via_ai_config', CONFIG);
-    renderProviderCenter();
-    toast(id ? '已绑定「' + (PROVIDER_PURPOSE_LABEL[purpose] || purpose) + '」用途' : '已改回自动选择');
-  };
   bindAgentWhitelist();
   bindWorkspace();
   bindRuntime();

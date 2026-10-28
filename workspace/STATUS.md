@@ -26,14 +26,15 @@
 - 0.11 开发候选包 SHA-256：`2d1fbac349e4ebacf9d033e6c89d753cc9cb9e6b3bcfc560468f8b0931429c08`（2,673,141 字节）；私有归档 `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.11-2026-10-28`。
 - 0.12 开发候选包 SHA-256：`c5662e24575d7df56e9a07c277bf7c072c8296fc6ee69cc03d00ac9af48c386d`（2,689,084 字节）；已归档私有 Release `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12-2026-10-28`。
 - 0.12.1 补丁候选包 SHA-256：`4770e2f8412ba948c02953374b3426f76c0dcfa720498a5dfd4943b2a5c85729`（2,694,210 字节）；已归档私有 Release `https://github.com/xysy92ds/ElysiaFloat-dev/releases/tag/dev-0.12.1-2026-10-28`。
+- 0.12.2 体验补丁候选包 SHA-256：`17848a11f34ed220e9591d5c6c86d83363c12d83741cb4a208fc1bd4a48f5091`（2,693,448 字节）；设置页恢复单页分区、模型提供商独立页、保存条遮挡修复。
 - 公开 Release：`https://github.com/xysy92ds/ElysiaFloat/releases/tag/v0.7.2`（已标记 Latest，标题保留 Beta；资产 APK / source.zip / SHA256SUMS）。
-- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`assembleDebug` 全通过（2026-10-28 复跑，含 0.12.1 补丁）；I-055~I-059、I-063~I-065 仍待真机复测。
+- 当前质量门：`build-html.js --check`、`smoke.js`、`behavior.test.js`、`check-release.js`、`scan-secrets.js`、`assembleDebug` 全通过（2026-10-28 复跑，含 0.12.2 设置页回退）；I-055~I-059、I-063~I-067 仍待真机复测。
 - 签名：debug/release 共用项目自有 keystore（`CN=ElysiaFloat`，SHA-256 `7851cb49…`），可直接覆盖 0.7.0/0.7.1；Beta 期不分离，见 `decisions/DEC-003-signing-and-release.md`。
 - 更新链路：应用内更新检查读取公开仓库 `release/latest.json`，当前已指向 v0.7.2（私有归档副本已同步为公开 URL）。
 - 平台化路线：全部 0.x Beta 小步走——0.9 核心体验+模型中心 → 0.10 开放式插件运行时 →
   0.11 插件 UI 运行时 → 0.12 依赖+持久会话 → 0.13 MC 插件 → 0.14 QQ 插件 → 0.15 沙箱 HTML+适配器生态+工作能力+治理；
   详见 `plans/PLATFORM-0.8-0.15.md`（决策 1A / 2C / 3C / 4ABC 已确认）。
-- 执行状态：0.8.0 的 N2/N3/N4/N5 已完成，只剩 N1 真机回归与最终发布；0.9.0 已代码完成（E1-001~004/006 + E2-001~005/008）；0.10.0 已代码完成（E3 开放式插件运行时）；0.11.0 已代码完成（E4 插件 UI 运行时：挂载点/样式白名单/主题包/会话引擎/设置扩展/卸载清理/开发者工具包 + 三个验收插件）；0.12.0 已代码完成（E5 依赖管理：HTTPS+SHA-256 下载校验/沙箱安装/lockfile/依赖面板/APK 系统安装器；E6 持久会话：心跳/检查点/唤醒锁/看门狗/调度器/预算熔断/日志轮转；G8-001 Termux run_id/超时/取消/审计/固定模板）；0.12.1 已代码完成（真机反馈的三项：清空对话未定义函数、联网阅读 fetch_url/web_search、模型中心 8 用途绑定）；五者均待真机验证，下一步 0.13.0（E7 MC 插件）；
+- 执行状态：0.8.0 的 N2/N3/N4/N5 已完成，只剩 N1 真机回归与最终发布；0.9.0 已代码完成（E1-001~004/006 + E2-001~005/008）；0.10.0 已代码完成（E3 开放式插件运行时）；0.11.0 已代码完成（E4 插件 UI 运行时：挂载点/样式白名单/主题包/会话引擎/设置扩展/卸载清理/开发者工具包 + 三个验收插件）；0.12.0 已代码完成（E5 依赖管理：HTTPS+SHA-256 下载校验/沙箱安装/lockfile/依赖面板/APK 系统安装器；E6 持久会话：心跳/检查点/唤醒锁/看门狗/调度器/预算熔断/日志轮转；G8-001 Termux run_id/超时/取消/审计/固定模板）；0.12.1 已代码完成（真机反馈的三项：清空对话未定义函数、联网阅读 fetch_url/web_search、模型中心 8 用途绑定）；0.12.2 已代码完成（设置页恢复单页分区、模型提供商独立页、底部保存条遮挡与输入区最小高度）；六者均待真机验证，下一步 0.13.0（E7 MC 插件）；
   每版按 10 步流程执行（新增「生成工作转移包」），变更记录见该文档第 13 节。
 - 工作转移：`tools/handoff.sh` 生成 `handoff/ElysiaFloat-handoff-v<版本>-<时间戳>.zip`
   （源码 + docs + APK + git bundle + status/diff + SHA256SUMS + 恢复说明），每版发布后必做；`handoff/` 已 gitignore；

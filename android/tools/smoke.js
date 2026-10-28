@@ -478,15 +478,17 @@ function step(name, fn) {
     if (missing.length) throw new Error('保存时会读到不存在的控件：' + missing.join(', '));
   });
 
-  await step('设置五分组页签与模型中心入口（E1-004 / E2-005）', () => {
-    if (!html.includes("const SETTINGS_GROUPS = [")) throw new Error('缺少设置分组定义');
-    for (const g of ['ai', 'appearance', 'permission', 'workspace', 'advanced']) {
-      if (!new RegExp("id: '" + g + "'").test(html)) throw new Error('缺少分组：' + g);
-    }
-    if (!html.includes("nav.className = 'settings-tabs'") || !html.includes("btn.className = 'settings-tab'") || !html.includes('data-settings-group')) throw new Error('分组页签没有渲染结构');
-    if (!html.includes('id="provider-bind-box"') || !html.includes('id="provider-list"')) throw new Error('模型中心缺少绑定/列表容器');
-    if (!html.includes('id="btn-provider-add"') || !html.includes('id="btn-provider-save"')) throw new Error('模型中心缺少新增/保存按钮');
-    if (!html.includes('data-provider-action="test"')) throw new Error('模型中心缺少连接测试入口');
+  await step('设置单页分类与模型提供商独立页（0.12.2 回归）', () => {
+    // 设置页恢复为单页分类，不再有 E1-004 的五个分组页签。
+    if (html.includes('settings-tabs') || html.includes('SETTINGS_GROUPS')) throw new Error('设置页不应再有分组页签');
+    if (!html.includes('id="btn-models-page"')) throw new Error('设置页缺少「模型提供商」入口');
+    if (!html.includes('id="providers"') || !html.includes('id="providers-scroll"')) throw new Error('缺少模型提供商独立页');
+    if (!html.includes('id="prov-back"')) throw new Error('模型提供商页缺少返回设置入口');
+    if (!html.includes('id="provider-bind-box"') || !html.includes('id="provider-list"')) throw new Error('模型提供商页缺少绑定/列表容器');
+    if (!html.includes('id="btn-provider-add"') || !html.includes('id="btn-provider-save"')) throw new Error('模型提供商页缺少新增/保存按钮');
+    if (!html.includes('data-provider-action="test"')) throw new Error('模型提供商页缺少连接测试入口');
+    if (!/showView\('providers'\)/.test(js)) throw new Error('模型提供商入口没有跳转独立页');
+    if (!/function renderProvidersPage\(\)/.test(js)) throw new Error('缺少模型提供商页渲染函数');
     if (!/url\.indexOf\('\/models'\) < 0\) url \+= '\/models'/.test(js)) throw new Error('连接测试没有固定探测 /models');
     for (const id of ['usage-box', 'set-usage-calls', 'set-usage-tokens', 'btn-usage-reset']) {
       if (!html.includes('id="' + id + '"')) throw new Error('模型中心缺少用量控件：#' + id);
@@ -499,7 +501,7 @@ function step(name, fn) {
     if (!/auto_confirm_on/.test(js) || !/auto_confirm_off/.test(js)) throw new Error('自动确认缺少审计事件');
     if (!/AUTO_CONFIRM\.taskId !== String\(id\)/.test(js)) throw new Error('切换任务时没有让自动确认失效');
     const css = require('fs').readFileSync(require('path').join(__dirname, '../app/src/main/assets/src/styles/main.css'), 'utf8');
-    for (const sel of ['.settings-tabs', '.settings-tab', '.set-group', '.provider-card', '.cap-chip']) {
+    for (const sel of ['#providers', '#providers-scroll', '.provider-card', '.cap-chip']) {
       if (css.indexOf(sel + '{') < 0) throw new Error('缺少样式：' + sel);
     }
   });

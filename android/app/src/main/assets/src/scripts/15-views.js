@@ -9,6 +9,7 @@ function showView(v, opts) {
   const bodyEl = $('#body'), footEl = $('#foot'), actionsEl = $('#actions');
   const settings = $('#settings'), music = $('#music'), mini = $('#mini-player'),
     memory = $('#memory'), memEdit = $('#mem-edit'), trans = $('#trans'),
+    providers = $('#providers'),
     plugins = $('#plugins'), plugMarketPage = $('#plug-market-page'), plugPage = $('#plug-page');
   const attachEl = $('#attach-bar');
   bodyEl.style.display = 'none';
@@ -18,6 +19,7 @@ function showView(v, opts) {
   settings.classList.remove('open');
   music.classList.remove('open');
   if (plugins) plugins.classList.remove('open');
+  if (providers) providers.classList.remove('open');
   if (plugMarketPage) plugMarketPage.classList.remove('open');
   if (plugPage) plugPage.classList.remove('open');
   if (memory) memory.classList.remove('open');
@@ -35,6 +37,7 @@ function showView(v, opts) {
     try { if (typeof plugMountRefresh === 'function') plugMountRefresh(); } catch (e) {}
     try { if (typeof plugThemeRestore === 'function') plugThemeRestore(); } catch (e) {}
   } else if (v === 'settings') settings.classList.add('open');
+  else if (v === 'providers' && providers) providers.classList.add('open');
   else if (v === 'plugins' && plugins) { plugins.classList.add('open'); renderPlugins(); }
   else if (v === 'plug-market' && plugMarketPage) { plugMarketPage.classList.add('open'); renderPlugMarket(); }
   else if (v === 'plug-page' && plugPage) { plugPage.classList.add('open'); plugRenderPage(); }
