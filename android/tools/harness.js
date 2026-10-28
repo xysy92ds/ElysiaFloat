@@ -46,7 +46,15 @@ const EXPORTS = ['M', 'playAt', 'togglePlay', 'playNext', 'playPrev', 'execTool'
   'plugNormalizeStyle', 'plugStyleAttr', 'plugMountEntries', 'plugMountHtml', 'plugMountRefresh',
   'plugThemeApply', 'plugThemeReset', 'plugThemeRestore', 'plugThemesOf', 'plugThemeContrast',
   'plugSessionAfterReply', 'plugSessionEnded', 'plugSessionOfTask',
-  'PLUG_CONFIG_TYPES', 'PLUG_COMPONENT_TYPES', 'PLUG_STATE_KEY', 'PLUG_CONFIG_KEY', 'PLUG_EVENT_NAMES'];
+  'PLUG_CONFIG_TYPES', 'PLUG_COMPONENT_TYPES', 'PLUG_STATE_KEY', 'PLUG_CONFIG_KEY', 'PLUG_EVENT_NAMES',
+  'persistEnsure', 'persistStart', 'persistHeartbeat', 'persistCheckpoint', 'persistPause', 'persistBackoff',
+  'persistBackoffReset', 'persistRecoverAll', 'persistSchedulerTick', 'persistSchedulerStart', 'persistSchedulerStop',
+  'persistBudgetCount', 'persistBudgetExceeded', 'persistLog', 'persistLogText', 'persistExportLogs',
+  'persistStatusLine', 'persistActiveSessions', 'persistJobsSummary', 'persistAcquireWake', 'persistReleaseWake',
+  'PERSIST_TUNING', 'PERSIST_SNAPSHOT_KEY', 'PERSIST_LOG_KEY',
+  'plugNormalizeDependency', 'plugDepPlan', 'plugDepStateOf', 'plugDepInstall', 'plugDepUninstall',
+  'plugDepInstallAll', 'plugDepUninstallAll', 'plugDepVerify', 'plugDepPanelHtml', 'plugDepCounts',
+  'plugDepOpen', 'plugDepHandleUi', 'PLUG_DEP_CACHE_KEY', 'PLUG_DEP_ORDER'];
 const cuts = js.lastIndexOf('})();');
 if (cuts < 0) { console.error('没找到 IIFE 结尾'); process.exit(1); }
 js = js.slice(0, cuts) + '\ntry { window.__T = {' + EXPORTS.join(',') + '}; window.__T.getHistory = function () { return history; }; } catch (e) { console.error("EXPORT FAIL", e); }\n' + js.slice(cuts);
@@ -172,7 +180,7 @@ const document = {
 const store = new Map();
 /** 假密钥仓：只存内存，模拟 AndroidKeyStore 的密文仓，测试里可断言“明文没进 store”。 */
 const vaultStore = new Map();
-const calls = { mp: [], tts: [], ui: [], net: [], tools: [], ws: [] };
+const calls = { mp: [], tts: [], ui: [], net: [], tools: [], ws: [], deps: [] };
 /** 可被测试改写的假页面：screenW/H + nodes */
 const SCREEN_STUB = {
   name: '首页',
@@ -321,8 +329,68 @@ const Perm = {
   agentInputText(t) { calls.tools.push('input:' + t); return JSON.stringify({ ok: true, level: 'L3', package: 'com.test.app' }); },
   agentKey(k) { calls.tools.push('key:' + k); return JSON.stringify({ ok: true, level: 'L3', package: 'com.test.app' }); },
   agentLaunch(a) { calls.tools.push('launch:' + a); return JSON.stringify({ ok: true, level: 'L3', package: 'com.test.app', label: a }); },
-  getWindowLimits() { return Android.getWindowLimits(); }, getEnvInfo() { return Android.getEnvInfo(); }
+  getWindowLimits() { return Android.getWindowLimits(); }, getEnvInfo() { return Android.getEnvInfo(); },
+  /* ---------- 0.12 依赖 / 长时运行 stub ---------- */
+  getDependencyState(pid) { return JSON.stringify({ ok: true, deps: Perm.__deps[String(pid)] || {} }); },
+  installDependency(pid, depJson) {
+    let d = {};
+    try { d = JSON.parse(depJson || '{}'); } catch (e) { }
+    calls.deps.push(['install', String(pid), d.id, d.kind]);
+    if (d.kind === 'termux-pkg' || d.kind === 'npm') return JSON.stringify({ ok: false, error: '包管理器依赖请走 Termux 固定模板' });
+    if (d.kind === 'apk') return JSON.stringify({ ok: true, depId: d.id, needsUserInstall: true, fileName: 'dep-' + d.id + '.apk' });
+    Perm.__deps[String(pid)] = Perm.__deps[String(pid)] || {};
+    Perm.__deps[String(pid)][d.id] = { id: d.id, kind: d.kind, version: d.version, sha256: d.sha256, size: d.size || 0, path: '/mock/' + d.id, installedAt: Date.now() };
+    return JSON.stringify({ ok: true, depId: d.id, installed: true });
+  },
+  removeDependency(pid, did) {
+    calls.deps.push(['remove', String(pid), String(did)]);
+    if (Perm.__deps[String(pid)]) delete Perm.__deps[String(pid)][String(did)];
+    return JSON.stringify({ ok: true });
+  },
+  verifyDependency(pid, did) {
+    const e = (Perm.__deps[String(pid)] || {})[String(did)];
+    return JSON.stringify({ ok: true, verified: !!e, reason: e ? '' : '未安装' });
+  },
+  recordDependency(pid, depJson) {
+    let d = {};
+    try { d = JSON.parse(depJson || '{}'); } catch (e) { }
+    Perm.__deps[String(pid)] = Perm.__deps[String(pid)] || {};
+    Perm.__deps[String(pid)][d.id] = { id: d.id, kind: d.kind, version: d.version, sha256: d.sha256 || '', path: '', installedAt: Date.now() };
+    calls.deps.push(['record', String(pid), d.id]);
+    return JSON.stringify({ ok: true, depId: d.id });
+  },
+  installDependencyApk(fileName) { calls.deps.push(['apk', String(fileName)]); return JSON.stringify({ ok: true }); },
+  runTermuxFixed(reqJson) {
+    calls.deps.push(['fixed', String(reqJson)]);
+    const id = 'fixed' + (++Perm.__fixedSeq);
+    Perm.__fixedJobs[id] = 'done';
+    return JSON.stringify({ ok: true, runId: id });
+  },
+  getTermuxJobStatus(runId) {
+    const st = Perm.__fixedJobs[String(runId)];
+    if (!st) return JSON.stringify({ ok: false, error: 'JOB_NOT_FOUND' });
+    return JSON.stringify({ ok: true, runId: String(runId), status: st, exitCode: st === 'done' ? 0 : null, output: '' });
+  },
+  readTermuxJobOutput(runId, offset) { return JSON.stringify({ ok: true, output: '', nextOffset: Number(offset) || 0 }); },
+  cancelTermuxJob(runId) { calls.deps.push(['cancel', String(runId)]); Perm.__fixedJobs[String(runId)] = 'cancelled'; return JSON.stringify({ ok: true }); },
+  acquireSessionWakeLock(reqJson) {
+    let r = {};
+    try { r = JSON.parse(reqJson || '{}'); } catch (e) { }
+    Perm.__wake = { held: true, taskId: r.taskId || '', minutes: r.minutes || 0 };
+    calls.deps.push(['wake-acquire', r.taskId || '']);
+    return JSON.stringify({ ok: true, minutes: r.minutes || 0 });
+  },
+  releaseSessionWakeLock() { Perm.__wake = { held: false }; calls.deps.push(['wake-release']); return JSON.stringify({ ok: true }); },
+  getSessionWakeState() { return JSON.stringify({ ok: true, held: !!(Perm.__wake && Perm.__wake.held) }); },
+  getTermuxWorkerState() { return JSON.stringify({ installed: true, connected: true, authenticated: true, protocolVersion: 2 }); },
+  createTermuxSession() { return JSON.stringify({ ok: true, token: 'mock' }); },
+  dispatchTermuxJob(jobJson) { calls.deps.push(['termux', String(jobJson)]); return JSON.stringify({ ok: true, runId: 'job' + (++Perm.__fixedSeq) }); },
+  listTermuxJobs() { return JSON.stringify({ ok: true, jobs: [] }); }
 };
+Perm.__deps = {};
+Perm.__wake = { held: false };
+Perm.__fixedJobs = {};
+Perm.__fixedSeq = 0;
 /* ======================= 组装 sandbox ======================= */
 const win = {};
 const sandbox = {

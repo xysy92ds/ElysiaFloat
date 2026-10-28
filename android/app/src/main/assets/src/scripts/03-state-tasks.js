@@ -323,6 +323,8 @@ function taskBegin(type, title, goal, timeoutMs) {
   if (t.type === 'device') deviceReset(t.id);
   taskUpdate(t.id, { state: 'active', phase: 'planning', goal: goal || t.goal, deadline: Date.now() + (timeoutMs || CONFIG.agentTaskTimeout || 1200000), progress: '正在规划' });
   taskEvent(t.id, 'started', { type, goal: goal || t.goal });
+  // 0.12：除聊天/快捷任务外都开持久会话（检查点 + 心跳 + 唤醒锁）。
+  if (typeof persistStart === 'function') { try { persistStart(t, { goal: goal || t.goal }); } catch (e) {} }
   return t;
 }
 function taskTouch(id, progress, patch) {
@@ -332,7 +334,16 @@ function taskTouch(id, progress, patch) {
 function taskFinish(id, state, error) {
   if (QUICK_OPS.has(id)) return quickOperationFinish(id, state, error);
   deviceReset(id);
-  return taskUpdate(id, { state: state || 'completed', error: error || '', progress: state === 'completed' ? '已完成' : (error || '已停止'), deadline: 0 });
+  const t = taskUpdate(id, { state: state || 'completed', error: error || '', progress: state === 'completed' ? '已完成' : (error || '已停止'), deadline: 0 });
+  // 0.12：结束持久会话时落最后一个检查点，并释放会话唤醒锁。
+  if (t && t.persist && t.persist.enabled) {
+    try {
+      if (typeof persistCheckpoint === 'function') persistCheckpoint(t, state || 'completed', t.progress);
+      if (typeof persistLog === 'function') persistLog(t.id, 'finish', '会话结束：' + (state || 'completed'));
+      if (typeof persistReleaseWake === 'function') persistReleaseWake(t);
+    } catch (e) {}
+  }
+  return t;
 }
 function taskAdd(type, title, goal) { taskSaveContext(currentTask()); const t = taskNormalize({ type, title: title || TASK_TYPES[type], goal: goal || '', state: 'active' }); TASKS.unshift(t); CURRENT_TASK_ID = t.id; taskLoadContext(t); saveTasks(); renderTaskDrawer(); updateTaskMode(); refreshSystemPrompt(false); return t; }
 function syncTaskWorkspace(t) { if (!t || t.type !== 'workspace' || !t.workspaceReady || !(HAS_PERM && Perm.updateTaskWorkspace)) return; try { Perm.updateTaskWorkspace(t.id, t.state || 'active', t.phase || '', t.progress || ''); } catch (e) {} }
@@ -351,7 +362,13 @@ function taskUpdate(id, patch) {
   Object.assign(t, patch || {}, { updatedAt: taskNow() });
   saveTasks(); syncTaskWorkspace(t); renderTaskDrawer(); updateTaskMode(); return t;
 }
-function taskPause(id) { const t = taskUpdate(id, { state: 'paused', progress: '已暂停' }); if (t && (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID)) { stopRequested = true; cancelTaskRequests(id); toast('任务已暂停'); } }
+function taskPause(id) {
+  const t = taskUpdate(id, { state: 'paused', progress: '已暂停' });
+  if (t) {
+    if (t.persist && t.persist.enabled && typeof persistCheckpoint === 'function') { try { persistCheckpoint(t, 'paused', t.progress); persistReleaseWake(t); } catch (e) {} }
+    if (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID) { stopRequested = true; cancelTaskRequests(id); toast('任务已暂停'); }
+  }
+}
 function taskResume(id) {
   const t = TASKS.find(x => x.id === id); if (!t) return;
   // 恢复即重置预算：否则长任务暂停后 deadline 早已过期，恢复会立刻 DEADLINE_EXCEEDED
@@ -368,9 +385,24 @@ function taskResume(id) {
   const resumed = taskUpdate(id, { state: 'active', error: '', progress: progress, deadline: Date.now() + budget });
   if (!resumed) return;
   CURRENT_TASK_ID = id; saveTasks(); updateTaskMode();
+  // 0.12：恢复持久会话时重新拿唤醒锁，并从检查点续跑。
+  if (resumed.persist && resumed.persist.enabled) {
+    try {
+      if (typeof persistAcquireWake === 'function') persistAcquireWake(resumed, resumed.persist.budget ? resumed.persist.budget.minutes : 480);
+      if (typeof persistCheckpoint === 'function') persistCheckpoint(resumed, 'running', '从检查点恢复');
+      if (typeof persistBackoffReset === 'function') persistBackoffReset(resumed);
+    } catch (e) {}
+  }
   toast('任务已恢复；下一轮会重新检查任务现场');
 }
-function taskCancel(id) { const t = taskUpdate(id, { state: 'cancelled', progress: '已取消', deadline: 0 }); if (t && (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID)) { stopRequested = true; cancelTaskRequests(id); } toast('任务已停止'); }
+function taskCancel(id) {
+  const t = taskUpdate(id, { state: 'cancelled', progress: '已取消', deadline: 0 });
+  if (t) {
+    if (t.persist && t.persist.enabled) { try { if (typeof persistLog === 'function') persistLog(t.id, 'cancel', '用户取消'); if (typeof persistReleaseWake === 'function') persistReleaseWake(t); } catch (e) {} }
+    if (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID) { stopRequested = true; cancelTaskRequests(id); }
+    toast('任务已停止');
+  }
+}
 function taskSetCurrent(id) {
   const t = TASKS.find(x => x.id === id); if (!t) return;
   taskSaveContext(currentTask());

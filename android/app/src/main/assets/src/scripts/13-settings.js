@@ -140,6 +140,22 @@ function renderPlugins() {
   box.innerHTML = html;
 }
 
+/** 0.12：插件声明了依赖时，设置页给一个「管理依赖」入口。 */
+function plugDepsRowHTML(p) {
+  const deps = Array.isArray(p.dependencies) ? p.dependencies : [];
+  if (!deps.length) return '';
+  let label = deps.length + ' 项';
+  try {
+    if (typeof plugDepCounts === 'function') {
+      const c = plugDepCounts(p);
+      label = c.installed + '/' + c.total + (c.missing ? ' · 缺 ' + c.missing : ' · 已齐');
+    }
+  } catch (e) {}
+  return '<div class="plug-market-meta"><b>依赖：</b>' + esc(label) +
+    ' <button type="button" class="plug-mini" data-plug-deps="' + esc(p.id) + '">管理依赖</button>' +
+    ' <button type="button" class="plug-mini" data-dep-all-install="' + esc(p.id) + '">装缺失</button></div>';
+}
+
 /** 自定义插件区块：已安装的插件 + 空状态提示。 */
 function plugCustomHtml() {
   let html = '<div class="sec-title" style="margin-top:16px">🧩 自定义插件</div>';
@@ -171,6 +187,7 @@ function plugCustomHtml() {
       </div>
       ${p.desc ? '<div class="plug-group-desc">' + esc(p.desc) + '</div>' : ''}
       <div class="plug-market-meta"><b>类型：</b>${esc(({chat:'聊天插件',quick:'快捷任务插件',device:'手机插件',workspace:'工作插件'}[p.pluginType] || '聊天插件'))}</div>
+      ${plugDepsRowHTML(p)}
       ${plugPermissionsHTML(p)}
       ${rows}
     </div>`;

@@ -84,6 +84,12 @@ function runStatusLabel() {
   let s = '运行中 ' + sec + 's';
   if (phase) s += ' · ' + phase;
   if (goal) s += ' · ' + goal;
+  if (t && t.persist && t.persist.enabled) {
+    const u = t.persist.used || {};
+    s += ' · 持久 ' + Math.round(Number(u.minutes) || 0) + 'm';
+    const over = typeof persistBudgetExceeded === 'function' ? persistBudgetExceeded(t) : '';
+    if (over) s += ' · 预算' + over + '已满';
+  }
   return s;
 }
 function updateRunStatus() {
@@ -97,6 +103,13 @@ function updateRunStatus() {
     return;
   }
   if (!RUN_STATUS_START) RUN_STATUS_START = Date.now();
+  // 0.12：运行状态条本身就是心跳来源；persistHeartbeat 内部按 10s 节流。
+  if (typeof persistHeartbeat === 'function') {
+    try {
+      const t = (TASKS || []).find(x => x.id === ACTIVE_RUN_TASK_ID);
+      if (t) persistHeartbeat(t);
+    } catch (e) {}
+  }
   box.hidden = false;
   const el = $('#run-status-text');
   if (el) el.textContent = runStatusLabel();
@@ -147,6 +160,14 @@ function bindPluginsPage() {
     if (b.dataset.cplugSw) { toggleUserPlug(b.dataset.cplugSw); return; }
     if (b.dataset.toolSw) { toggleTool(b.dataset.toolSw); return; }
     if (b.dataset.plugDel) { plugDelete(b.dataset.plugDel); return; }
+    if (b.dataset.plugDeps) { if (typeof plugDepOpen === 'function') plugDepOpen(b.dataset.plugDeps); return; }
+    if (b.dataset.depAllInstall) {
+      const p = USER_PLUGINS.filter(x => x.id === b.dataset.depAllInstall)[0];
+      if (p && typeof plugDepInstallAll === 'function') {
+        plugDepInstallAll(p).then(r => { toast(r && r.ok ? '缺失依赖已处理' : ((r && r.error) || '安装失败')); renderPlugins(); });
+      }
+      return;
+    }
     if (b.dataset.plugAct || b.dataset.plugOpen || b.dataset.plugConfig) { plugHandleUiAction(b); return; }
   };
 
@@ -156,6 +177,8 @@ function bindPluginsPage() {
   const pageBody = $('#plug-page-body');
   if (pageBody) {
     pageBody.onclick = (e) => {
+      const dep = e.target && e.target.closest ? e.target.closest('[data-dep-all],[data-dep-install],[data-dep-remove],[data-dep-verify]') : null;
+      if (dep && typeof plugDepHandleUi === 'function') { plugDepHandleUi(dep); return; }
       const el = e.target && e.target.closest ? e.target.closest('[data-plug-act],[data-plug-open],[data-plug-config]') : null;
       if (el) plugHandleUiAction(el);
     };

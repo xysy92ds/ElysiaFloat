@@ -286,6 +286,10 @@ function boot() {
   try { if (typeof plugThemeRestore === 'function') plugThemeRestore(); } catch (e) {}
   try { if (typeof plugMountRefresh === 'function') plugMountRefresh(); } catch (e) {}
 
+  // 0.12：进程重启后合并检查点（活跃会话转暂停），再启动后台任务调度。
+  try { if (typeof persistRecoverAll === 'function') persistRecoverAll(); } catch (e) {}
+  try { if (typeof persistSchedulerStart === 'function') persistSchedulerStart(); } catch (e) {}
+
   console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条 · 插件 ' + USER_PLUGINS.length + ' 个');
 }
 

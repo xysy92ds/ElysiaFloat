@@ -60,6 +60,45 @@ class PermissionBridge(private val ctx: Context) {
     @JavascriptInterface
     fun readTermuxJobOutput(runId: String, offset: Long): String = TermuxWorker.readJobOutput(ctx, runId, offset).toString()
 
+    /* ---------- 插件依赖（0.12 / E5） ---------- */
+    @JavascriptInterface
+    fun getDependencyState(pluginId: String): String = DependencyRuntime.state(ctx, pluginId).toString()
+
+    @JavascriptInterface
+    fun installDependency(pluginId: String, depJson: String): String = try {
+        DependencyRuntime.install(ctx, pluginId, depJson).toString()
+    } catch (e: Exception) { JSONObject().put("ok", false).put("errorCode", "DEP_INSTALL_FAILED").put("error", "依赖安装失败").toString() }
+
+    @JavascriptInterface
+    fun removeDependency(pluginId: String, depId: String): String = DependencyRuntime.remove(ctx, pluginId, depId).toString()
+
+    @JavascriptInterface
+    fun verifyDependency(pluginId: String, depId: String): String = DependencyRuntime.verify(ctx, pluginId, depId).toString()
+
+    @JavascriptInterface
+    fun recordDependency(pluginId: String, depJson: String): String = DependencyRuntime.record(ctx, pluginId, depJson).toString()
+
+    @JavascriptInterface
+    fun installDependencyApk(fileName: String): String = DependencyRuntime.installApk(ctx, fileName).toString()
+
+    @JavascriptInterface
+    fun runTermuxFixed(reqJson: String): String = try {
+        TermuxWorker.runFixed(ctx, reqJson).toString()
+    } catch (e: Exception) { JSONObject().put("ok", false).put("errorCode", "FIXED_DISPATCH_FAILED").put("error", "Termux 依赖任务失败").toString() }
+
+    /* ---------- 会话唤醒锁（0.12 / E6-004） ---------- */
+    @JavascriptInterface
+    fun acquireSessionWakeLock(reqJson: String): String = try {
+        val req = JSONObject(reqJson)
+        SessionKeepAlive.acquire(ctx, req.optString("taskId"), req.optInt("minutes", 480)).toString()
+    } catch (e: Exception) { JSONObject().put("ok", false).put("errorCode", "WAKE_BAD_REQUEST").put("error", "唤醒锁请求无效").toString() }
+
+    @JavascriptInterface
+    fun releaseSessionWakeLock(): String = SessionKeepAlive.release().toString()
+
+    @JavascriptInterface
+    fun getSessionWakeState(): String = SessionKeepAlive.state().toString()
+
     @JavascriptInterface
     fun listExternalAgents(): String = ExternalAgentAdapter.list(ctx).toString()
 

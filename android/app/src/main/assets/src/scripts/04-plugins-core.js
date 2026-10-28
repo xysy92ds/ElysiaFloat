@@ -30,7 +30,8 @@ const PLUG_PERMISSION_INFO = {
   'memory.read': { label: '读取长期记忆', risk: '可读取用户保存的记忆' },
   'memory.write': { label: '写入长期记忆', risk: '可新增或修改记忆' },
   'memory.delete': { label: '删除长期记忆', risk: '可请求删除记忆；仍需用户确认' },
-  'music.control': { label: '控制音乐', risk: '可搜索、播放、切歌、收藏和管理本地缓存' }};
+  'music.control': { label: '控制音乐', risk: '可搜索、播放、切歌、收藏和管理本地缓存' },
+  'dependencies.manage': { label: '安装/卸载依赖', risk: '可从 HTTPS 下载并校验 SHA-256 后装进插件沙箱；APK 依赖仍走系统安装器确认' }};
 const PLUG_CAPABILITY_PERMS = {
   read_screen_once: 'device.read', external_file_list: 'files.public.read', external_file_read: 'files.public.read',
   external_file_write: 'files.public.write', external_file_copy: ['files.public.read', 'files.public.write'],
@@ -48,6 +49,38 @@ const PLUG_CAPABILITY_PERMS = {
   search_and_play_music: 'music.control', music_control: 'music.control'
 };
 const PLUG_PERMISSION_NAMES = Object.keys(PLUG_PERMISSION_INFO);
+/* 0.12 / E5-001：依赖声明只认这五类；下载类必须 HTTPS + SHA-256。 */
+const PLUG_DEP_KINDS = ['termux-pkg', 'npm', 'archive', 'binary', 'apk'];
+const PLUG_DEP_HASH_KINDS = ['archive', 'binary', 'apk'];
+const PLUG_DEP_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+const PLUG_DEP_NAME_RE = /^[A-Za-z0-9@][A-Za-z0-9@/._+-]{0,119}$/;
+function plugDepIsHttps(u) {
+  try { const x = new URL(String(u)); return x.protocol === 'https:' && !!x.hostname; } catch (e) { return false; }
+}
+/** 规整一条依赖声明；缺关键字段返回 null。 */
+function plugNormalizeDependency(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+  const kind = String(d.kind || '').trim();
+  const id = String(d.id || '').trim();
+  const version = String(d.version || '').trim();
+  if (PLUG_DEP_KINDS.indexOf(kind) < 0 || !PLUG_DEP_ID_RE.test(id) || !version) return null;
+  const source = String(d.source || d.url || '').trim();
+  const sha = String(d.sha256 || '').trim().toLowerCase();
+  if (!source || source.length > 500) return null;
+  if (PLUG_DEP_HASH_KINDS.indexOf(kind) >= 0) {
+    if (!plugDepIsHttps(source) || !PLUG_SHA256_RE.test(sha)) return null;
+  } else if (!PLUG_DEP_NAME_RE.test(source)) return null;
+  const size = parseInt(d.size, 10);
+  return {
+    id, kind, version,
+    source,
+    sha256: PLUG_SHA256_RE.test(sha) ? sha : '',
+    bin: String(d.bin || '').slice(0, 64),
+    size: Number.isFinite(size) && size > 0 ? Math.min(size, 209715200) : 0,
+    license: String(d.license || '').slice(0, 40),
+    why: String(d.why || d.reason || '').slice(0, 200)
+  };
+}
 function plugNormalizePermissions(value) {
   if (!Array.isArray(value)) return [];
   return Array.from(new Set(value.map(String).map(s => s.trim()).filter(s => PLUG_PERMISSION_INFO[s])));
@@ -170,12 +203,8 @@ function plugNormalize(m) {
     surfaces,
     configVersion: config.version,
     configFields: config.fields,
-    dependencies: Array.isArray(m.dependencies) ? m.dependencies.slice(0, 40).map(d => ({
-      id: String((d && d.id) || '').slice(0, 64),
-      kind: String((d && d.kind) || '').slice(0, 24),
-      version: String((d && d.version) || '').slice(0, 32),
-      sha256: String((d && d.sha256) || '').toLowerCase().slice(0, 64)
-    })).filter(d => d.id) : [],
+    dependencies: (Array.isArray(m.dependencies) ? m.dependencies.slice(0, 40) : [])
+      .map(plugNormalizeDependency).filter(Boolean),
     models: plugPlainObject(m.models) ? plugJsonSafe(m.models, 0) : {}
   };
 }

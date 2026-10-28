@@ -25,6 +25,14 @@ object TermuxWorker {
     private const val PREFS = "elly_termux_worker"
     private const val TOKEN = "sessionToken"
     private const val JOBS_DIR = ".termux-jobs"
+    private const val FIXED_JOBS_DIR = "deps-jobs"
+    private const val LOG_MAX_BYTES = 200_000L
+    private const val AUDIT_MAX_BYTES = 200_000
+    private val RUN_ID_RE = Regex("[A-Za-z0-9_-]{1,96}")
+    private val PKG_NAME_RE = Regex("[A-Za-z0-9@][A-Za-z0-9@/._+-]{0,119}")
+    private val VERSION_RE = Regex("[A-Za-z0-9][A-Za-z0-9._+-]{0,63}")
+    private const val PKG_PATH = "/data/data/com.termux/files/usr/bin/pkg"
+    private const val NPM_PATH = "/data/data/com.termux/files/usr/bin/npm"
 
     private val allowedExecutors = setOf("python", "node", "git", "rg", "ffmpeg", "java", "bash")
     private val executablePaths = mapOf(
@@ -77,6 +85,8 @@ object TermuxWorker {
         val checked = validateJob(job)
         if (!checked.optBoolean("ok", false)) return checked
         val runId = checked.optString("jobId")
+        if (!RUN_ID_RE.matches(runId)) return error("INVALID_RUN_ID", "任务 id 不合法")
+        val timeoutSec = (job.optLong("timeoutMs", 0L) / 1000L).coerceIn(0L, 24L * 3600L)
         val executor = job.optString("executor")
         val taskId = job.optString("taskId")
         val taskDir = TaskWorkspace.taskDir(taskId) ?: return error("INVALID_TASK", "任务工作区不存在")
@@ -106,11 +116,14 @@ PIDFILE="${jobsDir.absolutePath}/$runId.pid"
 LOGFILE="${jobsDir.absolutePath}/$runId.log"
 EXITFILE="${jobsDir.absolutePath}/$runId.exit"
 CANCELFILE="${jobsDir.absolutePath}/$runId.cancel"
+TIMEOUT=$timeoutSec
+START=${'$'}(date +%s)
 rm -f "${'$'}CANCELFILE"
 echo ${'$'}${'$'} > "${'$'}PIDFILE"
 "$execPath" $escapedArgs > "${'$'}LOGFILE" 2>&1 &
 CHILD=${'$'}!
-# 等待子进程结束，或检测到取消信号
+TIMEDOUT=0
+# 等待子进程结束，或检测到取消/超时信号
 while kill -0 ${'$'}CHILD 2>/dev/null; do
   if [ -f "${'$'}CANCELFILE" ]; then
     kill -TERM ${'$'}CHILD 2>/dev/null
@@ -119,10 +132,21 @@ while kill -0 ${'$'}CHILD 2>/dev/null; do
     rm -f "${'$'}CANCELFILE"
     break
   fi
+  if [ "${'$'}TIMEOUT" -gt 0 ] && [ ${'$'}(( ${'$'}(date +%s) - START )) -ge "${'$'}TIMEOUT" ]; then
+    kill -TERM ${'$'}CHILD 2>/dev/null
+    sleep 2
+    kill -KILL ${'$'}CHILD 2>/dev/null
+    TIMEDOUT=1
+    break
+  fi
   sleep 1
 done
 wait ${'$'}CHILD 2>/dev/null
-echo ${'$'}? > "${'$'}EXITFILE"
+CODE=${'$'}?
+if [ "${'$'}TIMEDOUT" = "1" ]; then CODE=124; fi
+echo ${'$'}CODE > "${'$'}EXITFILE"
+# 日志上限：只保留最后 200KB，长跑任务不能把工作区撑爆
+if [ -f "${'$'}LOGFILE" ]; then tail -c 200000 "${'$'}LOGFILE" > "${'$'}LOGFILE.tmp" && mv -f "${'$'}LOGFILE.tmp" "${'$'}LOGFILE"; fi
 rm -f "${'$'}PIDFILE"
 """
         val scriptFile = File(jobsDir, "$runId.sh")
@@ -138,18 +162,92 @@ rm -f "${'$'}PIDFILE"
                 .putExtra("com.termux.RUN_COMMAND_WORKDIR", cwd.absolutePath)
                 .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
             ctx.startService(intent)
+            audit(ctx, "dispatch", runId, taskId)
             JSONObject().put("ok", true)
                 .put("runId", runId)
                 .put("dispatched", true)
+                .put("timeoutSec", timeoutSec)
                 .put("workdir", cwd.absolutePath)
                 .put("logFile", "$JOBS_DIR/$runId.log")
         } catch (e: Exception) { error("DISPATCH_FAILED", e.message ?: "Termux 启动失败") }
     }
 
+    /**
+     * 固定模板安装（0.12 / E5）：只接受 termux-pkg 与 npm 两种，不拼接任意 shell。
+     * 包名与版本走白名单正则；命令模板写死，用户只能给包名。
+     */
+    fun runFixed(ctx: Context, reqJson: String): JSONObject {
+        val req = try { JSONObject(reqJson) } catch (_: Exception) { return error("INVALID_REQUEST", "请求格式无效") }
+        if (req.optString("op") != "install") return error("OP_NOT_ALLOWED", "只支持 install")
+        val kind = req.optString("kind")
+        val name = req.optString("name")
+        val version = req.optString("version")
+        if (kind != "termux-pkg" && kind != "npm") return error("KIND_NOT_ALLOWED", "只支持 termux-pkg / npm")
+        if (!PKG_NAME_RE.matches(name)) return error("INVALID_PACKAGE", "包名不合法")
+        val hasVersion = version.isNotBlank()
+        if (hasVersion && !VERSION_RE.matches(version)) return error("INVALID_VERSION", "版本号不合法")
+
+        val runId = UUID.randomUUID().toString().replace("-", "")
+        val jobsDir = File(TaskWorkspace.root(), FIXED_JOBS_DIR)
+        if (!jobsDir.isDirectory && !jobsDir.mkdirs()) return error("JOBS_DIR_FAILED", "无法创建依赖任务目录")
+
+        val target = if (hasVersion) "$name@$version" else name
+        val command = if (kind == "termux-pkg") {
+            "${shellQuote(PKG_PATH)} install -y ${shellQuote(name)}"
+        } else {
+            "${shellQuote(NPM_PATH)} install -g ${shellQuote(target)}"
+        }
+
+        val script = """#!/data/data/com.termux/files/usr/bin/bash
+PIDFILE="${jobsDir.absolutePath}/$runId.pid"
+LOGFILE="${jobsDir.absolutePath}/$runId.log"
+EXITFILE="${jobsDir.absolutePath}/$runId.exit"
+CANCELFILE="${jobsDir.absolutePath}/$runId.cancel"
+TIMEOUT=900
+START=${'$'}(date +%s)
+rm -f "${'$'}CANCELFILE"
+echo ${'$'}${'$'} > "${'$'}PIDFILE"
+$command > "${'$'}LOGFILE" 2>&1 &
+CHILD=${'$'}!
+TIMEDOUT=0
+while kill -0 ${'$'}CHILD 2>/dev/null; do
+  if [ -f "${'$'}CANCELFILE" ]; then
+    kill -TERM ${'$'}CHILD 2>/dev/null; sleep 2; kill -KILL ${'$'}CHILD 2>/dev/null
+    rm -f "${'$'}CANCELFILE"; break
+  fi
+  if [ ${'$'}(( ${'$'}(date +%s) - START )) -ge "${'$'}TIMEOUT" ]; then
+    kill -TERM ${'$'}CHILD 2>/dev/null; sleep 2; kill -KILL ${'$'}CHILD 2>/dev/null
+    TIMEDOUT=1; break
+  fi
+  sleep 1
+done
+wait ${'$'}CHILD 2>/dev/null
+CODE=${'$'}?
+if [ "${'$'}TIMEDOUT" = "1" ]; then CODE=124; fi
+echo ${'$'}CODE > "${'$'}EXITFILE"
+if [ -f "${'$'}LOGFILE" ]; then tail -c 200000 "${'$'}LOGFILE" > "${'$'}LOGFILE.tmp" && mv -f "${'$'}LOGFILE.tmp" "${'$'}LOGFILE"; fi
+rm -f "${'$'}PIDFILE"
+"""
+        return try {
+            val scriptFile = File(jobsDir, "$runId.sh")
+            scriptFile.writeText(script)
+            scriptFile.setExecutable(true)
+            val intent = Intent("com.termux.RUN_COMMAND").setPackage("com.termux")
+                .putExtra("com.termux.RUN_COMMAND_PATH", BASH_PATH)
+                .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(scriptFile.absolutePath))
+                .putExtra("com.termux.RUN_COMMAND_WORKDIR", jobsDir.absolutePath)
+                .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+            ctx.startService(intent)
+            audit(ctx, "fixed_dispatch", runId, "$kind:$target")
+            JSONObject().put("ok", true).put("runId", runId)
+                .put("kind", kind).put("package", target).put("timeoutSec", 900)
+        } catch (e: Exception) { error("DISPATCH_FAILED", e.message ?: "Termux 启动失败") }
+    }
+
     /** 查询任务状态：running / done / failed / not_found */
     fun getJobStatus(ctx: Context, runId: String): JSONObject {
-        val taskDir = findTaskDirForJob(ctx, runId) ?: return error("JOB_NOT_FOUND", "任务不存在：$runId")
-        val jobsDir = File(taskDir, JOBS_DIR)
+        if (!RUN_ID_RE.matches(runId)) return error("INVALID_RUN_ID", "任务 id 不合法")
+        val jobsDir = findJobsDirForRun(ctx, runId) ?: return error("JOB_NOT_FOUND", "任务不存在：$runId")
         val pidFile = File(jobsDir, "$runId.pid")
         val exitFile = File(jobsDir, "$runId.exit")
         val logFile = File(jobsDir, "$runId.log")
@@ -195,8 +293,8 @@ rm -f "${'$'}PIDFILE"
 
     /** 取消任务：创建信号文件，由 wrapper 脚本检测并 kill 子进程 */
     fun cancelJob(ctx: Context, runId: String): JSONObject {
-        val taskDir = findTaskDirForJob(ctx, runId) ?: return error("JOB_NOT_FOUND", "任务不存在：$runId")
-        val jobsDir = File(taskDir, JOBS_DIR)
+        if (!RUN_ID_RE.matches(runId)) return error("INVALID_RUN_ID", "任务 id 不合法")
+        val jobsDir = findJobsDirForRun(ctx, runId) ?: return error("JOB_NOT_FOUND", "任务不存在：$runId")
         val pidFile = File(jobsDir, "$runId.pid")
         if (!pidFile.exists()) return error("NOT_RUNNING", "任务未在运行：$runId")
         return try {
@@ -213,14 +311,16 @@ rm -f "${'$'}PIDFILE"
             if (cancelled && !File(jobsDir, "$runId.exit").exists()) {
                 File(jobsDir, "$runId.exit").writeText("143")
             }
+            audit(ctx, "cancel", runId, "cancelled=$cancelled")
             JSONObject().put("ok", cancelled).put("runId", runId).put("cancelled", cancelled)
         } catch (e: Exception) { error("CANCEL_FAILED", e.message ?: "取消失败") }
     }
 
     /** 读取任务输出（可指定偏移，模拟流式读取） */
     fun readJobOutput(ctx: Context, runId: String, offset: Long = 0): JSONObject {
-        val taskDir = findTaskDirForJob(ctx, runId) ?: return error("JOB_NOT_FOUND", "任务不存在：$runId")
-        val logFile = File(taskDir, "$JOBS_DIR/$runId.log")
+        if (!RUN_ID_RE.matches(runId)) return error("INVALID_RUN_ID", "任务 id 不合法")
+        val jobsDir = findJobsDirForRun(ctx, runId) ?: return error("JOB_NOT_FOUND", "任务不存在：$runId")
+        val logFile = File(jobsDir, "$runId.log")
         if (!logFile.exists()) return JSONObject().put("ok", true).put("output", "").put("nextOffset", 0L).put("eof", false)
         val totalLen = logFile.length()
         val start = offset.coerceIn(0, totalLen)
@@ -234,15 +334,27 @@ rm -f "${'$'}PIDFILE"
             .put("totalLength", totalLen)
     }
 
-    /** 在所有任务目录中查找某个 runId 属于哪个任务 */
-    private fun findTaskDirForJob(ctx: Context, runId: String): File? {
+    /** 在所有任务目录 / 固定依赖目录中查找某个 runId 的 jobs 目录 */
+    private fun findJobsDirForRun(ctx: Context, runId: String): File? {
+        val fixedDir = File(TaskWorkspace.root(), FIXED_JOBS_DIR)
+        if (File(fixedDir, "$runId.sh").exists() || File(fixedDir, "$runId.log").exists()) return fixedDir
         val tasksRoot = File(TaskWorkspace.root(), "tasks")
         if (!tasksRoot.isDirectory) return null
         tasksRoot.listFiles()?.forEach { taskDir ->
             val jobsDir = File(taskDir, JOBS_DIR)
-            if (File(jobsDir, "$runId.sh").exists() || File(jobsDir, "$runId.log").exists()) return taskDir
+            if (File(jobsDir, "$runId.sh").exists() || File(jobsDir, "$runId.log").exists()) return jobsDir
         }
         return null
+    }
+
+    private fun audit(ctx: Context, event: String, runId: String, detail: String) {
+        try {
+            val dir = File(TaskWorkspace.root(), "audit")
+            if (!dir.isDirectory && !dir.mkdirs()) return
+            val f = File(dir, "termux-audit.log")
+            f.appendText("${System.currentTimeMillis()} $event run=$runId $detail\n")
+            if (f.length() > AUDIT_MAX_BYTES) f.writeText(f.readText().takeLast(AUDIT_MAX_BYTES / 2))
+        } catch (_: Exception) {}
     }
 
     private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"

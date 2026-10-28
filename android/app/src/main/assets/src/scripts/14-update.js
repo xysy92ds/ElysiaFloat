@@ -241,6 +241,15 @@ function renderRuntimeState() {
     const e = HAS_PERM && Perm.listExternalAgents ? JSON.parse(Perm.listExternalAgents() || '[]') : [];
     box.textContent = 'Android：可用 · 无障碍：' + (a.accessibility ? '已连接' : '未连接') + ' · Shizuku：' + (a.shizukuInstalled ? '已安装' : '未安装') + ' · Root：' + (a.rootAvailable ? '可检测到' : '未授权') + ' · Termux：' + (t.installed ? '已安装，未连接' : '未安装') + ' · 外部 Agent：' + (Array.isArray(e) ? e.length : 0) + ' 个';
   } catch (e) { box.textContent = '运行时状态暂时不可用。'; }
+  renderPersistState();
+}
+function renderPersistState() {
+  const line = $('#persist-state');
+  const guide = $('#persist-keepalive');
+  try {
+    if (line && typeof persistStatusLine === 'function') line.textContent = persistStatusLine();
+    if (guide && typeof persistKeepAliveGuideHtml === 'function') guide.innerHTML = persistKeepAliveGuideHtml();
+  } catch (e) {}
 }
 function renderWorkspaceState() {
   const box = $('#workspace-state');
@@ -274,6 +283,7 @@ function bindWorkspace() {
 }
 function bindRuntime() {
   const refresh = $('#btn-runtime-refresh'); if (refresh) refresh.onclick = renderRuntimeState;
+  const prefresh = $('#btn-persist-refresh'); if (prefresh) prefresh.onclick = renderPersistState;
   const ext = $('#btn-external-agents'); if (ext) ext.onclick = () => { renderRuntimeState(); toast('外部 Agent 适配框架已就绪，具体适配需单独安装并确认~'); };
   renderRuntimeState();
 }
@@ -548,7 +558,9 @@ function renderSettings() {
 <div class="sec-title">高级运行时</div>
 <div class="mini-note" style="margin-top:8px">Root、Shizuku、Termux 和外部 Agent 都是可选后端。当前只显示状态并建立受控协议，不会自动执行命令或安装外部 Agent。</div>
 <div id="runtime-state" class="mini-note" style="margin-top:8px"></div>
-<div class="acts" style="margin-top:8px"><button id="btn-runtime-refresh" class="btn-s">刷新运行时状态</button><button id="btn-external-agents" class="btn-s">查看外部 Agent</button></div>
+<div id="persist-state" class="mini-note" style="margin-top:8px"></div>
+<div id="persist-keepalive" class="mini-note" style="margin-top:8px"></div>
+<div class="acts" style="margin-top:8px"><button id="btn-runtime-refresh" class="btn-s">刷新运行时状态</button><button id="btn-external-agents" class="btn-s">查看外部 Agent</button><button id="btn-persist-refresh" class="btn-s">刷新长时运行状态</button></div>
 
 <div class="sec-title">应用白名单</div>
 <div class="mini-note" style="margin-top:8px">默认拒绝。只有加入白名单的应用才允许 L1/L2/L3 读取或操作；ElysiaFloat 自身不会加入。</div>

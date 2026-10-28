@@ -457,6 +457,180 @@ step('开放式运行时：v2 surface 隔离、私有存储与 secret 不落明�
     errors.push('模型中心：连接测试只 GET /models（E2-005）: ' + e.message);
   }
 
+  /* ================= 0.12 / E5 依赖管理 ================= */
+  {
+    const { calls } = require('./harness');
+    const sha = 'a'.repeat(64);
+    const mkDep = o => T.plugNormalizeDependency(o);
+
+    try {
+      if (mkDep({ id: 'a', kind: 'binary', version: '1', source: 'http://x/y', sha256: sha })) throw new Error('http 依赖未被拒绝');
+      if (mkDep({ id: 'a', kind: 'binary', version: '1', source: 'https://x/y', sha256: '' })) throw new Error('缺哈希依赖未被拒绝');
+      if (mkDep({ id: 'a', kind: 'weird', version: '1', source: 'https://x/y', sha256: sha })) throw new Error('未知 kind 未被拒绝');
+      const good = mkDep({ id: 'bin', kind: 'binary', version: '1.0', source: 'https://x/y', sha256: sha, bin: 'tool', size: 12, license: 'MIT', why: 'test' });
+      if (!good || good.id !== 'bin' || good.license !== 'MIT' || good.bin !== 'tool' || good.size !== 12) throw new Error('合法依赖字段被截断：' + JSON.stringify(good));
+      if (!/dependencies\.manage/.test(JSON.stringify(T.PLUG_PERMISSION_INFO))) throw new Error('缺少 dependencies.manage 权限说明');
+      console.log('  ✓ 依赖声明：HTTPS + SHA-256 强制，字段完整（E5-001）');
+    } catch (e) { errors.push('依赖声明：HTTPS + SHA-256 强制，字段完整（E5-001）: ' + e.message); }
+
+    try {
+      const plugin = {
+        id: 'dep-test', name: '依赖测试', enabled: true, version: '1.0.0',
+        permissions: ['dependencies.manage'], grantedPermissions: ['dependencies.manage'],
+        dependencies: [
+          mkDep({ id: 'apk1', kind: 'apk', version: '1', source: 'https://x/a.apk', sha256: sha, size: 10 }),
+          mkDep({ id: 'bin1', kind: 'binary', version: '1', source: 'https://x/b', sha256: sha, bin: 'b' }),
+          mkDep({ id: 'pkg1', kind: 'termux-pkg', version: '1.2', source: 'ffmpeg' })
+        ]
+      };
+      const plan = T.plugDepPlan(plugin).map(x => x.dep.id);
+      if (plan.join(',') !== 'pkg1,bin1,apk1') throw new Error('安装顺序不对：' + plan.join(','));
+      if (T.plugDepCounts(plugin).missing !== 3) throw new Error('缺失计数不对');
+      calls.deps.length = 0;
+      const r1 = await T.plugDepInstall(plugin, 'bin1', { confirmed: true, force: true });
+      if (!r1.ok) throw new Error('binary 依赖安装失败：' + JSON.stringify(r1));
+      if (T.plugDepStateOf(plugin, T.plugDepPlan(plugin).filter(x => x.dep.id === 'bin1')[0].dep) !== 'installed') throw new Error('安装后状态不是 installed');
+      const v = await T.plugDepVerify(plugin, 'bin1');
+      if (!v.ok || !v.verified) throw new Error('校验未通过：' + JSON.stringify(v));
+      const r2 = await T.plugDepUninstall(plugin, 'bin1', { confirmed: true });
+      if (!r2.ok) throw new Error('卸载失败');
+      if (T.plugDepCounts(plugin).installed !== 0) throw new Error('卸载后仍有已安装');
+      console.log('  ✓ 依赖安装/校验/卸载：走原生契约（E5-002/003）');
+    } catch (e) { errors.push('依赖安装/校验/卸载：走原生契约（E5-002/003）: ' + e.message); }
+
+    try {
+      const plugin = {
+        id: 'dep-apk', name: 'APK 测试', enabled: true,
+        permissions: ['dependencies.manage'], grantedPermissions: ['dependencies.manage'],
+        dependencies: [mkDep({ id: 'a1', kind: 'apk', version: '1', source: 'https://x/a.apk', sha256: sha })]
+      };
+      calls.deps.length = 0;
+      const p = T.plugDepInstall(plugin, 'a1', { confirmed: true, force: true });
+      await new Promise(r => setTimeout(r, 20));
+      if (calls.deps.some(c => c[0] === 'apk')) throw new Error('APK 未经二次确认就调用系统安装器');
+      T.closeModal(false);
+      const denied = await p;
+      if (denied.ok) throw new Error('用户取消后 APK 安装仍成功');
+      const p2 = T.plugDepInstall(plugin, 'a1', { confirmed: true, force: true });
+      await new Promise(r => setTimeout(r, 20));
+      T.closeModal(true);
+      const okr = await p2;
+      if (!okr.ok || !calls.deps.some(c => c[0] === 'apk')) throw new Error('确认后没有启动系统安装器');
+      console.log('  ✓ APK 依赖只交给系统安装器且需二次确认（E5-004）');
+    } catch (e) { errors.push('APK 依赖只交给系统安装器且需二次确认（E5-004）: ' + e.message); }
+
+    try {
+      const plugin = {
+        id: 'dep-termux', name: 'Termux 测试', enabled: true,
+        permissions: ['dependencies.manage'], grantedPermissions: ['dependencies.manage'],
+        dependencies: [mkDep({ id: 'p1', kind: 'termux-pkg', version: '6.0', source: 'ffmpeg' })]
+      };
+      calls.deps.length = 0;
+      const r = await T.plugDepInstall(plugin, 'p1', { confirmed: true, force: true });
+      if (!r.ok) throw new Error('Termux 固定模板安装失败：' + JSON.stringify(r));
+      if (!calls.deps.some(c => c[0] === 'fixed' && /ffmpeg/.test(c[1]))) throw new Error('没有走固定模板');
+      if (!calls.deps.some(c => c[0] === 'record')) throw new Error('安装后没有写 lockfile 记录');
+      console.log('  ✓ Termux 依赖走固定模板并记录 lockfile（E5-005）');
+    } catch (e) { errors.push('Termux 依赖走固定模板并记录 lockfile（E5-005）: ' + e.message); }
+
+    try {
+      const plugin = {
+        id: 'dep-order', name: '卸载顺序', enabled: true,
+        permissions: ['dependencies.manage'], grantedPermissions: ['dependencies.manage'],
+        dependencies: [
+          mkDep({ id: 'x1', kind: 'binary', version: '1', source: 'https://x/1', sha256: sha }),
+          mkDep({ id: 'x2', kind: 'binary', version: '1', source: 'https://x/2', sha256: 'b'.repeat(64) })
+        ]
+      };
+      await T.plugDepInstall(plugin, 'x1', { confirmed: true, force: true });
+      await T.plugDepInstall(plugin, 'x2', { confirmed: true, force: true });
+      calls.deps.length = 0;
+      const p = T.plugDepUninstallAll(plugin);
+      await new Promise(r => setTimeout(r, 10));
+      T.closeModal(true);
+      const r = await p;
+      if (!r.ok) throw new Error('全部卸载失败：' + JSON.stringify(r));
+      const removes = calls.deps.filter(c => c[0] === 'remove').map(c => c[2]);
+      if (removes.join(',') !== 'x2,x1') throw new Error('卸载不是逆序：' + removes.join(','));
+      console.log('  ✓ 全部卸载按声明逆序删除（E5-006）');
+    } catch (e) { errors.push('全部卸载按声明逆序删除（E5-006）: ' + e.message); }
+  }
+
+  /* ================= 0.12 / E6 持久会话 ================= */
+  {
+    const { calls } = require('./harness');
+
+    try {
+      const t = T.taskAdd('device', '长任务', '持久测试');
+      calls.deps.length = 0;
+      const p = T.persistStart(t, { goal: '持久测试', minutes: 30 });
+      if (!p || !p.enabled || !t.persist) throw new Error('持久会话未建立');
+      if (!calls.deps.some(c => c[0] === 'wake-acquire')) throw new Error('未申请会话唤醒锁');
+      const ph = T.persistHeartbeat(t, { phase: 'run', progress: '第 1 步' }, { force: true });
+      if (!ph || t.persist.phase !== 'run') throw new Error('心跳未写入');
+      if (!T.persistCheckpoint(t, 'step', '完成第一步')) throw new Error('检查点失败');
+      const snap = JSON.parse(store.get(T.PERSIST_SNAPSHOT_KEY) || '{}');
+      if (!snap[t.id] || snap[t.id].phase !== 'step') throw new Error('快照没有落盘');
+      if (!/持久会话开始/.test(T.persistLogText(t.id))) throw new Error('会话日志缺失');
+      const t2 = T.taskAdd('device', '恢复', '恢复测试');
+      T.persistStart(t2);
+      T.persistCheckpoint(t2, 'run', '运行中');
+      t2.state = 'active';
+      const n = T.persistRecoverAll();
+      if (n < 1 || t2.state !== 'paused' || !/检查点/.test(t2.progress)) throw new Error('重启恢复没有转暂停：' + JSON.stringify({ n, st: t2.state, pg: t2.progress }));
+      T.taskCancel(t.id); T.taskCancel(t2.id);
+      console.log('  ✓ 持久会话：唤醒锁、心跳、检查点、重启恢复（E6-001~003）');
+    } catch (e) { errors.push('持久会话：唤醒锁、心跳、检查点、重启恢复（E6-001~003）: ' + e.message); }
+
+    try {
+      const t = T.taskAdd('device', '预算', '预算测试');
+      T.persistStart(t);
+      t.persist.budget.actions = 2;
+      if (T.persistBudgetCount(t, 'actions', 1)) throw new Error('未超预算就熔断');
+      const hit = T.persistBudgetCount(t, 'actions', 2);
+      if (!hit || t.state !== 'paused' || !/预算熔断/.test(t.persist.pausedReason || '')) throw new Error('预算熔断未暂停：' + JSON.stringify({ hit, st: t.state }));
+      T.taskCancel(t.id);
+      console.log('  ✓ 预算熔断只暂停、不判失败（E6-006）');
+    } catch (e) { errors.push('预算熔断只暂停、不判失败（E6-006）: ' + e.message); }
+
+    try {
+      const t = T.taskAdd('device', '退避', '退避测试');
+      T.persistStart(t);
+      const r1 = T.persistBackoff(t, 'boom');
+      if (r1.paused || r1.delay !== T.PERSIST_TUNING.backoffBase) throw new Error('首次退避不符合基数：' + JSON.stringify(r1));
+      let last;
+      for (let i = 0; i < 6; i++) last = T.persistBackoff(t, 'boom');
+      if (!last.paused || t.state !== 'paused') throw new Error('连续异常没有转暂停：' + JSON.stringify(last));
+      T.taskCancel(t.id);
+      console.log('  ✓ 看门狗指数退避，连续异常转暂停（E6-005）');
+    } catch (e) { errors.push('看门狗指数退避，连续异常转暂停（E6-005）: ' + e.message); }
+
+    try {
+      const t = T.taskAdd('device', '日志', '轮转测试');
+      T.persistStart(t);
+      for (let i = 0; i < 200; i++) T.persistLog(t.id, 'info', 'line-' + i);
+      const list = JSON.parse(store.get(T.PERSIST_LOG_KEY) || '{}')[t.id];
+      if (!list || list.length > T.PERSIST_TUNING.logMax) throw new Error('日志没有按上限轮转');
+      const exp = T.persistExportLogs(t.id);
+      if (/sk-[A-Za-z0-9]|ghp_/.test(exp)) throw new Error('导出日志没有脱敏');
+      T.taskCancel(t.id);
+      console.log('  ✓ 会话日志轮转与导出脱敏（E6-007）');
+    } catch (e) { errors.push('会话日志轮转与导出脱敏（E6-007）: ' + e.message); }
+
+    try {
+      T.sSet('via_ai_plugin_jobs', { 'ghost:svc': { every: 60, nextRun: 0, failures: 0 } });
+      for (let i = 0; i < 3; i++) {
+        const cur = JSON.parse(store.get('via_ai_plugin_jobs') || '{}')['ghost:svc'] || {};
+        T.persistSchedulerTick((Number(cur.nextRun) || Date.now()) + 1);
+        await new Promise(r => setTimeout(r, 30));
+      }
+      const jobs = JSON.parse(store.get('via_ai_plugin_jobs') || '{}');
+      const job = jobs['ghost:svc'];
+      if (!job || !job.paused || !/连续失败 3 次/.test(job.error || '')) throw new Error('调度器失败未暂停：' + JSON.stringify(job));
+      console.log('  ✓ 插件后台任务调度：失败退避 + 连续失败暂停（E6-005）');
+    } catch (e) { errors.push('插件后台任务调度：失败退避 + 连续失败暂停（E6-005）: ' + e.message); }
+  }
+
   if (errors.length) {
     console.error('\n✗ 行为测试失败 ' + errors.length + ' 项：');
     errors.forEach(e => console.error('  - ' + e));

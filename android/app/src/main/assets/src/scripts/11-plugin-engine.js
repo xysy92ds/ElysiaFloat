@@ -381,6 +381,8 @@ async function chatReqTools(messages, hooks) {
     round++;
     if (activeRunTask && taskDeadline) taskTouch(activeRunTask.id, '第 ' + round + ' 轮处理中', { currentStep: round, totalSteps: maxRoundsForState });
     if (hooks.onRound) { try { hooks.onRound(round, maxRoundsForState); } catch (e) {} }
+    // 0.12：每轮推进持久会话心跳（内部 10s 节流，不会写爆存储）。
+    if (activeRunTask && typeof persistHeartbeat === 'function') { try { persistHeartbeat(activeRunTask); } catch (e) {} }
     compactTaskMessages(proc);
     taskTouch(activeRunTask.id, '第 ' + round + ' 轮请求模型', { phase: 'planning', currentStep: round, totalSteps: maxRoundsForState });
     const body = JSON.stringify({ model: CONFIG.model, messages: proc, stream: false, tools, tool_choice: 'auto' });
@@ -479,6 +481,10 @@ async function chatReqTools(messages, hooks) {
     }
     const results = slot.filter(Boolean);
     results.forEach(({ c, result }) => proc.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(result) }));
+    // 0.12：工具动作计入持久会话预算；超限会由 persistBudgetCount 触发暂停（不是失败）。
+    if (activeRunTask && typeof persistBudgetCount === 'function' && results.length) {
+      try { persistBudgetCount(activeRunTask, 'actions', results.length); } catch (e) {}
+    }
     if (runIsStale(runToken) || stopRequested) return '（已由你停止本轮工具执行）';
     if (parIdx.length > 1) taskEvent(activeRunTask.id, 'parallel_tools', { count: parIdx.length });
     taskTouch(activeRunTask.id, '已完成工具，正在验证', { phase: 'verify' });

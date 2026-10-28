@@ -186,6 +186,15 @@ function plugManifestV2Error(raw) {
     if (seen[s.type + ':' + id]) return 'surface 重复：' + s.type + ':' + id;
     seen[s.type + ':' + id] = true;
   }
+  // E5-001：依赖声明必须完整；下载类强制 HTTPS + SHA-256，且插件要申请 dependencies.manage。
+  const deps = Array.isArray(raw.dependencies) ? raw.dependencies : [];
+  if (deps.length && declared.indexOf('dependencies.manage') < 0) return '声明 dependencies 的插件必须同时申请 dependencies.manage';
+  const seenDep = {};
+  for (const d of deps) {
+    if (!plugNormalizeDependency(d)) return '依赖声明无效：' + String((d && d.id) || '') + '（检查 kind/version/source/sha256）';
+    if (seenDep[d.id]) return '依赖 id 重复：' + d.id;
+    seenDep[d.id] = true;
+  }
   return '';
 }
 
@@ -232,6 +241,15 @@ function plugLifecycle(plugin, phase, payload) {
     delete jobs[plugin.id];
     sSet(PLUG_JOBS_KEY, jobs);
     plugThemeClearPlugin(plugin.id);
+    // E5-005：卸载插件时逆序清理它自己的依赖；失败不影响卸载本身。
+    try {
+      if (HAS_PERM && typeof Perm.removeDependency === 'function') {
+        (plugin.dependencies || []).slice().reverse().forEach(d => {
+          try { Perm.removeDependency(String(plugin.id), String(d.id)); } catch (e) {}
+        });
+      }
+      if (typeof plugDepCacheSet === 'function') plugDepCacheSet(plugin.id, {});
+    } catch (e) {}
     // 删除该插件创建的会话，避免卸载后留下无法归属的任务。
     try {
       const doomed = (typeof TASKS !== 'undefined' ? TASKS : []).filter(t => t && t.pluginSession && t.pluginSession.pluginId === plugin.id);
@@ -918,7 +936,11 @@ async function plugRunAction(plugin, action, ctx) {
     if (action.type === 'theme.reset') {
       return plugThemeReset(String(action.scope || 'global'), String(action.session || ctx.sessionId || CURRENT_TASK_ID || ''));
     }
-    if (action.type === 'dependency.install') return { ok: false, error: '依赖安装将在 0.12 提供' };
+    if (action.type === 'dependency.install') {
+      const depId = String(action.dep || action.target || action.value || '');
+      if (typeof plugDepInstall !== 'function') return { ok: false, error: '依赖运行时不可用' };
+      return await plugDepInstall(plugin, depId);
+    }
     if (action.type === 'confirm') return { ok: true };
     if (action.type === 'custom') return { ok: false, error: '0.10 不执行插件自定义代码；请使用通用动作' };
   } catch (e) {
@@ -1028,7 +1050,9 @@ function plugHostApi(plugin, surface) {
       summary: () => providerSummary(CONFIG).map(p => ({ id: p.id, kind: p.kind, capabilities: p.capabilities, hasKey: p.hasKey }))
     },
     dependency: {
-      list: () => (plugin.dependencies || []).slice()
+      list: () => (plugin.dependencies || []).map(d => Object.assign({}, d, { status: typeof plugDepStateOf === 'function' ? plugDepStateOf(plugin, d) : 'unknown' })),
+      install: id => typeof plugDepInstall === 'function' ? plugDepInstall(plugin, id) : Promise.resolve({ ok: false, error: '依赖运行时不可用' }),
+      remove: id => typeof plugDepUninstall === 'function' ? plugDepUninstall(plugin, id) : Promise.resolve({ ok: false, error: '依赖运行时不可用' })
     },
     job: {
       schedule: id => plugJobSchedule(plugin, id || sid),
@@ -1101,6 +1125,12 @@ function plugRenderPage() {
     const surface = PLUG_PAGE_CTX.surfaceId ? plugPluginSurfaces(plugin, 'settings').filter(s => s.id === PLUG_PAGE_CTX.surfaceId)[0] : null;
     titleEl.textContent = (surface ? surface.title : '插件配置') + ' · ' + plugin.name;
     body.innerHTML = plugConfigFormHTML(plugin, surface);
+    return;
+  }
+  if (PLUG_PAGE_CTX.mode === 'deps') {
+    titleEl.textContent = '插件依赖 · ' + plugin.name;
+    body.innerHTML = typeof plugDepPanelHtml === 'function'
+      ? plugDepPanelHtml(plugin) : '<div class="mini-note">依赖运行时不可用。</div>';
     return;
   }
   const surface = plugPluginSurfaces(plugin, 'page').filter(s => s.id === PLUG_PAGE_CTX.surfaceId)[0];

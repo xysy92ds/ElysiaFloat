@@ -797,6 +797,14 @@ input,textarea,#input,#body,.msg,.mini-note,.msg-body{
 .pc-chart-l{font-size:9px;color:var(--muted);margin-top:3px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pc-tabs .pc-tab{padding:6px 0;border-bottom:1px dashed rgba(255,154,158,.28)}
 .pc-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:3px}
+/* 0.12：依赖状态徽标与安装日志 */
+.pc-badge{display:inline-block;padding:1px 7px;border-radius:8px;font-size:10px;font-weight:600;
+  background:rgba(255,154,158,.18);color:var(--muted)}
+.pc-badge-ok{background:rgba(76,175,80,.16);color:#2e7d32}
+.pc-badge-bad{background:rgba(220,53,69,.14);color:#c62828}
+.dep-log{margin-top:8px;max-height:150px;overflow:auto;padding:8px 10px;border-radius:10px;
+  background:rgba(255,154,158,.08);border:1px solid rgba(255,154,158,.22);
+  font:11px/1.55 inherit;color:var(--muted);white-space:pre-wrap;word-break:break-word;user-select:text}
 .pc-choice{display:flex;flex-wrap:wrap;gap:6px}
 .pc-divider{height:1px;background:rgba(255,154,158,.24);margin:8px 0}
 .pc-spacer{height:10px}
@@ -3522,6 +3530,8 @@ function taskBegin(type, title, goal, timeoutMs) {
   if (t.type === 'device') deviceReset(t.id);
   taskUpdate(t.id, { state: 'active', phase: 'planning', goal: goal || t.goal, deadline: Date.now() + (timeoutMs || CONFIG.agentTaskTimeout || 1200000), progress: '正在规划' });
   taskEvent(t.id, 'started', { type, goal: goal || t.goal });
+  // 0.12：除聊天/快捷任务外都开持久会话（检查点 + 心跳 + 唤醒锁）。
+  if (typeof persistStart === 'function') { try { persistStart(t, { goal: goal || t.goal }); } catch (e) {} }
   return t;
 }
 function taskTouch(id, progress, patch) {
@@ -3531,7 +3541,16 @@ function taskTouch(id, progress, patch) {
 function taskFinish(id, state, error) {
   if (QUICK_OPS.has(id)) return quickOperationFinish(id, state, error);
   deviceReset(id);
-  return taskUpdate(id, { state: state || 'completed', error: error || '', progress: state === 'completed' ? '已完成' : (error || '已停止'), deadline: 0 });
+  const t = taskUpdate(id, { state: state || 'completed', error: error || '', progress: state === 'completed' ? '已完成' : (error || '已停止'), deadline: 0 });
+  // 0.12：结束持久会话时落最后一个检查点，并释放会话唤醒锁。
+  if (t && t.persist && t.persist.enabled) {
+    try {
+      if (typeof persistCheckpoint === 'function') persistCheckpoint(t, state || 'completed', t.progress);
+      if (typeof persistLog === 'function') persistLog(t.id, 'finish', '会话结束：' + (state || 'completed'));
+      if (typeof persistReleaseWake === 'function') persistReleaseWake(t);
+    } catch (e) {}
+  }
+  return t;
 }
 function taskAdd(type, title, goal) { taskSaveContext(currentTask()); const t = taskNormalize({ type, title: title || TASK_TYPES[type], goal: goal || '', state: 'active' }); TASKS.unshift(t); CURRENT_TASK_ID = t.id; taskLoadContext(t); saveTasks(); renderTaskDrawer(); updateTaskMode(); refreshSystemPrompt(false); return t; }
 function syncTaskWorkspace(t) { if (!t || t.type !== 'workspace' || !t.workspaceReady || !(HAS_PERM && Perm.updateTaskWorkspace)) return; try { Perm.updateTaskWorkspace(t.id, t.state || 'active', t.phase || '', t.progress || ''); } catch (e) {} }
@@ -3550,7 +3569,13 @@ function taskUpdate(id, patch) {
   Object.assign(t, patch || {}, { updatedAt: taskNow() });
   saveTasks(); syncTaskWorkspace(t); renderTaskDrawer(); updateTaskMode(); return t;
 }
-function taskPause(id) { const t = taskUpdate(id, { state: 'paused', progress: '已暂停' }); if (t && (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID)) { stopRequested = true; cancelTaskRequests(id); toast('任务已暂停'); } }
+function taskPause(id) {
+  const t = taskUpdate(id, { state: 'paused', progress: '已暂停' });
+  if (t) {
+    if (t.persist && t.persist.enabled && typeof persistCheckpoint === 'function') { try { persistCheckpoint(t, 'paused', t.progress); persistReleaseWake(t); } catch (e) {} }
+    if (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID) { stopRequested = true; cancelTaskRequests(id); toast('任务已暂停'); }
+  }
+}
 function taskResume(id) {
   const t = TASKS.find(x => x.id === id); if (!t) return;
   // 恢复即重置预算：否则长任务暂停后 deadline 早已过期，恢复会立刻 DEADLINE_EXCEEDED
@@ -3567,9 +3592,24 @@ function taskResume(id) {
   const resumed = taskUpdate(id, { state: 'active', error: '', progress: progress, deadline: Date.now() + budget });
   if (!resumed) return;
   CURRENT_TASK_ID = id; saveTasks(); updateTaskMode();
+  // 0.12：恢复持久会话时重新拿唤醒锁，并从检查点续跑。
+  if (resumed.persist && resumed.persist.enabled) {
+    try {
+      if (typeof persistAcquireWake === 'function') persistAcquireWake(resumed, resumed.persist.budget ? resumed.persist.budget.minutes : 480);
+      if (typeof persistCheckpoint === 'function') persistCheckpoint(resumed, 'running', '从检查点恢复');
+      if (typeof persistBackoffReset === 'function') persistBackoffReset(resumed);
+    } catch (e) {}
+  }
   toast('任务已恢复；下一轮会重新检查任务现场');
 }
-function taskCancel(id) { const t = taskUpdate(id, { state: 'cancelled', progress: '已取消', deadline: 0 }); if (t && (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID)) { stopRequested = true; cancelTaskRequests(id); } toast('任务已停止'); }
+function taskCancel(id) {
+  const t = taskUpdate(id, { state: 'cancelled', progress: '已取消', deadline: 0 });
+  if (t) {
+    if (t.persist && t.persist.enabled) { try { if (typeof persistLog === 'function') persistLog(t.id, 'cancel', '用户取消'); if (typeof persistReleaseWake === 'function') persistReleaseWake(t); } catch (e) {} }
+    if (id === CURRENT_TASK_ID || id === ACTIVE_RUN_TASK_ID) { stopRequested = true; cancelTaskRequests(id); }
+    toast('任务已停止');
+  }
+}
 function taskSetCurrent(id) {
   const t = TASKS.find(x => x.id === id); if (!t) return;
   taskSaveContext(currentTask());
@@ -3945,6 +3985,400 @@ if (!CONFIG.persona) {
 if (!CONFIG.plugins || typeof CONFIG.plugins !== 'object') CONFIG.plugins = Object.assign({}, DC.plugins);
 
 /* ==========================================================
+ *  E6 持久会话与长时运行（0.12）
+ *
+ *  目标：息屏 8 小时会话不丢；进程被杀后能恢复；随时可停。
+ *  实现边界：
+ *    - 会话状态挂在任务对象上，检查点另存一份快照，重启后合并；
+ *    - 心跳只在 JS 活着时推进，原生部分由前台服务 + 唤醒锁保活；
+ *    - 看门狗只暂停、不重置预算，恢复时沿用检查点；
+ *    - 调度器运行插件 job，失败指数退避，连续失败转暂停；
+ *    - 日志按会话分桶，超限轮转，导出时脱敏。
+ * ========================================================== */
+
+const PERSIST_SNAPSHOT_KEY = 'via_ai_persist_snapshots';
+const PERSIST_LOG_KEY = 'via_ai_persist_logs';
+const PERSIST_TUNING = {
+  heartbeatMs: 10000,        // 心跳最小写入间隔
+  staleMs: 90000,            // 超过这个时间没心跳视为异常（仅参考）
+  idlePauseMs: 300000,       // 活跃会话 5 分钟没心跳 → 看门狗暂停
+  maxRestarts: 5,            // 连续失败 5 次转暂停
+  backoffBase: 5000,
+  backoffMax: 300000,
+  wakeRefreshMs: 600000,     // 每 10 分钟续一次唤醒锁
+  logMax: 120,
+  logChars: 24000,
+  totalLogChars: 180000,
+  tickMs: 30000
+};
+const PERSIST_JOB_RUNNING = Object.create(null);
+let PERSIST_TIMER = 0;
+
+function persistNow() { return new Date().toISOString(); }
+function persistMs(iso) { const t = Date.parse(String(iso || '')); return Number.isFinite(t) ? t : 0; }
+function persistClamp(n, lo, hi, def) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return def;
+  return Math.max(lo, Math.min(hi, Math.round(v)));
+}
+function persistSnapshots() {
+  const all = sGet(PERSIST_SNAPSHOT_KEY, {});
+  return all && typeof all === 'object' && !Array.isArray(all) ? all : {};
+}
+function persistSaveSnapshots(all) { sSet(PERSIST_SNAPSHOT_KEY, all || {}); }
+function persistLogsAll() {
+  const all = sGet(PERSIST_LOG_KEY, {});
+  return all && typeof all === 'object' && !Array.isArray(all) ? all : {};
+}
+function persistSaveLogs(all) { sSet(PERSIST_LOG_KEY, all || {}); }
+
+/** 确保任务上有持久会话结构；不合法字段就地修正。 */
+function persistEnsure(t, opts) {
+  if (!t || typeof t !== 'object') return null;
+  opts = opts || {};
+  const p = (t.persist && typeof t.persist === 'object' && !Array.isArray(t.persist)) ? t.persist : {};
+  const now = persistNow();
+  p.enabled = opts.enabled !== undefined ? !!opts.enabled : (p.enabled !== false);
+  p.goal = String(p.goal || opts.goal || t.goal || t.title || '').slice(0, 300);
+  p.phase = String(p.phase || opts.phase || 'running').slice(0, 40);
+  p.progress = String(p.progress || opts.progress || t.progress || '').slice(0, 300);
+  p.plan = Array.isArray(p.plan) ? p.plan.slice(0, 30).map(x => ({
+    id: String((x && x.id) || '').slice(0, 64),
+    title: String((x && x.title) || '').slice(0, 120),
+    status: ['pending', 'active', 'done', 'failed'].indexOf(String(x && x.status)) >= 0 ? x.status : 'pending'
+  })).filter(x => x.id || x.title) : [];
+  const budget = (p.budget && typeof p.budget === 'object') ? p.budget : {};
+  p.budget = {
+    minutes: persistClamp(budget.minutes, 0, 2880, opts.minutes || 480),
+    tokens: persistClamp(budget.tokens, 0, 50000000, opts.tokens || 0),
+    actions: persistClamp(budget.actions, 0, 100000, opts.actions || 0),
+    cost: Math.max(0, Number(budget.cost) || Number(opts.cost) || 0)
+  };
+  const used = (p.used && typeof p.used === 'object') ? p.used : {};
+  p.used = {
+    tokens: Math.max(0, parseInt(used.tokens, 10) || 0),
+    actions: Math.max(0, parseInt(used.actions, 10) || 0),
+    minutes: Math.max(0, Number(used.minutes) || 0),
+    cost: Math.max(0, Number(used.cost) || 0)
+  };
+  p.startedAt = p.startedAt || now;
+  p.heartbeatAt = p.heartbeatAt || now;
+  p.checkpointAt = p.checkpointAt || '';
+  p.restarts = Math.max(0, parseInt(p.restarts, 10) || 0);
+  p.nextRunAt = Math.max(0, parseInt(p.nextRunAt, 10) || 0);
+  p.lastError = String(p.lastError || '').slice(0, 300);
+  p.pausedReason = String(p.pausedReason || '').slice(0, 200);
+  p.wakeAt = Math.max(0, parseInt(p.wakeAt, 10) || 0);
+  t.persist = p;
+  return p;
+}
+function persistAcquireWake(t, minutes) {
+  if (!t || !HAS_PERM || typeof Perm.acquireSessionWakeLock !== 'function') return false;
+  const p = persistEnsure(t);
+  try {
+    const r = JSON.parse(Perm.acquireSessionWakeLock(JSON.stringify({ taskId: t.id, minutes: persistClamp(minutes, 5, 480, 480) })) || '{}');
+    if (r && r.ok !== false) p.wakeAt = Date.now();
+    return !!(r && r.ok !== false);
+  } catch (e) { return false; }
+}
+function persistReleaseWake(t) {
+  if (!HAS_PERM || typeof Perm.releaseSessionWakeLock !== 'function') return false;
+  const p = t && t.persist;
+  if (p) p.wakeAt = 0;
+  try { Perm.releaseSessionWakeLock(); return true; } catch (e) { return false; }
+}
+function persistStart(t, opts) {
+  if (!t) return null;
+  const p = persistEnsure(t, opts);
+  p.enabled = true;
+  p.startedAt = p.startedAt || persistNow();
+  p.heartbeatAt = persistNow();
+  p.pausedReason = '';
+  persistAcquireWake(t, p.budget.minutes);
+  persistCheckpoint(t, 'running', t.progress || '开始长时运行');
+  persistLog(t.id, 'start', '持久会话开始：' + (p.goal || t.title || t.id));
+  return p;
+}
+function persistHeartbeat(t, patch, opts) {
+  if (!t || !t.persist || !t.persist.enabled) return false;
+  const p = persistEnsure(t);
+  const now = Date.now();
+  const last = persistMs(p.heartbeatAt);
+  if (!(opts && opts.force) && last && now - last < PERSIST_TUNING.heartbeatMs) {
+    if (patch) Object.assign(p, patch);
+    return true;
+  }
+  p.heartbeatAt = persistNow();
+  const start = persistMs(p.startedAt) || now;
+  p.used.minutes = Math.round((now - start) / 60000 * 10) / 10;
+  if (patch && typeof patch === 'object') {
+    if (patch.phase) p.phase = String(patch.phase).slice(0, 40);
+    if (patch.progress) p.progress = String(patch.progress).slice(0, 300);
+    if (patch.goal) p.goal = String(patch.goal).slice(0, 300);
+    if (patch.plan) p.plan = patch.plan;
+  }
+  if (now - (p.wakeAt || 0) > PERSIST_TUNING.wakeRefreshMs) persistAcquireWake(t, p.budget.minutes);
+  t.updatedAt = persistNow();
+  saveTasks();
+  return true;
+}
+function persistCheckpoint(t, phase, progress, extra) {
+  if (!t) return false;
+  const p = persistEnsure(t);
+  if (phase) p.phase = String(phase).slice(0, 40);
+  if (progress) p.progress = String(progress).slice(0, 300);
+  p.checkpointAt = persistNow();
+  const snaps = persistSnapshots();
+  snaps[t.id] = {
+    taskId: t.id,
+    goal: p.goal,
+    phase: p.phase,
+    progress: p.progress,
+    plan: p.plan.slice(),
+    used: Object.assign({}, p.used),
+    restarts: p.restarts,
+    at: p.checkpointAt,
+    extra: extra && typeof extra === 'object' ? JSON.parse(JSON.stringify(extra)) : null
+  };
+  persistSaveSnapshots(snaps);
+  t.updatedAt = persistNow();
+  saveTasks();
+  return true;
+}
+function persistLog(taskId, level, message) {
+  const key = String(taskId || '');
+  if (!key) return false;
+  const all = persistLogsAll();
+  const list = Array.isArray(all[key]) ? all[key] : [];
+  list.push({ at: persistNow(), level: String(level || 'info').slice(0, 12), msg: String(message || '').slice(0, 300) });
+  while (list.length > PERSIST_TUNING.logMax) list.shift();
+  while (list.length && JSON.stringify(list).length > PERSIST_TUNING.logChars) list.shift();
+  all[key] = list;
+  // 全局轮转：总量超限时先删最旧的会话日志，避免 localStorage 被长任务撑爆。
+  let total = 0;
+  Object.keys(all).forEach(k => { total += JSON.stringify(all[k]).length; });
+  if (total > PERSIST_TUNING.totalLogChars) {
+    Object.keys(all).sort((a, b) => persistMs((all[a][0] || {}).at) - persistMs((all[b][0] || {}).at))
+      .forEach(k => { if (total > PERSIST_TUNING.totalLogChars) { total -= JSON.stringify(all[k]).length; delete all[k]; } });
+  }
+  persistSaveLogs(all);
+  return true;
+}
+function persistLogText(taskId) {
+  const list = persistLogsAll()[String(taskId || '')] || [];
+  return list.map(x => '[' + String(x.at || '').slice(11, 19) + '][' + x.level + '] ' + x.msg).join('\n');
+}
+/** 导出日志：去掉可能的密钥形状，只留任务 id 与脱敏文本。 */
+function persistExportLogs(taskId) {
+  const text = persistLogText(taskId)
+    .replace(/(sk-|ghp_|Bearer\s+)[A-Za-z0-9._-]{8,}/gi, '$1***')
+    .replace(/(api[_-]?key|token|secret)\s*[=:]\s*[^\s]+/gi, '$1=***');
+  return text;
+}
+
+function persistBudgetExceeded(t) {
+  const p = t && t.persist;
+  if (!p) return '';
+  const b = p.budget, u = p.used;
+  if (b.minutes > 0 && u.minutes >= b.minutes) return '时长';
+  if (b.tokens > 0 && u.tokens >= b.tokens) return 'token';
+  if (b.actions > 0 && u.actions >= b.actions) return '动作数';
+  if (b.cost > 0 && u.cost >= b.cost) return '费用';
+  return '';
+}
+function persistBudgetCount(t, field, n) {
+  if (!t || !t.persist || !t.persist.enabled) return false;
+  const p = persistEnsure(t);
+  const key = ['tokens', 'actions', 'cost', 'minutes'].indexOf(String(field)) >= 0 ? String(field) : '';
+  if (!key) return false;
+  p.used[key] = Math.max(0, (Number(p.used[key]) || 0) + (Number(n) || 0));
+  const over = persistBudgetExceeded(t);
+  if (over) {
+    persistPause(t, '预算熔断：' + over + '已超限，已暂停（不是失败）');
+    return true;
+  }
+  return false;
+}
+/** 看门狗暂停：保留检查点与预算，随时可恢复。 */
+function persistPause(t, reason) {
+  if (!t) return false;
+  const p = persistEnsure(t);
+  p.pausedReason = String(reason || '已暂停').slice(0, 200);
+  persistCheckpoint(t, 'paused', p.progress);
+  persistLog(t.id, 'pause', p.pausedReason);
+  if (typeof taskPause === 'function') {
+    try { taskPause(t.id); } catch (e) {}
+  }
+  persistReleaseWake(t);
+  return true;
+}
+function persistBackoff(t, error) {
+  if (!t) return { paused: false, delay: 0 };
+  const p = persistEnsure(t);
+  p.restarts = Math.max(1, (parseInt(p.restarts, 10) || 0) + 1);
+  p.lastError = String(error || '运行异常').slice(0, 300);
+  const delay = Math.min(PERSIST_TUNING.backoffMax,
+    PERSIST_TUNING.backoffBase * Math.pow(2, Math.max(0, p.restarts - 1)));
+  p.nextRunAt = Date.now() + delay;
+  persistLog(t.id, 'watchdog', '第 ' + p.restarts + ' 次异常：' + p.lastError + '；' + Math.round(delay / 1000) + ' 秒后重试');
+  if (p.restarts > PERSIST_TUNING.maxRestarts) {
+    persistPause(t, '看门狗：连续 ' + p.restarts + ' 次异常，已暂停并保留检查点');
+    return { paused: true, delay: 0 };
+  }
+  t.updatedAt = persistNow();
+  saveTasks();
+  return { paused: false, delay: delay };
+}
+function persistBackoffReset(t) {
+  if (!t || !t.persist) return false;
+  t.persist.restarts = 0;
+  t.persist.nextRunAt = 0;
+  t.persist.lastError = '';
+  t.updatedAt = persistNow();
+  saveTasks();
+  return true;
+}
+/** 启动恢复：进程重启后所有 active 的持久会话都转 paused，并合并检查点。 */
+function persistRecoverAll() {
+  const snaps = persistSnapshots();
+  let recovered = 0;
+  (typeof TASKS !== 'undefined' ? TASKS : []).forEach(t => {
+    if (!t || !t.persist || !t.persist.enabled) return;
+    const p = persistEnsure(t);
+    const snap = snaps[t.id];
+    if (snap && typeof snap === 'object') {
+      if (snap.goal) p.goal = String(snap.goal).slice(0, 300);
+      if (snap.phase) p.phase = String(snap.phase).slice(0, 40);
+      if (snap.progress) p.progress = String(snap.progress).slice(0, 300);
+      if (Array.isArray(snap.plan)) p.plan = snap.plan.slice(0, 30);
+      if (snap.used && typeof snap.used === 'object') p.used = Object.assign({}, p.used, snap.used);
+      p.checkpointAt = String(snap.at || p.checkpointAt || '');
+    }
+    if (t.state === 'active') {
+      t.state = 'paused';
+      t.progress = '上次运行中断，检查点已保存；点恢复继续';
+      t.error = '';
+      p.pausedReason = '进程重启自动恢复';
+      p.heartbeatAt = persistNow();
+      t.events = Array.isArray(t.events) ? t.events : [];
+      t.events.push({ type: 'persist_recovered', at: persistNow(), data: { checkpointAt: p.checkpointAt } });
+      if (t.events.length > 100) t.events = t.events.slice(-100);
+      persistLog(t.id, 'recover', '进程重启：已从检查点恢复（' + (p.phase || 'running') + '）');
+      recovered++;
+    }
+    p.wakeAt = 0;
+  });
+  if (recovered) saveTasks();
+  return recovered;
+}
+function persistActiveSessions() {
+  return (typeof TASKS !== 'undefined' ? TASKS : [])
+    .filter(t => t && t.persist && t.persist.enabled && (t.state === 'active' || t.state === 'waiting_user'));
+}
+
+/* ---------------- 插件后台任务调度器（E6-005） ---------------- */
+function persistJobStore() {
+  const all = sGet(PLUG_JOBS_KEY, {});
+  return all && typeof all === 'object' && !Array.isArray(all) ? all : {};
+}
+function persistJobSplit(key) {
+  const i = String(key).lastIndexOf(':');
+  return i > 0 ? { pluginId: String(key).slice(0, i), surfaceId: String(key).slice(i + 1) } : null;
+}
+function persistJobBackoff(job) {
+  const fails = Math.max(0, parseInt(job.failures, 10) || 0);
+  return Math.min(3600000, PERSIST_TUNING.backoffBase * Math.pow(2, Math.max(0, fails - 1)));
+}
+function persistSchedulerTick(now) {
+  now = now || Date.now();
+  const jobs = persistJobStore();
+  let ran = 0;
+  Object.keys(jobs).slice(0, 60).forEach(key => {
+    const job = jobs[key];
+    if (!job || job.paused) return;
+    // nextRun 缺省 / 为 0 表示「立即到期」，不能被 falsy 判断当成未排期。
+    if (job.nextRun && job.nextRun > now) return;
+    if (PERSIST_JOB_RUNNING[key]) return;
+    const ids = persistJobSplit(key);
+    if (!ids) return;
+    if (typeof plugRunJob !== 'function') return;
+    PERSIST_JOB_RUNNING[key] = true;
+    Promise.resolve().then(() => plugRunJob(ids.pluginId, ids.surfaceId))
+      .then(r => {
+        if (!r || r.ok === false) throw new Error((r && r.error) || '后台任务失败');
+        job.failures = 0;
+        job.lastError = '';
+        job.lastRun = Date.now();
+        job.nextRun = Date.now() + Math.max(10, parseInt(job.every, 10) || 60) * 1000;
+        ran++;
+      })
+      .catch(e => {
+        job.failures = (parseInt(job.failures, 10) || 0) + 1;
+        job.lastError = errMsg(e);
+        job.nextRun = Date.now() + persistJobBackoff(job);
+        if (job.failures >= 3) { job.paused = true; job.error = '连续失败 3 次，已暂停'; }
+      })
+      .then(() => {
+        delete PERSIST_JOB_RUNNING[key];
+        sSet(PLUG_JOBS_KEY, jobs);
+      });
+  });
+  // 看门狗：活跃持久会话心跳断掉 → 暂停（不是失败），保留检查点。
+  persistActiveSessions().forEach(t => {
+    if (t.state !== 'active') return;
+    if (typeof sending !== 'undefined' && sending && ACTIVE_RUN_TASK_ID === t.id) return;
+    const last = persistMs(t.persist.heartbeatAt);
+    if (last && now - last > PERSIST_TUNING.idlePauseMs) {
+      persistPause(t, '看门狗：心跳停止超过 ' + Math.round(PERSIST_TUNING.idlePauseMs / 60000) + ' 分钟');
+    }
+  });
+  return ran;
+}
+function persistSchedulerStart() {
+  if (PERSIST_TIMER) return PERSIST_TIMER;
+  PERSIST_TIMER = setInterval(() => {
+    try { persistSchedulerTick(); } catch (e) { /* 单个 tick 异常不能影响聊天 */ }
+  }, PERSIST_TUNING.tickMs);
+  return PERSIST_TIMER;
+}
+function persistSchedulerStop() {
+  if (PERSIST_TIMER) { clearInterval(PERSIST_TIMER); PERSIST_TIMER = 0; }
+}
+function persistJobsSummary() {
+  const jobs = persistJobStore();
+  const keys = Object.keys(jobs);
+  return {
+    total: keys.length,
+    paused: keys.filter(k => jobs[k] && jobs[k].paused).length,
+    failures: keys.reduce((n, k) => n + (parseInt(jobs[k] && jobs[k].failures, 10) || 0), 0)
+  };
+}
+
+/* ---------------- 保活引导（E6-008） ---------------- */
+function persistKeepAliveState() {
+  const battery = HAS_PERM && typeof Perm.isIgnoringBattery === 'function' ? !!Perm.isIgnoringBattery() : false;
+  const noti = HAS_PERM && typeof Perm.hasNotification === 'function' ? !!Perm.hasNotification() : true;
+  const channel = HAS_PERM && typeof Perm.isNotificationChannelOn === 'function' ? !!Perm.isNotificationChannelOn() : true;
+  return { battery, notification: noti, channel };
+}
+function persistKeepAliveGuideHtml() {
+  const s = persistKeepAliveState();
+  return '<div class="mini-note" style="margin-top:8px">长时运行需要三层保活：前台服务（已内置）、电池优化白名单、厂商自启动设置。' +
+    '<br>电池白名单：' + (s.battery ? '已加入' : '未加入（建议开启）') +
+    ' · 通知：' + (s.notification ? '已允许' : '未允许') +
+    ' · 通知渠道：' + (s.channel ? '正常' : '被关闭，前台服务可能被杀') +
+    '<br>厂商路径：小米/红米 → 设置→应用→爱莉希雅→省电策略→无限制；华为/荣耀 → 应用启动管理→手动管理；' +
+    'OPPO/一加/realme → 电池→应用耗电管理→允许后台运行；vivo/iQOO → 电池→后台耗电管理→允许；三星 → 电池→不受限制。' +
+    '<br>提醒：息屏 8 小时仍可能被系统回收；恢复入口在任务抽屉，检查点会自动合并。</div>';
+}
+function persistStatusLine() {
+  const active = persistActiveSessions();
+  const jobs = persistJobsSummary();
+  const s = persistKeepAliveState();
+  return '长时会话：' + active.length + ' 个运行中 · 插件后台任务：' + jobs.total + ' 个（暂停 ' + jobs.paused + '）' +
+    ' · 电池白名单：' + (s.battery ? '已加入' : '未加入');
+}
+/* ==========================================================
  *  开放插件系统
  *  插件清单存在本机，每个插件声明若干工具，工具实现分两类：
  *    http —— 声明式请求（method/url/headers/body，支持 {{参数}} 占位）
@@ -3976,7 +4410,8 @@ const PLUG_PERMISSION_INFO = {
   'memory.read': { label: '读取长期记忆', risk: '可读取用户保存的记忆' },
   'memory.write': { label: '写入长期记忆', risk: '可新增或修改记忆' },
   'memory.delete': { label: '删除长期记忆', risk: '可请求删除记忆；仍需用户确认' },
-  'music.control': { label: '控制音乐', risk: '可搜索、播放、切歌、收藏和管理本地缓存' }};
+  'music.control': { label: '控制音乐', risk: '可搜索、播放、切歌、收藏和管理本地缓存' },
+  'dependencies.manage': { label: '安装/卸载依赖', risk: '可从 HTTPS 下载并校验 SHA-256 后装进插件沙箱；APK 依赖仍走系统安装器确认' }};
 const PLUG_CAPABILITY_PERMS = {
   read_screen_once: 'device.read', external_file_list: 'files.public.read', external_file_read: 'files.public.read',
   external_file_write: 'files.public.write', external_file_copy: ['files.public.read', 'files.public.write'],
@@ -3994,6 +4429,38 @@ const PLUG_CAPABILITY_PERMS = {
   search_and_play_music: 'music.control', music_control: 'music.control'
 };
 const PLUG_PERMISSION_NAMES = Object.keys(PLUG_PERMISSION_INFO);
+/* 0.12 / E5-001：依赖声明只认这五类；下载类必须 HTTPS + SHA-256。 */
+const PLUG_DEP_KINDS = ['termux-pkg', 'npm', 'archive', 'binary', 'apk'];
+const PLUG_DEP_HASH_KINDS = ['archive', 'binary', 'apk'];
+const PLUG_DEP_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+const PLUG_DEP_NAME_RE = /^[A-Za-z0-9@][A-Za-z0-9@/._+-]{0,119}$/;
+function plugDepIsHttps(u) {
+  try { const x = new URL(String(u)); return x.protocol === 'https:' && !!x.hostname; } catch (e) { return false; }
+}
+/** 规整一条依赖声明；缺关键字段返回 null。 */
+function plugNormalizeDependency(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+  const kind = String(d.kind || '').trim();
+  const id = String(d.id || '').trim();
+  const version = String(d.version || '').trim();
+  if (PLUG_DEP_KINDS.indexOf(kind) < 0 || !PLUG_DEP_ID_RE.test(id) || !version) return null;
+  const source = String(d.source || d.url || '').trim();
+  const sha = String(d.sha256 || '').trim().toLowerCase();
+  if (!source || source.length > 500) return null;
+  if (PLUG_DEP_HASH_KINDS.indexOf(kind) >= 0) {
+    if (!plugDepIsHttps(source) || !PLUG_SHA256_RE.test(sha)) return null;
+  } else if (!PLUG_DEP_NAME_RE.test(source)) return null;
+  const size = parseInt(d.size, 10);
+  return {
+    id, kind, version,
+    source,
+    sha256: PLUG_SHA256_RE.test(sha) ? sha : '',
+    bin: String(d.bin || '').slice(0, 64),
+    size: Number.isFinite(size) && size > 0 ? Math.min(size, 209715200) : 0,
+    license: String(d.license || '').slice(0, 40),
+    why: String(d.why || d.reason || '').slice(0, 200)
+  };
+}
 function plugNormalizePermissions(value) {
   if (!Array.isArray(value)) return [];
   return Array.from(new Set(value.map(String).map(s => s.trim()).filter(s => PLUG_PERMISSION_INFO[s])));
@@ -4116,12 +4583,8 @@ function plugNormalize(m) {
     surfaces,
     configVersion: config.version,
     configFields: config.fields,
-    dependencies: Array.isArray(m.dependencies) ? m.dependencies.slice(0, 40).map(d => ({
-      id: String((d && d.id) || '').slice(0, 64),
-      kind: String((d && d.kind) || '').slice(0, 24),
-      version: String((d && d.version) || '').slice(0, 32),
-      sha256: String((d && d.sha256) || '').toLowerCase().slice(0, 64)
-    })).filter(d => d.id) : [],
+    dependencies: (Array.isArray(m.dependencies) ? m.dependencies.slice(0, 40) : [])
+      .map(plugNormalizeDependency).filter(Boolean),
     models: plugPlainObject(m.models) ? plugJsonSafe(m.models, 0) : {}
   };
 }
@@ -4495,6 +4958,15 @@ function plugManifestV2Error(raw) {
     if (seen[s.type + ':' + id]) return 'surface 重复：' + s.type + ':' + id;
     seen[s.type + ':' + id] = true;
   }
+  // E5-001：依赖声明必须完整；下载类强制 HTTPS + SHA-256，且插件要申请 dependencies.manage。
+  const deps = Array.isArray(raw.dependencies) ? raw.dependencies : [];
+  if (deps.length && declared.indexOf('dependencies.manage') < 0) return '声明 dependencies 的插件必须同时申请 dependencies.manage';
+  const seenDep = {};
+  for (const d of deps) {
+    if (!plugNormalizeDependency(d)) return '依赖声明无效：' + String((d && d.id) || '') + '（检查 kind/version/source/sha256）';
+    if (seenDep[d.id]) return '依赖 id 重复：' + d.id;
+    seenDep[d.id] = true;
+  }
   return '';
 }
 
@@ -4541,6 +5013,15 @@ function plugLifecycle(plugin, phase, payload) {
     delete jobs[plugin.id];
     sSet(PLUG_JOBS_KEY, jobs);
     plugThemeClearPlugin(plugin.id);
+    // E5-005：卸载插件时逆序清理它自己的依赖；失败不影响卸载本身。
+    try {
+      if (HAS_PERM && typeof Perm.removeDependency === 'function') {
+        (plugin.dependencies || []).slice().reverse().forEach(d => {
+          try { Perm.removeDependency(String(plugin.id), String(d.id)); } catch (e) {}
+        });
+      }
+      if (typeof plugDepCacheSet === 'function') plugDepCacheSet(plugin.id, {});
+    } catch (e) {}
     // 删除该插件创建的会话，避免卸载后留下无法归属的任务。
     try {
       const doomed = (typeof TASKS !== 'undefined' ? TASKS : []).filter(t => t && t.pluginSession && t.pluginSession.pluginId === plugin.id);
@@ -5227,7 +5708,11 @@ async function plugRunAction(plugin, action, ctx) {
     if (action.type === 'theme.reset') {
       return plugThemeReset(String(action.scope || 'global'), String(action.session || ctx.sessionId || CURRENT_TASK_ID || ''));
     }
-    if (action.type === 'dependency.install') return { ok: false, error: '依赖安装将在 0.12 提供' };
+    if (action.type === 'dependency.install') {
+      const depId = String(action.dep || action.target || action.value || '');
+      if (typeof plugDepInstall !== 'function') return { ok: false, error: '依赖运行时不可用' };
+      return await plugDepInstall(plugin, depId);
+    }
     if (action.type === 'confirm') return { ok: true };
     if (action.type === 'custom') return { ok: false, error: '0.10 不执行插件自定义代码；请使用通用动作' };
   } catch (e) {
@@ -5337,7 +5822,9 @@ function plugHostApi(plugin, surface) {
       summary: () => providerSummary(CONFIG).map(p => ({ id: p.id, kind: p.kind, capabilities: p.capabilities, hasKey: p.hasKey }))
     },
     dependency: {
-      list: () => (plugin.dependencies || []).slice()
+      list: () => (plugin.dependencies || []).map(d => Object.assign({}, d, { status: typeof plugDepStateOf === 'function' ? plugDepStateOf(plugin, d) : 'unknown' })),
+      install: id => typeof plugDepInstall === 'function' ? plugDepInstall(plugin, id) : Promise.resolve({ ok: false, error: '依赖运行时不可用' }),
+      remove: id => typeof plugDepUninstall === 'function' ? plugDepUninstall(plugin, id) : Promise.resolve({ ok: false, error: '依赖运行时不可用' })
     },
     job: {
       schedule: id => plugJobSchedule(plugin, id || sid),
@@ -5410,6 +5897,12 @@ function plugRenderPage() {
     const surface = PLUG_PAGE_CTX.surfaceId ? plugPluginSurfaces(plugin, 'settings').filter(s => s.id === PLUG_PAGE_CTX.surfaceId)[0] : null;
     titleEl.textContent = (surface ? surface.title : '插件配置') + ' · ' + plugin.name;
     body.innerHTML = plugConfigFormHTML(plugin, surface);
+    return;
+  }
+  if (PLUG_PAGE_CTX.mode === 'deps') {
+    titleEl.textContent = '插件依赖 · ' + plugin.name;
+    body.innerHTML = typeof plugDepPanelHtml === 'function'
+      ? plugDepPanelHtml(plugin) : '<div class="mini-note">依赖运行时不可用。</div>';
     return;
   }
   const surface = plugPluginSurfaces(plugin, 'page').filter(s => s.id === PLUG_PAGE_CTX.surfaceId)[0];
@@ -5557,6 +6050,396 @@ async function plugCommandRun(hit, rawArgs) {
   const act = JSON.parse(JSON.stringify(action));
   if (act.type === 'message.send') act.text = String(act.text || '').replace(/\{\{\s*args\s*\}\}/g, args);
   return await plugRunAction(hit.plugin, act, { command: hit.surface.command, args });
+}
+/* ==========================================================
+ *  E5 插件依赖与运行时（0.12）
+ *
+ *  宿主只做四件事：
+ *    1. 按清单校验依赖声明（HTTPS + SHA-256 必填）；
+ *    2. 通过原生 DependencyRuntime 下载/校验/安装/卸载/回滚；
+ *    3. 通过 Termux 固定命令模板检测/安装 termux-pkg 与 npm；
+ *    4. 把缺失原因、体积、许可证、进度和日志摊给用户看。
+ *
+ *  安全边界：
+ *    - 插件不能传任意 shell，只能选固定操作与白名单包名；
+ *    - 没有 SHA-256 的下载类依赖一律不装；
+ *    - APK 依赖只能交给系统安装器，绝不静默安装；
+ *    - 所有安装/卸载都要用户确认。
+ * ========================================================== */
+
+const PLUG_DEP_CACHE_KEY = 'via_ai_plugin_dep_cache';
+const PLUG_DEP_LOG_KEY = 'via_ai_plugin_dep_log';
+const PLUG_DEP_LOG_MAX = 60;
+const PLUG_DEP_KIND_LABEL = {
+  'termux-pkg': 'Termux 包',
+  'npm': 'npm 包',
+  'archive': '压缩包',
+  'binary': '可执行文件',
+  'apk': 'APK'
+};
+
+function plugDepNative(name) {
+  return HAS_PERM && typeof Perm[name] === 'function' ? Perm : null;
+}
+function plugDepJson(raw, fallback) {
+  try {
+    const v = JSON.parse(String(raw || ''));
+    return v && typeof v === 'object' ? v : (fallback || null);
+  } catch (e) { return fallback || null; }
+}
+function plugDepCacheAll() {
+  const all = sGet(PLUG_DEP_CACHE_KEY, {});
+  return plugPlainObject(all) ? all : {};
+}
+function plugDepCacheSet(pluginId, deps) {
+  const all = plugDepCacheAll();
+  all[String(pluginId)] = plugPlainObject(deps) ? deps : {};
+  sSet(PLUG_DEP_CACHE_KEY, all);
+}
+/** 已安装表：优先问原生，原生不可用时退回上次缓存（只用于展示）。 */
+function plugDepInstalledMap(pluginId) {
+  const native = plugDepNative('getDependencyState');
+  if (native) {
+    const r = plugDepJson(native.getDependencyState(String(pluginId)), null);
+    if (r && r.ok && plugPlainObject(r.deps)) {
+      plugDepCacheSet(pluginId, r.deps);
+      return r.deps;
+    }
+  }
+  return plugPlainObject(plugDepCacheAll()[String(pluginId)]) ? plugDepCacheAll()[String(pluginId)] : {};
+}
+function plugDepStateOf(plugin, dep) {
+  if (!plugin || !dep) return 'missing';
+  const entry = plugDepInstalledMap(plugin.id)[dep.id];
+  if (!entry) return 'missing';
+  if (String(entry.version || '') !== String(dep.version || '')) return 'outdated';
+  if (dep.sha256 && String(entry.sha256 || '').toLowerCase() !== String(dep.sha256).toLowerCase()) return 'outdated';
+  return 'installed';
+}
+function plugDepStatusText(state) {
+  return ({ installed: '已安装', outdated: '版本不符', missing: '未安装' })[state] || '未知';
+}
+function plugDepHumanSize(n) {
+  const v = Number(n) || 0;
+  if (v <= 0) return '体积未知';
+  if (v >= 1048576) return (Math.round(v / 1048576 * 10) / 10) + ' MB';
+  if (v >= 1024) return Math.round(v / 1024) + ' KB';
+  return v + ' B';
+}
+function plugDepAccess(plugin) {
+  if (!plugin) return '插件不存在';
+  if (plugStateOf(plugin) === 'disabled') return '插件已停用';
+  if (!plugPermissionGranted(plugin, 'dependencies.manage')) return '未获准 dependencies.manage';
+  return '';
+}
+function plugDepFind(plugin, depId) {
+  return (plugin && Array.isArray(plugin.dependencies) ? plugin.dependencies : []).filter(d => d.id === String(depId))[0] || null;
+}
+/** 安装顺序：termux-pkg → npm → binary → archive → apk，再按声明顺序。 */
+const PLUG_DEP_ORDER = { 'termux-pkg': 0, 'npm': 1, 'binary': 2, 'archive': 3, 'apk': 4 };
+function plugDepPlan(plugin) {
+  const deps = Array.isArray(plugin && plugin.dependencies) ? plugin.dependencies : [];
+  return deps.map((d, i) => ({ dep: d, i, state: plugDepStateOf(plugin, d) }))
+    .sort((a, b) => {
+      const oa = PLUG_DEP_ORDER[a.dep.kind], ob = PLUG_DEP_ORDER[b.dep.kind];
+      return ((oa === undefined ? 9 : oa) - (ob === undefined ? 9 : ob)) || (a.i - b.i);
+    });
+}
+function plugDepMissing(plugin) {
+  return plugDepPlan(plugin).filter(x => x.state !== 'installed').map(x => x.dep);
+}
+
+function plugDepLogAll() {
+  const all = sGet(PLUG_DEP_LOG_KEY, {});
+  return plugPlainObject(all) ? all : {};
+}
+function plugDepAppendLog(pluginId, line) {
+  const all = plugDepLogAll();
+  const key = String(pluginId || '');
+  const list = Array.isArray(all[key]) ? all[key] : [];
+  list.push({ at: new Date().toISOString(), text: String(line || '').slice(0, 300) });
+  while (list.length > PLUG_DEP_LOG_MAX) list.shift();
+  all[key] = list;
+  sSet(PLUG_DEP_LOG_KEY, all);
+}
+function plugDepLogText(pluginId) {
+  const list = plugDepLogAll()[String(pluginId || '')] || [];
+  return list.map(x => '[' + String(x.at || '').slice(11, 19) + '] ' + x.text).join('\n');
+}
+
+/** 在插件页里轮询 Termux 固定任务；超时自动取消。 */
+async function plugDepWaitTermux(runId, pluginId, timeoutMs) {
+  const started = Date.now();
+  let offset = 0;
+  while (Date.now() - started < (timeoutMs || 600000)) {
+    await new Promise(r => setTimeout(r, 1200));
+    const st = plugDepJson(Perm.getTermuxJobStatus ? Perm.getTermuxJobStatus(runId) : '{}', {});
+    const out = plugDepJson(Perm.readTermuxJobOutput ? Perm.readTermuxJobOutput(runId, offset) : '{}', {});
+    if (out && out.output) {
+      offset = Number(out.nextOffset) || offset;
+      String(out.output).split(/\r?\n/).filter(Boolean).slice(-20)
+        .forEach(line => plugDepAppendLog(pluginId, '· ' + line));
+    }
+    if (!st || !st.ok) continue;
+    if (st.status === 'done') return { ok: true, exitCode: st.exitCode };
+    if (st.status === 'failed') return { ok: false, error: '安装命令退出码 ' + st.exitCode };
+  }
+  try { if (Perm.cancelTermuxJob) Perm.cancelTermuxJob(runId); } catch (e) {}
+  return { ok: false, error: '安装超时，已取消' };
+}
+function plugDepTermuxInfo() {
+  if (!HAS_PERM || typeof Perm.getTermuxWorkerState !== 'function') return { installed: false, bridge: false };
+  const s = plugDepJson(Perm.getTermuxWorkerState(), {});
+  return { installed: s.installed === true, bridge: true };
+}
+function plugDepTermuxGuide() {
+  return '需要先安装 Termux，并在 Termux 里执行：\n' +
+    'pkg install -y termux-am\n' +
+    '并通过 Termux 设置开启 allow-external-apps（或在 termux.properties 里写 allow-external-apps=true）。\n' +
+    '本应用只使用固定命令模板，不会传任意 shell。';
+}
+
+/** 安装单个依赖：下载类走原生，包管理器类走 Termux 固定模板。 */
+async function plugDepInstall(plugin, depId, opts) {
+  opts = opts || {};
+  const dep = plugDepFind(plugin, depId);
+  if (!dep) return { ok: false, error: '依赖不存在：' + String(depId) };
+  const denied = plugDepAccess(plugin);
+  if (denied) return { ok: false, error: denied };
+  if (plugDepStateOf(plugin, dep) === 'installed' && !opts.force) return { ok: true, already: true };
+
+  const need = PLUG_DEP_HASH_KINDS.indexOf(dep.kind) >= 0;
+  if (need && (!plugDepIsHttps(dep.source) || !PLUG_SHA256_RE.test(dep.sha256 || ''))) {
+    return { ok: false, error: '下载类依赖必须使用 HTTPS 且提供 SHA-256；清单不完整，拒绝安装' };
+  }
+  if (!opts.confirmed) {
+    const text = '安装依赖「' + dep.id + '」' + dep.version + '\n' +
+      '类型：' + (PLUG_DEP_KIND_LABEL[dep.kind] || dep.kind) + '\n' +
+      '来源：' + dep.source + '\n' +
+      '体积：' + plugDepHumanSize(dep.size) + '\n' +
+      '许可证：' + (dep.license || '未标注') + '\n' +
+      (dep.why ? '用途：' + dep.why + '\n' : '') +
+      (need ? '安装前会校验 SHA-256；校验失败会删除临时文件并中止。\n' : '使用 Termux/npm 自带的完整性校验。\n') +
+      (dep.kind === 'apk' ? 'APK 只会交给系统安装器，仍需你在系统界面确认。\n' : '') +
+      '是否继续？';
+    if (!(await uiConfirm(text, '安装依赖', '依赖安装'))) return { ok: false, error: '用户取消' };
+  }
+  plugDepAppendLog(plugin.id, '准备安装 ' + dep.id + ' ' + dep.version);
+
+  if (dep.kind === 'apk') {
+    const r = await plugDepInstallNative(plugin, dep);
+    if (!r.ok || !r.needsUserInstall) return r;
+    if (!(await uiConfirm('APK 依赖已下载并通过 SHA-256 校验：' + (r.fileName || dep.id) + '\n接下来会打开系统安装界面，需要你手动确认。', '打开系统安装器', 'APK 依赖'))) {
+      return { ok: false, error: '用户取消系统安装' };
+    }
+    const launched = plugDepJson(Perm.installDependencyApk ? Perm.installDependencyApk(String(r.fileName || '')) : '{}', {});
+    plugDepAudit(plugin, 'dep_apk_install', dep.id);
+    return launched && launched.ok ? { ok: true, needsUserInstall: true } : { ok: false, error: (launched && launched.error) || '系统安装器未启动' };
+  }
+  if (need) return await plugDepInstallNative(plugin, dep);
+
+  // termux-pkg / npm
+  const tx = plugDepTermuxInfo();
+  if (!tx.installed) return { ok: false, error: 'Termux 未安装。\n' + plugDepTermuxGuide() };
+  if (typeof Perm.runTermuxFixed !== 'function') return { ok: false, error: '当前原生桥不支持固定 Termux 依赖安装' };
+  const req = {
+    op: 'install', kind: dep.kind, name: dep.source,
+    version: dep.version, bin: dep.bin || ''
+  };
+  plugDepAppendLog(plugin.id, 'Termux 安装 ' + dep.source + '@' + dep.version);
+  let run;
+  try { run = plugDepJson(Perm.runTermuxFixed(JSON.stringify(req)), {}); }
+  catch (e) { return { ok: false, error: errMsg(e) }; }
+  if (!run || !run.ok || !run.runId) return { ok: false, error: (run && run.error) || 'Termux 未接受安装任务' };
+  const done = await plugDepWaitTermux(run.runId, plugin.id);
+  if (!done.ok) {
+    plugDepAppendLog(plugin.id, '安装失败：' + done.error);
+    plugDepAudit(plugin, 'dep_install_fail', dep.id);
+    return done;
+  }
+  const rec = plugDepJson(Perm.recordDependency ? Perm.recordDependency(String(plugin.id), JSON.stringify(dep)) : '{}', {});
+  if (!rec || !rec.ok) return { ok: false, error: (rec && rec.error) || '依赖记录写入失败' };
+  plugDepAppendLog(plugin.id, '安装完成：' + dep.id);
+  plugDepAudit(plugin, 'dep_install', dep.id);
+  plugDepCacheSet(plugin.id, plugDepInstalledMap(plugin.id));
+  return { ok: true };
+}
+async function plugDepInstallNative(plugin, dep) {
+  if (typeof Perm.installDependency !== 'function') return { ok: false, error: '当前原生桥不支持依赖下载' };
+  let r;
+  try { r = plugDepJson(Perm.installDependency(String(plugin.id), JSON.stringify(dep)), {}); }
+  catch (e) { return { ok: false, error: errMsg(e) }; }
+  if (r && r.ok) {
+    plugDepAppendLog(plugin.id, '校验并装好：' + dep.id + (r.needsUserInstall ? '（待系统安装）' : ''));
+    plugDepCacheSet(plugin.id, plugDepInstalledMap(plugin.id));
+    plugDepAudit(plugin, 'dep_install', dep.id);
+    return r;
+  }
+  plugDepAppendLog(plugin.id, '安装失败：' + ((r && (r.error || r.errorCode)) || '未知错误'));
+  plugDepAudit(plugin, 'dep_install_fail', dep.id);
+  return { ok: false, error: (r && (r.error || r.errorCode)) || '依赖安装失败' };
+}
+async function plugDepInstallAll(plugin) {
+  const missing = plugDepMissing(plugin);
+  if (!missing.length) return { ok: true, count: 0 };
+  const denied = plugDepAccess(plugin);
+  if (denied) return { ok: false, error: denied };
+  const text = '将按顺序安装 ' + missing.length + ' 项缺失依赖：\n' +
+    missing.map(d => '· ' + d.id + ' ' + d.version + '（' + (PLUG_DEP_KIND_LABEL[d.kind] || d.kind) + '，' + plugDepHumanSize(d.size) + '）').join('\n') +
+    '\n\n下载类依赖会校验 SHA-256；APK 仍需系统安装器确认。';
+  if (!(await uiConfirm(text, '安装全部', '依赖安装'))) return { ok: false, error: '用户取消' };
+  let ok = 0, lastError = '';
+  for (const dep of missing) {
+    const r = await plugDepInstall(plugin, dep.id, { confirmed: true, force: true });
+    if (r.ok) ok++;
+    else { lastError = r.error || '安装失败'; break; }
+  }
+  return { ok: ok === missing.length, installed: ok, error: lastError };
+}
+
+async function plugDepUninstall(plugin, depId, opts) {
+  const dep = plugDepFind(plugin, depId);
+  if (!dep) return { ok: false, error: '依赖不存在' };
+  const denied = plugDepAccess(plugin);
+  if (denied) return { ok: false, error: denied };
+  if (!opts || !opts.confirmed) {
+    if (!(await uiConfirm('卸载依赖「' + dep.id + ' ' + dep.version + '」？\n只删除插件沙箱里的这一份，不动系统目录。', '卸载依赖', '依赖卸载'))) {
+      return { ok: false, error: '用户取消' };
+    }
+  }
+  if (typeof Perm.removeDependency !== 'function') return { ok: false, error: '当前原生桥不支持依赖卸载' };
+  let r;
+  try { r = plugDepJson(Perm.removeDependency(String(plugin.id), String(dep.id)), {}); }
+  catch (e) { return { ok: false, error: errMsg(e) }; }
+  plugDepAppendLog(plugin.id, (r && r.ok ? '已卸载 ' : '卸载失败 ') + dep.id);
+  if (r && r.ok) {
+    const cache = plugDepInstalledMap(plugin.id);
+    delete cache[dep.id];
+    plugDepCacheSet(plugin.id, cache);
+    plugDepAudit(plugin, 'dep_remove', dep.id);
+  }
+  return r && r.ok ? { ok: true } : { ok: false, error: (r && r.error) || '卸载失败' };
+}
+/** 逆序卸载：先卸声明里靠后的（通常是被依赖方）。 */
+async function plugDepUninstallAll(plugin) {
+  const installed = plugDepPlan(plugin).filter(x => x.state === 'installed').map(x => x.dep).reverse();
+  if (!installed.length) return { ok: true, count: 0 };
+  if (!(await uiConfirm('卸载「' + plugin.name + '」的全部 ' + installed.length + ' 项依赖？\n按逆序删除：' +
+    installed.map(d => d.id).join(' → ') + '\n插件配置与会话不会被删除。', '全部卸载', '依赖卸载'))) {
+    return { ok: false, error: '用户取消' };
+  }
+  let ok = 0;
+  for (const dep of installed) {
+    const r = await plugDepUninstall(plugin, dep.id, { confirmed: true });
+    if (!r.ok) return { ok: false, installed: ok, error: r.error };
+    ok++;
+  }
+  return { ok: true, installed: ok };
+}
+
+async function plugDepVerify(plugin, depId) {
+  const dep = plugDepFind(plugin, depId);
+  if (!dep) return { ok: false, error: '依赖不存在' };
+  if (typeof Perm.verifyDependency !== 'function') return { ok: false, error: '当前原生桥不支持依赖校验' };
+  let r;
+  try { r = plugDepJson(Perm.verifyDependency(String(plugin.id), String(dep.id)), {}); }
+  catch (e) { return { ok: false, error: errMsg(e) }; }
+  plugDepAppendLog(plugin.id, (r && r.ok && r.verified ? '校验通过 ' : '校验未通过 ') + dep.id + (r && r.reason ? '：' + r.reason : ''));
+  return r || { ok: false, error: '校验失败' };
+}
+function plugDepAudit(plugin, event, depId) {
+  try { plugAudit(event, plugin, { tool: String(depId || '') }); } catch (e) {}
+}
+
+/** 插件页里的依赖面板（mode === 'deps'）。 */
+function plugDepPanelHtml(plugin) {
+  if (!plugin) return '<div class="mini-note">插件已不存在。</div>';
+  const plan = plugDepPlan(plugin);
+  const log = plugDepLogText(plugin.id);
+  let html = '<div class="mini-note">依赖来自插件清单，宿主逐项校验 HTTPS + SHA-256。' +
+    '没有哈希的下载一律拒绝；APK 只交给系统安装器；卸载按逆序删除，不动系统目录。</div>';
+  if (!plan.length) {
+    return html + '<div class="mini-note" style="margin-top:10px">这个插件没有声明依赖。</div>';
+  }
+  html += '<div class="pc-actions" style="margin-top:10px">' +
+    '<button type="button" class="pc-btn pc-primary" data-dep-all="install"' + (plugDepAccess(plugin) ? ' disabled' : '') + '>安装全部缺失</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-dep-all="remove"' + (plugDepAccess(plugin) ? ' disabled' : '') + '>全部卸载</button>' +
+    '</div>';
+  html += plan.map(({ dep, state }) => {
+    const ok = state === 'installed';
+    const badge = '<span class="pc-badge' + (ok ? ' pc-badge-ok' : '') + '">' + plugEsc(plugDepStatusText(state)) + '</span>';
+    const meta = [
+      PLUG_DEP_KIND_LABEL[dep.kind] || dep.kind,
+      dep.version,
+      plugDepHumanSize(dep.size),
+      dep.license ? '许可证 ' + dep.license : '许可证未标注'
+    ].join(' · ');
+    const src = dep.kind === 'termux-pkg' || dep.kind === 'npm' ? dep.source : dep.source;
+    return '<div class="pc pc-row-item pc-dep-row">' +
+      '<div class="pc-row-main">' +
+      '<div class="pc-row-t">' + plugEsc(dep.id) + ' ' + badge + '</div>' +
+      '<div class="pc-row-d">' + plugEsc(meta) + '</div>' +
+      (dep.why ? '<div class="pc-row-d">' + plugEsc(dep.why) + '</div>' : '') +
+      '<div class="pc-row-d pc-muted" style="word-break:break-all">来源：' + plugEsc(src) + '</div>' +
+      (dep.sha256 ? '<div class="pc-row-d pc-muted" style="word-break:break-all">SHA-256：' + plugEsc(dep.sha256) + '</div>' : '<div class="pc-row-d pc-muted">包管理器自带完整性校验</div>') +
+      '</div>' +
+      '<div class="pc-actions">' +
+      '<button type="button" class="pc-btn pc-mini" data-dep-install="' + plugEsc(dep.id) + '"' + (plugDepAccess(plugin) ? ' disabled' : '') + '>' + (ok ? '重装' : '安装') + '</button>' +
+      '<button type="button" class="pc-btn pc-mini" data-dep-verify="' + plugEsc(dep.id) + '"' + (ok ? '' : ' disabled') + '>校验</button>' +
+      '<button type="button" class="pc-btn pc-mini" data-dep-remove="' + plugEsc(dep.id) + '"' + (ok ? '' : ' disabled') + '>卸载</button>' +
+      '</div></div>';
+  }).join('');
+  html += '<div class="pc-title" style="margin-top:12px">安装日志</div>' +
+    '<pre id="dep-log" class="dep-log">' + plugEsc(log || '（还没有日志）') + '</pre>';
+  return html;
+}
+function plugDepRefreshPanel() {
+  if (typeof plugRenderPage === 'function' && PLUG_PAGE_CTX.mode === 'deps') { try { plugRenderPage(); } catch (e) {} }
+}
+async function plugDepHandleUi(el) {
+  if (!el || !el.dataset) return false;
+  const plugin = USER_PLUGINS.filter(p => p.id === PLUG_PAGE_CTX.pluginId)[0];
+  if (!plugin) return false;
+  if (el.dataset.depAll) {
+    const r = el.dataset.depAll === 'install'
+      ? await plugDepInstallAll(plugin)
+      : await plugDepUninstallAll(plugin);
+    if (!r.ok) toast(r.error || '操作失败');
+    else toast(el.dataset.depAll === 'install' ? '依赖已处理' : '依赖已卸载');
+    plugDepRefreshPanel();
+    return true;
+  }
+  if (el.dataset.depInstall) {
+    const r = await plugDepInstall(plugin, el.dataset.depInstall);
+    toast(r.ok ? '依赖已安装' : (r.error || '安装失败'));
+    plugDepRefreshPanel();
+    return true;
+  }
+  if (el.dataset.depRemove) {
+    const r = await plugDepUninstall(plugin, el.dataset.depRemove);
+    toast(r.ok ? '依赖已卸载' : (r.error || '卸载失败'));
+    plugDepRefreshPanel();
+    return true;
+  }
+  if (el.dataset.depVerify) {
+    const r = await plugDepVerify(plugin, el.dataset.depVerify);
+    toast(r.ok && r.verified ? '校验通过' : ((r && (r.reason || r.error)) || '校验未通过'));
+    plugDepRefreshPanel();
+    return true;
+  }
+  return false;
+}
+function plugDepOpen(pid) {
+  const plugin = USER_PLUGINS.filter(p => p.id === String(pid))[0];
+  if (!plugin) { toast('插件不存在'); return; }
+  PLUG_PAGE_CTX = { pluginId: plugin.id, surfaceId: '', mode: 'deps' };
+  if (typeof showView === 'function') showView(PLUG_PAGE_VIEW, { noStack: true });
+  if (typeof VIEW_STACK !== 'undefined' && VIEW_STACK[VIEW_STACK.length - 1] !== PLUG_PAGE_VIEW) VIEW_STACK.push(PLUG_PAGE_VIEW);
+  plugRenderPage();
+}
+function plugDepCounts(plugin) {
+  const plan = plugDepPlan(plugin);
+  return { total: plan.length, installed: plan.filter(x => x.state === 'installed').length, missing: plan.filter(x => x.state !== 'installed').length };
 }
 /* ==========================================================
  *  长期记忆库（v0.4）
@@ -9539,6 +10422,8 @@ async function chatReqTools(messages, hooks) {
     round++;
     if (activeRunTask && taskDeadline) taskTouch(activeRunTask.id, '第 ' + round + ' 轮处理中', { currentStep: round, totalSteps: maxRoundsForState });
     if (hooks.onRound) { try { hooks.onRound(round, maxRoundsForState); } catch (e) {} }
+    // 0.12：每轮推进持久会话心跳（内部 10s 节流，不会写爆存储）。
+    if (activeRunTask && typeof persistHeartbeat === 'function') { try { persistHeartbeat(activeRunTask); } catch (e) {} }
     compactTaskMessages(proc);
     taskTouch(activeRunTask.id, '第 ' + round + ' 轮请求模型', { phase: 'planning', currentStep: round, totalSteps: maxRoundsForState });
     const body = JSON.stringify({ model: CONFIG.model, messages: proc, stream: false, tools, tool_choice: 'auto' });
@@ -9637,6 +10522,10 @@ async function chatReqTools(messages, hooks) {
     }
     const results = slot.filter(Boolean);
     results.forEach(({ c, result }) => proc.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(result) }));
+    // 0.12：工具动作计入持久会话预算；超限会由 persistBudgetCount 触发暂停（不是失败）。
+    if (activeRunTask && typeof persistBudgetCount === 'function' && results.length) {
+      try { persistBudgetCount(activeRunTask, 'actions', results.length); } catch (e) {}
+    }
     if (runIsStale(runToken) || stopRequested) return '（已由你停止本轮工具执行）';
     if (parIdx.length > 1) taskEvent(activeRunTask.id, 'parallel_tools', { count: parIdx.length });
     taskTouch(activeRunTask.id, '已完成工具，正在验证', { phase: 'verify' });
@@ -10062,6 +10951,22 @@ function renderPlugins() {
   box.innerHTML = html;
 }
 
+/** 0.12：插件声明了依赖时，设置页给一个「管理依赖」入口。 */
+function plugDepsRowHTML(p) {
+  const deps = Array.isArray(p.dependencies) ? p.dependencies : [];
+  if (!deps.length) return '';
+  let label = deps.length + ' 项';
+  try {
+    if (typeof plugDepCounts === 'function') {
+      const c = plugDepCounts(p);
+      label = c.installed + '/' + c.total + (c.missing ? ' · 缺 ' + c.missing : ' · 已齐');
+    }
+  } catch (e) {}
+  return '<div class="plug-market-meta"><b>依赖：</b>' + esc(label) +
+    ' <button type="button" class="plug-mini" data-plug-deps="' + esc(p.id) + '">管理依赖</button>' +
+    ' <button type="button" class="plug-mini" data-dep-all-install="' + esc(p.id) + '">装缺失</button></div>';
+}
+
 /** 自定义插件区块：已安装的插件 + 空状态提示。 */
 function plugCustomHtml() {
   let html = '<div class="sec-title" style="margin-top:16px">🧩 自定义插件</div>';
@@ -10093,6 +10998,7 @@ function plugCustomHtml() {
       </div>
       ${p.desc ? '<div class="plug-group-desc">' + esc(p.desc) + '</div>' : ''}
       <div class="plug-market-meta"><b>类型：</b>${esc(({chat:'聊天插件',quick:'快捷任务插件',device:'手机插件',workspace:'工作插件'}[p.pluginType] || '聊天插件'))}</div>
+      ${plugDepsRowHTML(p)}
       ${plugPermissionsHTML(p)}
       ${rows}
     </div>`;
@@ -10718,6 +11624,15 @@ function renderRuntimeState() {
     const e = HAS_PERM && Perm.listExternalAgents ? JSON.parse(Perm.listExternalAgents() || '[]') : [];
     box.textContent = 'Android：可用 · 无障碍：' + (a.accessibility ? '已连接' : '未连接') + ' · Shizuku：' + (a.shizukuInstalled ? '已安装' : '未安装') + ' · Root：' + (a.rootAvailable ? '可检测到' : '未授权') + ' · Termux：' + (t.installed ? '已安装，未连接' : '未安装') + ' · 外部 Agent：' + (Array.isArray(e) ? e.length : 0) + ' 个';
   } catch (e) { box.textContent = '运行时状态暂时不可用。'; }
+  renderPersistState();
+}
+function renderPersistState() {
+  const line = $('#persist-state');
+  const guide = $('#persist-keepalive');
+  try {
+    if (line && typeof persistStatusLine === 'function') line.textContent = persistStatusLine();
+    if (guide && typeof persistKeepAliveGuideHtml === 'function') guide.innerHTML = persistKeepAliveGuideHtml();
+  } catch (e) {}
 }
 function renderWorkspaceState() {
   const box = $('#workspace-state');
@@ -10751,6 +11666,7 @@ function bindWorkspace() {
 }
 function bindRuntime() {
   const refresh = $('#btn-runtime-refresh'); if (refresh) refresh.onclick = renderRuntimeState;
+  const prefresh = $('#btn-persist-refresh'); if (prefresh) prefresh.onclick = renderPersistState;
   const ext = $('#btn-external-agents'); if (ext) ext.onclick = () => { renderRuntimeState(); toast('外部 Agent 适配框架已就绪，具体适配需单独安装并确认~'); };
   renderRuntimeState();
 }
@@ -11025,7 +11941,9 @@ function renderSettings() {
 <div class="sec-title">高级运行时</div>
 <div class="mini-note" style="margin-top:8px">Root、Shizuku、Termux 和外部 Agent 都是可选后端。当前只显示状态并建立受控协议，不会自动执行命令或安装外部 Agent。</div>
 <div id="runtime-state" class="mini-note" style="margin-top:8px"></div>
-<div class="acts" style="margin-top:8px"><button id="btn-runtime-refresh" class="btn-s">刷新运行时状态</button><button id="btn-external-agents" class="btn-s">查看外部 Agent</button></div>
+<div id="persist-state" class="mini-note" style="margin-top:8px"></div>
+<div id="persist-keepalive" class="mini-note" style="margin-top:8px"></div>
+<div class="acts" style="margin-top:8px"><button id="btn-runtime-refresh" class="btn-s">刷新运行时状态</button><button id="btn-external-agents" class="btn-s">查看外部 Agent</button><button id="btn-persist-refresh" class="btn-s">刷新长时运行状态</button></div>
 
 <div class="sec-title">应用白名单</div>
 <div class="mini-note" style="margin-top:8px">默认拒绝。只有加入白名单的应用才允许 L1/L2/L3 读取或操作；ElysiaFloat 自身不会加入。</div>
@@ -11661,6 +12579,12 @@ function runStatusLabel() {
   let s = '运行中 ' + sec + 's';
   if (phase) s += ' · ' + phase;
   if (goal) s += ' · ' + goal;
+  if (t && t.persist && t.persist.enabled) {
+    const u = t.persist.used || {};
+    s += ' · 持久 ' + Math.round(Number(u.minutes) || 0) + 'm';
+    const over = typeof persistBudgetExceeded === 'function' ? persistBudgetExceeded(t) : '';
+    if (over) s += ' · 预算' + over + '已满';
+  }
   return s;
 }
 function updateRunStatus() {
@@ -11674,6 +12598,13 @@ function updateRunStatus() {
     return;
   }
   if (!RUN_STATUS_START) RUN_STATUS_START = Date.now();
+  // 0.12：运行状态条本身就是心跳来源；persistHeartbeat 内部按 10s 节流。
+  if (typeof persistHeartbeat === 'function') {
+    try {
+      const t = (TASKS || []).find(x => x.id === ACTIVE_RUN_TASK_ID);
+      if (t) persistHeartbeat(t);
+    } catch (e) {}
+  }
   box.hidden = false;
   const el = $('#run-status-text');
   if (el) el.textContent = runStatusLabel();
@@ -11724,6 +12655,14 @@ function bindPluginsPage() {
     if (b.dataset.cplugSw) { toggleUserPlug(b.dataset.cplugSw); return; }
     if (b.dataset.toolSw) { toggleTool(b.dataset.toolSw); return; }
     if (b.dataset.plugDel) { plugDelete(b.dataset.plugDel); return; }
+    if (b.dataset.plugDeps) { if (typeof plugDepOpen === 'function') plugDepOpen(b.dataset.plugDeps); return; }
+    if (b.dataset.depAllInstall) {
+      const p = USER_PLUGINS.filter(x => x.id === b.dataset.depAllInstall)[0];
+      if (p && typeof plugDepInstallAll === 'function') {
+        plugDepInstallAll(p).then(r => { toast(r && r.ok ? '缺失依赖已处理' : ((r && r.error) || '安装失败')); renderPlugins(); });
+      }
+      return;
+    }
     if (b.dataset.plugAct || b.dataset.plugOpen || b.dataset.plugConfig) { plugHandleUiAction(b); return; }
   };
 
@@ -11733,6 +12672,8 @@ function bindPluginsPage() {
   const pageBody = $('#plug-page-body');
   if (pageBody) {
     pageBody.onclick = (e) => {
+      const dep = e.target && e.target.closest ? e.target.closest('[data-dep-all],[data-dep-install],[data-dep-remove],[data-dep-verify]') : null;
+      if (dep && typeof plugDepHandleUi === 'function') { plugDepHandleUi(dep); return; }
       const el = e.target && e.target.closest ? e.target.closest('[data-plug-act],[data-plug-open],[data-plug-config]') : null;
       if (el) plugHandleUiAction(el);
     };
@@ -12299,6 +13240,10 @@ function boot() {
   // 0.11：启动时恢复插件主题并挂载聊天入口（失败不影响主流程）。
   try { if (typeof plugThemeRestore === 'function') plugThemeRestore(); } catch (e) {}
   try { if (typeof plugMountRefresh === 'function') plugMountRefresh(); } catch (e) {}
+
+  // 0.12：进程重启后合并检查点（活跃会话转暂停），再启动后台任务调度。
+  try { if (typeof persistRecoverAll === 'function') persistRecoverAll(); } catch (e) {}
+  try { if (typeof persistSchedulerStart === 'function') persistSchedulerStart(); } catch (e) {}
 
   console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条 · 插件 ' + USER_PLUGINS.length + ' 个');
 }
