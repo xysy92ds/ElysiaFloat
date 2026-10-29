@@ -31,6 +31,19 @@ class MainActivity : Activity() {
     }
 
     private fun checkAndStart() {
+        // 由 TermuxWorker.requestRunCommandPermission 拉起：专门用来申请 RUN_COMMAND 权限。
+        // normal 权限只要 Termux 已装，requestPermissions 会立即授予。
+        if (intent?.getBooleanExtra("requestRunCommand", false) == true) {
+            val perm = "com.termux.permission.RUN_COMMAND"
+            if (checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED) {
+                finish()
+                return
+            }
+            try {
+                requestPermissions(arrayOf(perm), TermuxWorker.REQ_RUN_COMMAND)
+            } catch (_: Exception) { finish() }
+            return
+        }
         // 如果浮窗已经在运行（例如当前只是缩成了小球），直接还原，无需重复启动。
         val running = FloatService.instance
         if (running != null) {
@@ -69,6 +82,11 @@ class MainActivity : Activity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == TermuxWorker.REQ_RUN_COMMAND) {
+            // normal 权限申请结果回来后直接关闭 Activity，浮窗服务会重新检测权限状态
+            finish()
+            return
+        }
         if (requestCode == 1001 && Settings.canDrawOverlays(this)) {
             startFloatService()
             finish()

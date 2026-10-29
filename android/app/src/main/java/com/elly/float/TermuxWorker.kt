@@ -1,5 +1,6 @@
 package com.elly.assistant
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -50,6 +51,76 @@ object TermuxWorker {
     )
     private const val BASH_PATH = "/data/data/com.termux/files/usr/bin/bash"
     private const val RUN_PERM = "com.termux.permission.RUN_COMMAND"
+    private const val TERMUX_PKG = "com.termux"
+    private const val TERMUX_RUN_SERVICE = "com.termux.app.RunCommandService"
+    const val REQ_RUN_COMMAND = 4101
+
+    /**
+     * 启动 Termux RunCommandService：优先 startForegroundService，失败回退 startService。
+     * 浮窗应用在后台时直接 startService 会抛 IllegalStateException（Android 8+），
+     * 必须用 startForegroundService；Termux 内部会在 5 秒内调用 startForeground。
+     */
+    private fun startTermuxService(ctx: Context, intent: Intent): ComponentName? {
+        return try {
+            ctx.startForegroundService(intent)
+        } catch (e: Exception) {
+            try {
+                ctx.startService(intent)
+            } catch (e2: Exception) {
+                null
+            }
+        }
+    }
+
+    /**
+     * 运行时申请 com.termux.permission.RUN_COMMAND。
+     * 该权限 protectionLevel=normal，只要 Termux 已安装，requestPermissions 会立即授予；
+     * 即使本应用安装在 Termux 之前（此时安装时未授予），运行时申请仍可补上。
+     * Aether（com.baimoqilin.aether）用的就是这一招。
+     */
+    fun requestRunCommandPermission(ctx: Context): JSONObject {
+        if (ctx.checkSelfPermission(RUN_PERM) == PackageManager.PERMISSION_GRANTED) {
+            return JSONObject().apply {
+                put("ok", true); put("alreadyGranted", true)
+                put("message", "Termux RUN_COMMAND 权限已授予")
+            }
+        }
+        val installed = try { ctx.packageManager.getPackageInfo(TERMUX_PKG, 0); true } catch (_: Exception) { false }
+        if (!installed) return JSONObject().apply {
+            put("ok", false); put("need", "install_termux")
+            put("message", "Termux 未安装，无法申请权限")
+        }
+        val act = MainActivity.current
+        if (act == null) {
+            // 没有可用的 Activity，尝试拉起 MainActivity 由它去申请
+            try {
+                ctx.startActivity(Intent(ctx, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    .putExtra("requestRunCommand", true))
+            } catch (_: Exception) {}
+            return JSONObject().apply {
+                put("ok", false); put("need", "activity")
+                put("message", "需要通过 Activity 发起权限申请，已尝试打开应用界面")
+            }
+        }
+        val latch = java.util.concurrent.CountDownLatch(1)
+        var granted = false
+        act.runOnUiThread {
+            try {
+                act.requestPermissions(arrayOf(RUN_PERM), REQ_RUN_COMMAND)
+            } catch (_: Exception) {}
+            latch.countDown()
+        }
+        try { latch.await(3, java.util.concurrent.TimeUnit.SECONDS) } catch (_: Exception) {}
+        // 普通权限 requestPermissions 通常立即回调，给一点时间让权限状态刷新
+        try { Thread.sleep(300) } catch (_: Exception) {}
+        granted = ctx.checkSelfPermission(RUN_PERM) == PackageManager.PERMISSION_GRANTED
+        return JSONObject().apply {
+            put("ok", granted); put("permissionGranted", granted)
+            put("message", if (granted) "已通过 requestPermissions 获得 Termux RUN_COMMAND 权限"
+                            else "requestPermissions 未授予权限。请尝试：1) 卸载重装本应用（先装 Termux）；2) 有 root 时点一键配置；3) 在 Termux 内用 pm grant 手动授权")
+        }
+    }
 
     /**
      * 调用 Termux 之前的体检：包是否安装、RUN_COMMAND 权限是否到手。
@@ -105,9 +176,7 @@ object TermuxWorker {
 
     /**
      * 一键配置 Termux 权限。
-     * - 已就绪：直接返回
-     * - 有 root：自动 pm grant 授权 + 写入 allow-external-apps=true
-     * - 无 root：返回 manual，由前端复制命令并打开 Termux
+     * 顺序：已就绪 → requestPermissions（普通权限可运行时授予）→ root pm grant → 手动命令
      */
     fun autoConfigure(ctx: Context): JSONObject {
         if (ctx.checkSelfPermission(RUN_PERM) == PackageManager.PERMISSION_GRANTED) {
@@ -116,15 +185,20 @@ object TermuxWorker {
                 put("message", "Termux 权限已就绪")
             }
         }
-        val installed = try { ctx.packageManager.getPackageInfo("com.termux", 0); true } catch (_: Exception) { false }
+        val installed = try { ctx.packageManager.getPackageInfo(TERMUX_PKG, 0); true } catch (_: Exception) { false }
         if (!installed) return JSONObject().apply {
             put("ok", false); put("need", "install_termux")
             put("message", "请先安装 Termux（F-Droid 版），再回来点一次")
         }
+        // 1) 运行时申请：normal 权限只要 Termux 已装就能直接授予
+        val permResult = requestRunCommandPermission(ctx)
+        if (permResult.optBoolean("ok")) return permResult
+        // 2) root 自动授权
         if (RootWorker.isRootBinaryAvailable()) {
             val r = tryRootAutoConfigure(ctx)
             if (r.optBoolean("ok")) return r
         }
+        // 3) 手动
         return JSONObject().apply {
             put("ok", false); put("need", "manual")
             put("message", "未获得 root。已复制命令到剪贴板并打开 Termux，请粘贴执行后重启 Termux；若仍提示权限缺失，请卸载重装本应用（RUN_COMMAND 权限只能在安装时授予）。")
@@ -251,12 +325,16 @@ rm -f "${'$'}PIDFILE"
         } catch (e: Exception) { return error("SCRIPT_WRITE_FAILED", e.message ?: "脚本写入失败") }
 
         return try {
-            val intent = Intent("com.termux.RUN_COMMAND").setPackage("com.termux")
+            val intent = Intent("com.termux.RUN_COMMAND")
+                .setComponent(ComponentName(TERMUX_PKG, TERMUX_RUN_SERVICE))
                 .putExtra("com.termux.RUN_COMMAND_PATH", BASH_PATH)
                 .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(scriptFile.absolutePath))
                 .putExtra("com.termux.RUN_COMMAND_WORKDIR", cwd.absolutePath)
                 .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
-            ctx.startService(intent)
+                .putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "ElysiaFloat")
+                .putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "ElysiaFloat agent task")
+            val cn = startTermuxService(ctx, intent)
+            if (cn == null) return error("DISPATCH_FAILED", "Termux 服务启动失败（startForegroundService/startService 均无效）")
             audit(ctx, "dispatch", runId, taskId)
             JSONObject().put("ok", true)
                 .put("runId", runId)
@@ -335,12 +413,16 @@ rm -f "${'$'}PIDFILE"
             val scriptFile = File(jobsDir, "$runId.sh")
             scriptFile.writeText(script)
             scriptFile.setExecutable(true)
-            val intent = Intent("com.termux.RUN_COMMAND").setPackage("com.termux")
+            val intent = Intent("com.termux.RUN_COMMAND")
+                .setComponent(ComponentName(TERMUX_PKG, TERMUX_RUN_SERVICE))
                 .putExtra("com.termux.RUN_COMMAND_PATH", BASH_PATH)
                 .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(scriptFile.absolutePath))
                 .putExtra("com.termux.RUN_COMMAND_WORKDIR", jobsDir.absolutePath)
                 .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
-            ctx.startService(intent)
+                .putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "ElysiaFloat")
+                .putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "ElysiaFloat dependency install")
+            val cn = startTermuxService(ctx, intent)
+            if (cn == null) return error("DISPATCH_FAILED", "Termux 服务启动失败（startForegroundService/startService 均无效）")
             audit(ctx, "fixed_dispatch", runId, "$kind:$target")
             JSONObject().put("ok", true).put("runId", runId)
                 .put("kind", kind).put("package", target).put("timeoutSec", 900)

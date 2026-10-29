@@ -97,6 +97,13 @@ class PermissionBridge(private val ctx: Context) {
     @JavascriptInterface
     fun autoConfigureTermux(): String = TermuxWorker.autoConfigure(ctx).toString()
 
+    /**
+     * 运行时申请 Termux RUN_COMMAND 权限（normal 权限，Termux 已装即可授予）。
+     * 参考 Aether 的做法：在 Activity 上调用 requestPermissions，系统立即授予 normal 权限。
+     */
+    @JavascriptInterface
+    fun requestTermuxRunCommandPermission(): String = TermuxWorker.requestRunCommandPermission(ctx).toString()
+
     @JavascriptInterface
     fun createTermuxSession(): String = TermuxWorker.createSession(ctx).toString()
 
