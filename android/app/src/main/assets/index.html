@@ -11477,7 +11477,7 @@ async function chatReqTools(messages, hooks) {
     if (activeRunTask && typeof persistHeartbeat === 'function') { try { persistHeartbeat(activeRunTask); } catch (e) {} }
     compactTaskMessages(proc);
     taskTouch(activeRunTask.id, '第 ' + round + ' 轮请求模型', { phase: 'planning', currentStep: round, totalSteps: maxRoundsForState });
-    const body = JSON.stringify({ model: CONFIG.model, messages: proc, stream: false, tools, tool_choice: 'auto' });
+    const body = JSON.stringify({ model: CONFIG.model, messages: (proc.some(m => m && m.role === 'user') ? proc : proc.concat([{ role: 'user', content: '（继续上一步）' }])), stream: false, tools, tool_choice: 'auto' });
     let msg = null, fallback = false, errText = '';
     try {
       // 模型单次预算 200s；有任务 deadline 时取剩余时间，且不超过 200s
@@ -11600,8 +11600,18 @@ async function chatReqTools(messages, hooks) {
 }
 function compactTaskMessages(list) {
   if (!Array.isArray(list) || list.length <= 26) return;
-  const first = list[0]; const tail = list.slice(-24);
-  list.splice(0, list.length, first, { role: 'system', content: '[较早的工具结果已压缩；以当前任务状态和最近结果为准]' }, ...tail);
+  // 开头的 system 必须留在最前；此外还至少要保留一条 user，
+  // 否则尾部 24 条全是 assistant/tool 时，模型侧会直接 400
+  // 「No user query found in messages」。
+  const head = [];
+  let i = 0;
+  while (i < list.length && list[i] && list[i].role === 'system') { head.push(list[i]); i++; }
+  const userMsg = list.slice(i).filter(m => m && m.role === 'user')[0] || null;
+  const tail = list.slice(-24);
+  const kept = head.slice();
+  kept.push({ role: 'system', content: '[较早的工具结果已压缩；以当前任务状态和最近结果为准]' });
+  if (userMsg && tail.indexOf(userMsg) < 0) kept.push(userMsg);
+  list.splice(0, list.length, ...kept, ...tail);
 }
 function canParallelTool(name) {
   if (isDeviceAction(name)) return false;   // 设备动作必须串行，见 G5-1
