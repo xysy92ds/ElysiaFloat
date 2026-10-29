@@ -139,23 +139,32 @@ function providerMigrate(cfg, aux) {
 
 /** 旧扁平字段改动后，把固定 id 的旧 Provider 同步过去，避免启动时回填过期值。 */
 function providerSyncLegacy(cfg, aux) {
-  const sync = (id, base, model) => {
+  const sync = (id, base, model, purpose) => {
     const p = providerFind(cfg, id);
     if (!p) return;
     p.base = String(base || '').trim();
     p.model = String(model || '').trim();
+    // 绑定里的 model 优先于 Provider 自身（providerResolve 就是这么取的）。
+    // 不同步的话，设置页刚改的模型会被绑定的旧模型名顶回去，
+    // 表现就是「页面上写着 A，实际请求发的是 B」。
+    const b = cfg.bindings && cfg.bindings[purpose];
+    if (b && b.provider === id) b.model = p.model;
   };
-  sync('legacy-chat', cfg.apiBase, cfg.model);
-  sync('legacy-vision', cfg.visionBase, cfg.visionModel);
-  sync('legacy-tts', cfg.ttsBaseUrl, cfg.ttsModel);
-  if (aux) sync('legacy-vector', aux.vecBase, aux.vecModel);
+  sync('legacy-chat', cfg.apiBase, cfg.model, 'chat');
+  sync('legacy-vision', cfg.visionBase, cfg.visionModel, 'vision');
+  sync('legacy-tts', cfg.ttsBaseUrl, cfg.ttsModel, 'tts');
+  if (aux) sync('legacy-vector', aux.vecBase, aux.vecModel, 'embedding');
   if (!String(cfg.visionBase || '').trim() && !String(cfg.visionKey || '').trim()) {
     cfg.providers = (cfg.providers || []).filter(p => !p || p.id !== 'legacy-vision');
     if (cfg.bindings && cfg.bindings.vision && cfg.bindings.vision.provider === 'legacy-vision') delete cfg.bindings.vision;
   }
 }
 
-/** 解析某用途实际使用的 Provider：绑定优先，失效则回退到第一个具备该能力的启用项。 */
+/**
+ * 解析某用途实际使用的 Provider：绑定优先，失效则回退到第一个具备该能力的启用项。
+ * legacy-* 是旧扁平字段的镜像（设置页 模型/API 地址 直接写这里），模型名以 Provider 为准：
+ * 否则绑定里残留的旧模型名会盖住用户刚改的值，页面上写 A、请求里发 B。
+ */
 function providerResolve(cfg, purpose) {
   if (!cfg || !Array.isArray(cfg.providers)) return null;
   const b = (cfg.bindings && cfg.bindings[purpose]) || null;
@@ -163,11 +172,13 @@ function providerResolve(cfg, purpose) {
   const usable = x => x && x.enabled !== false && (x.capabilities || []).indexOf(purpose) >= 0;
   if (!usable(p)) p = cfg.providers.filter(usable)[0] || null;
   if (!p) return null;
+  const mirror = String(p.id || '').indexOf('legacy-') === 0;
+  const bound = b && b.provider === p.id && b.model && !mirror ? b.model : '';
   return {
     provider: p,
     base: String(p.base || ''),
     key: providerKeyOf(p),
-    model: (b && b.provider === p.id && b.model) || p.model || ''
+    model: bound || p.model || ''
   };
 }
 

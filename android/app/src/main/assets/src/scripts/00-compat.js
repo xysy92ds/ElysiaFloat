@@ -287,8 +287,15 @@ const errMsg = (err) => {
   const base = (err && err.message) || (err && err.error && err.error.message) || String(err || '') || '未知错误';
   const code = err && err.code;
   // 统一请求错误的错误码对用户可见，但不要重复拼接
-  if (code && String(base).indexOf(String(code)) < 0) return base + '〔' + code + '〕';
-  return base;
+  let out = base;
+  if (code && String(base).indexOf(String(code)) < 0) out = base + '〔' + code + '〕';
+  // 服务端不认模型名时，真正的原因几乎都是「Key 的分组不提供这个模型」，
+  // 直接把排查方向写出来，省得对着 404 猜是不是没保存。
+  if (/model_not_found|model is not available|模型不存在|model not found/i.test(out)) {
+    out += '\n提示：当前 Key 的分组不提供这个模型名。请到 设置 → 模型 核对模型名，' +
+      '或点「检测」从服务端拉一份可用列表；改完记得点保存。';
+  }
+  return out;
 };
 
 /** 从文本里摘掉"看起来像工具调用"的 JSON 片段（用括号配对扫描，避免误伤普通文字） */

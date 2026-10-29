@@ -20,6 +20,10 @@ function parseVars(t) {
 }
 
 async function chatReq(messages, skipParse) {
+  // 请求前先把 chat 用途的绑定解析回填到扁平字段：
+  // 只读 CONFIG.model/apiBase 的话，设置页刚改的值可能被绑定里的旧值盖住，
+  // 表现就是「页面上写 agnes，请求里发 gpt-4o-mini」→ 404 model_not_found。
+  try { if (typeof providerApply === 'function') providerApply(CONFIG, 'chat'); } catch (e) {}
   if (!CONFIG.apiKey) throw new Error('未填写 API Key，请到设置里配置');
   // E2-008：额度用尽时先拦下，不再发请求。
   const quota = usageCheck();
