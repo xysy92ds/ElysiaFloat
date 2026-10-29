@@ -336,12 +336,37 @@ function plugStorageExport(plugin) {
   return JSON.stringify({ pluginId: plugin.id, version: plugin.configVersion || 1, data: plugStateGet(plugin) });
 }
 function plugConfigAll() { const all = sGet(PLUG_CONFIG_KEY, {}); return plugPlainObject(all) ? all : {}; }
+/**
+ * 插件的全部配置字段。
+ * v1 清单写在 plugin.configFields；v2 清单写在 settings surface 的 config 里，
+ * 两者都得算上，否则 v2 插件的配置项会被当成「未知配置项」而存不进去。
+ */
+function plugConfigAllFields(plugin) {
+  if (!plugin) return [];
+  const out = [];
+  const seen = Object.create(null);
+  const push = f => {
+    if (!f || !f.key || seen[f.key]) return;
+    seen[f.key] = true;
+    out.push(f);
+  };
+  (plugin.configFields || []).forEach(push);
+  plugPluginSurfaces(plugin, 'settings').forEach(s => {
+    const fields = s && s.config && Array.isArray(s.config.fields) ? s.config.fields : [];
+    fields.forEach(push);
+  });
+  return out;
+}
+function plugConfigFieldOf(plugin, key) {
+  const k = String(key || '');
+  return plugConfigAllFields(plugin).filter(f => f.key === k)[0] || null;
+}
 function plugConfigGet(plugin) {
   if (!plugin) return {};
   const all = plugConfigAll();
   const data = plugPlainObject(all[plugin.id]) ? all[plugin.id] : {};
   const out = {};
-  (plugin.configFields || []).forEach(f => {
+  plugConfigAllFields(plugin).forEach(f => {
     if (f.type === 'secret') {
       if (secretStore.ok && secretStore.get(plugSecretName(plugin.id, f.key), '')) out[f.key] = '••••••';
     } else if (Object.prototype.hasOwnProperty.call(data, f.key)) {
@@ -365,7 +390,7 @@ function plugConfigClear(plugin) {
 }
 function plugConfigSet(plugin, key, value) {
   if (!plugin) return { ok: false, error: '插件不存在' };
-  const field = (plugin.configFields || []).filter(f => f.key === String(key))[0];
+  const field = plugConfigFieldOf(plugin, key);
   if (!field) return { ok: false, error: '未知配置项：' + String(key) };
   const all = plugConfigAll();
   const data = plugPlainObject(all[plugin.id]) ? all[plugin.id] : {};

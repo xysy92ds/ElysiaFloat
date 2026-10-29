@@ -1043,6 +1043,14 @@ ${plugSettings ? '<div class="sec-title">插件设置</div><div id="settings-plu
 
   organizeSettingsSections();
   legacyModelsRefresh();
+  // 设置页里挂着的插件配置表单（settings.section）原先没有绑定 change，
+  // 填了值既不写入也不报错，看起来就是「配置完保存不了」。
+  const settingsBody = $('#settings');
+  if (settingsBody) settingsBody.onchange = (e) => {
+    const el = e.target && e.target.closest ? e.target.closest('[data-plug-cfg]') : null;
+    if (!el || typeof plugHandleConfigChange !== 'function') return;
+    if (plugHandleConfigChange(el)) toast('已保存');
+  };
   $('#settings').onclick = (e) => {
     const legacy = e.target && e.target.closest ? e.target.closest('[data-legacy-models]') : null;
     if (legacy) { legacyModelApply(legacy.dataset.legacyModels, legacy.dataset.providerId); return; }
