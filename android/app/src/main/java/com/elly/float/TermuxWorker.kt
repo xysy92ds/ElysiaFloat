@@ -373,10 +373,12 @@ rm -f "${'$'}PIDFILE"
         if (!jobsDir.isDirectory && !jobsDir.mkdirs()) return error("JOBS_DIR_FAILED", "无法创建依赖任务目录")
 
         val target = if (hasVersion) "$name@$version" else name
+        // npm 全局安装额外加 --no-audit --no-fund：Termux 上审计请求经常超时，
+        // 会把一个本来能装成功的包拖成 exit 1，日志里只留下一堆 npm ERR。
         val command = if (kind == "termux-pkg") {
             "${shellQuote(PKG_PATH)} install -y ${shellQuote(name)}"
         } else {
-            "${shellQuote(NPM_PATH)} install -g ${shellQuote(target)}"
+            "${shellQuote(NPM_PATH)} install -g --no-audit --no-fund ${shellQuote(target)}"
         }
 
         val script = """#!/data/data/com.termux/files/usr/bin/bash
@@ -388,6 +390,14 @@ TIMEOUT=900
 START=${'$'}(date +%s)
 rm -f "${'$'}CANCELFILE"
 echo ${'$'}${'$'} > "${'$'}PIDFILE"
+BIN=${shellQuote(if (kind == "termux-pkg") PKG_PATH else NPM_PATH)}
+# 先在 shell 里确认二进制存在：直接跑会得到 exit 127，用户看不出是「没装 nodejs」。
+if [ ! -x "${'$'}BIN" ]; then
+  { echo "找不到可执行文件：${'$'}BIN"; echo "请先在 Termux 里执行：pkg install -y nodejs"; } > "${'$'}LOGFILE" 2>&1
+  echo 127 > "${'$'}EXITFILE"
+  rm -f "${'$'}PIDFILE"
+  exit 0
+fi
 $command > "${'$'}LOGFILE" 2>&1 &
 CHILD=${'$'}!
 TIMEDOUT=0

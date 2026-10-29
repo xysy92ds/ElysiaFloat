@@ -6739,21 +6739,37 @@ function plugDepLogText(pluginId) {
 async function plugDepWaitTermux(runId, pluginId, timeoutMs) {
   const started = Date.now();
   let offset = 0;
+  // 保留本次任务的全部输出行：失败时把最后几行直接写进错误信息，
+  // 否则用户只能看到「退出码 1」，根本不知道 npm/pkg 到底报了什么。
+  const tail = [];
   while (Date.now() - started < (timeoutMs || 600000)) {
     await new Promise(r => setTimeout(r, 1200));
     const st = plugDepJson(Perm.getTermuxJobStatus ? Perm.getTermuxJobStatus(runId) : '{}', {});
     const out = plugDepJson(Perm.readTermuxJobOutput ? Perm.readTermuxJobOutput(runId, offset) : '{}', {});
     if (out && out.output) {
       offset = Number(out.nextOffset) || offset;
-      String(out.output).split(/\r?\n/).filter(Boolean).slice(-20)
-        .forEach(line => plugDepAppendLog(pluginId, '· ' + line));
+      const lines = String(out.output).split(/\r?\n/).filter(Boolean);
+      lines.slice(-20).forEach(line => plugDepAppendLog(pluginId, '· ' + line));
+      lines.forEach(line => { tail.push(line); while (tail.length > 12) tail.shift(); });
     }
     if (!st || !st.ok) continue;
     if (st.status === 'done') return { ok: true, exitCode: st.exitCode };
-    if (st.status === 'failed') return { ok: false, error: '安装命令退出码 ' + st.exitCode };
+    if (st.status === 'failed') {
+      return { ok: false, exitCode: st.exitCode, error: plugDepFailText(st.exitCode, tail) };
+    }
   }
   try { if (Perm.cancelTermuxJob) Perm.cancelTermuxJob(runId); } catch (e) {}
   return { ok: false, error: '安装超时，已取消' };
+}
+/** 把退出码翻译成可操作的原因；有日志就把最后几行贴出来。 */
+function plugDepFailText(exitCode, tail) {
+  const head = '安装命令退出码 ' + exitCode;
+  const hint = exitCode === 1
+    ? '（包管理器自己报的错，通常是包名不对、npm 源不可达或磁盘/权限问题）'
+    : (exitCode === 124 ? '（超过时限被终止，常见于 npm 包太大或网络太慢）'
+      : (exitCode === 127 ? '（找不到可执行文件，通常是 nodejs/npm 没装好）' : ''));
+  const detail = (tail || []).filter(Boolean).slice(-8).join('\n');
+  return head + hint + (detail ? '\n—— 最后输出 ——\n' + detail : '\n（没有捕获到输出，请到插件依赖日志里查看）');
 }
 function plugDepTermuxInfo() {
   if (!HAS_PERM || typeof Perm.getTermuxWorkerState !== 'function') return { installed: false, bridge: false };
@@ -6859,13 +6875,16 @@ async function plugDepInstallAll(plugin) {
     missing.map(d => '· ' + d.id + ' ' + d.version + '（' + (PLUG_DEP_KIND_LABEL[d.kind] || d.kind) + '，' + plugDepHumanSize(d.size) + '）').join('\n') +
     '\n\n下载类依赖会校验 SHA-256；APK 仍需系统安装器确认。';
   if (!(await uiConfirm(text, '安装全部', '依赖安装'))) return { ok: false, error: '用户取消' };
-  let ok = 0, lastError = '';
+  let ok = 0;
+  const failed = [];
   for (const dep of missing) {
     const r = await plugDepInstall(plugin, dep.id, { confirmed: true, force: true });
     if (r.ok) ok++;
-    else { lastError = r.error || '安装失败'; break; }
+    // 一项失败不再中断整批：npm 包之间没有强依赖，全部试一遍才能看清到底哪几个坏。
+    else failed.push({ id: dep.id, error: r.error || '安装失败' });
   }
-  return { ok: ok === missing.length, installed: ok, error: lastError };
+  const first = failed.length ? failed[0].id + '：' + failed[0].error : '';
+  return { ok: failed.length === 0, installed: ok, failed: failed.length, failedIds: failed.map(f => f.id), error: first };
 }
 
 async function plugDepUninstall(plugin, depId, opts) {
