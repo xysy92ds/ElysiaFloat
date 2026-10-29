@@ -373,6 +373,9 @@ class FloatService : Service() {
             allowContentAccess = true
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            // 本地 file:// 资源也可能命中 WebView 缓存：升级后 URL 不变就会拉起上一版
+            // index.html，新原生接口配旧 JS，初始化时抛异常（白屏、头像不出来）。
+            // 真正的规避在 loadUrl 里用版本号做 query 破缓存。
             cacheMode = WebSettings.LOAD_DEFAULT
             loadsImagesAutomatically = true
             useWideViewPort = true
@@ -404,7 +407,14 @@ class FloatService : Service() {
         }
         wv.addJavascriptInterface(JsBridge(this, wv), "Android")
         wv.addJavascriptInterface(PermissionBridge(this), "Perm")
-        wv.loadUrl("file:///android_asset/index.html")
+        // 带上 versionCode 做破缓存：升级后 URL 变化，WebView 必然重新读 assets，
+        // 不会再拿上一版的 index.html 配新原生接口。
+        val vc = try {
+            packageManager.getPackageInfo(packageName, 0).let {
+                @Suppress("DEPRECATION") it.versionCode
+            }
+        } catch (_: Exception) { 0 }
+        wv.loadUrl("file:///android_asset/index.html?v=$vc")
         webView = wv
     }
 

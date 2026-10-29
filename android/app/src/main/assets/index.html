@@ -1661,6 +1661,56 @@ function vibrate(ms) {
 }
 
 /* ==========================================================
+ *  启动守护
+ *  原地升级后，如果某个脚本在初始化时抛异常（旧版 localStorage
+ *  结构不兼容是常见原因），整个 bundle 会静默停摆：没有报错、
+ *  没有界面，只剩空白。这里兜住异常并给一条自救路径，
+ *  免得用户只能靠卸载重装。
+ * ========================================================== */
+let __bootOk = false;
+window.__bootDone = function () { __bootOk = true; };
+
+function bootEsc(s) {
+  // 不能用文件里的 esc：出错可能发生在它定义之前（TDZ），这里自带一份。
+  const m = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
+  return String(s == null ? '' : s).replace(/[&<>]/g, c => m[c]);
+}
+
+function bootFail(reason) {
+  if (__bootOk || document.getElementById('boot-fail')) return;
+  const box = document.createElement('div');
+  box.id = 'boot-fail';
+  box.style.cssText = 'position:fixed;left:12px;right:12px;top:50%;transform:translateY(-50%);' +
+    'z-index:2147483647;padding:16px;border-radius:14px;background:#fff6f9;color:#5b3a44;' +
+    'box-shadow:0 8px 28px rgba(0,0,0,.22);font:13px/1.6 system-ui,sans-serif';
+  box.innerHTML =
+    '<div style="font-weight:700;margin-bottom:6px;font-size:14px">启动中途卡住了</div>' +
+    '<div style="opacity:.78;margin-bottom:8px">下边是出错原因。多数情况是旧版本留下的本地数据跟新版本不兼容，' +
+    '重置本地数据即可，不用卸载重装。</div>' +
+    '<pre style="max-height:110px;overflow:auto;margin:0 0 10px;padding:8px;border-radius:8px;' +
+    'background:rgba(0,0,0,.05);white-space:pre-wrap;word-break:break-all;font-size:11px">' +
+    bootEsc(reason || '未知原因') + '</pre>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button id="boot-retry" style="flex:1;padding:9px;border:0;border-radius:9px;' +
+    'background:#ffd9e4;color:#a8324f;font-weight:600">重新加载</button>' +
+    '<button id="boot-reset" style="flex:1;padding:9px;border:0;border-radius:9px;' +
+    'background:#ff8fb1;color:#fff;font-weight:600">重置本地数据</button></div>';
+  (document.body || document.documentElement).appendChild(box);
+  document.getElementById('boot-retry').onclick = () => location.reload();
+  document.getElementById('boot-reset').onclick = () => {
+    try { localStorage.clear(); } catch (e) {}
+    location.reload();
+  };
+}
+
+window.addEventListener('error', (e) => bootFail((e && e.message) || '脚本执行出错'));
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e && e.reason;
+  bootFail('异步任务出错：' + ((r && (r.message || r)) || '未知'));
+});
+setTimeout(() => bootFail('启动超时（12 秒内没走完初始化）'), 12000);
+
+/* ==========================================================
  *  统一请求管理（G3）
  *  - 唯一出网入口：超时预算、重试退避、跳数上限、大小上限、
  *    错误码、任务绑定、脱敏审计
@@ -14514,6 +14564,7 @@ function boot() {
   try { if (typeof persistRecoverAll === 'function') persistRecoverAll(); } catch (e) {}
   try { if (typeof persistSchedulerStart === 'function') persistSchedulerStart(); } catch (e) {}
 
+  try { window.__bootDone && window.__bootDone(); } catch (e) {}
   console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条 · 插件 ' + USER_PLUGINS.length + ' 个');
 }
 

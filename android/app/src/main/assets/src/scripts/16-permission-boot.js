@@ -290,6 +290,7 @@ function boot() {
   try { if (typeof persistRecoverAll === 'function') persistRecoverAll(); } catch (e) {}
   try { if (typeof persistSchedulerStart === 'function') persistSchedulerStart(); } catch (e) {}
 
+  try { window.__bootDone && window.__bootDone(); } catch (e) {}
   console.log('[Elly] 就绪 ♪ 记忆 ' + MEM.length + ' 条 · 插件 ' + USER_PLUGINS.length + ' 个');
 }
 
