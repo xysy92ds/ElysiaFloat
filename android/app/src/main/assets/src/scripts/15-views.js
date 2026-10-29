@@ -185,7 +185,7 @@ function bindPluginsPage() {
   const pageBody = $('#plug-page-body');
   if (pageBody) {
     pageBody.onclick = (e) => {
-      const dep = e.target && e.target.closest ? e.target.closest('[data-dep-all],[data-dep-install],[data-dep-remove],[data-dep-verify]') : null;
+      const dep = e.target && e.target.closest ? e.target.closest('[data-dep-all],[data-dep-install],[data-dep-remove],[data-dep-verify],[data-dep-repair]') : null;
       if (dep && typeof plugDepHandleUi === 'function') { plugDepHandleUi(dep); return; }
       const rt = e.target && e.target.closest ? e.target.closest('[data-rt-start],[data-rt-stop],[data-rt-refresh],[data-rt-env],[data-rt-copy],[data-rt-clear]') : null;
       if (rt && typeof plugRuntimeHandleUi === 'function') { plugRuntimeHandleUi(rt); return; }

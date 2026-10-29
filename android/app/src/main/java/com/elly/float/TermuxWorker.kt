@@ -353,6 +353,94 @@ rm -f "${'$'}PIDFILE"
     }
 
     /**
+     * 生成带 PID/日志/退出码/超时/取消的受控任务脚本。
+     * binPath 会在 shell 里先做存在性检查，避免直接得到 exit 127 让用户无从判断。
+     */
+    private fun buildJobScript(
+        jobsDir: File, runId: String, command: String,
+        timeoutSec: Int, binPath: String, missingHint: String
+    ): String = """#!/data/data/com.termux/files/usr/bin/bash
+PIDFILE="${jobsDir.absolutePath}/$runId.pid"
+LOGFILE="${jobsDir.absolutePath}/$runId.log"
+EXITFILE="${jobsDir.absolutePath}/$runId.exit"
+CANCELFILE="${jobsDir.absolutePath}/$runId.cancel"
+TIMEOUT=$timeoutSec
+START=${'$'}(date +%s)
+rm -f "${'$'}CANCELFILE"
+echo ${'$'}${'$'} > "${'$'}PIDFILE"
+BIN=${shellQuote(binPath)}
+if [ ! -x "${'$'}BIN" ]; then
+  { echo "找不到可执行文件：${'$'}BIN"; echo "$missingHint"; } > "${'$'}LOGFILE" 2>&1
+  echo 127 > "${'$'}EXITFILE"
+  rm -f "${'$'}PIDFILE"
+  exit 0
+fi
+$command > "${'$'}LOGFILE" 2>&1 &
+CHILD=${'$'}!
+TIMEDOUT=0
+while kill -0 ${'$'}CHILD 2>/dev/null; do
+  if [ -f "${'$'}CANCELFILE" ]; then
+    kill -TERM ${'$'}CHILD 2>/dev/null; sleep 2; kill -KILL ${'$'}CHILD 2>/dev/null
+    rm -f "${'$'}CANCELFILE"; break
+  fi
+  if [ ${'$'}(( ${'$'}(date +%s) - START )) -ge "${'$'}TIMEOUT" ]; then
+    kill -TERM ${'$'}CHILD 2>/dev/null; sleep 2; kill -KILL ${'$'}CHILD 2>/dev/null
+    TIMEDOUT=1; break
+  fi
+  sleep 1
+done
+wait ${'$'}CHILD 2>/dev/null
+CODE=${'$'}?
+if [ "${'$'}TIMEDOUT" = "1" ]; then CODE=124; fi
+echo ${'$'}CODE > "${'$'}EXITFILE"
+if [ -f "${'$'}LOGFILE" ]; then tail -c 200000 "${'$'}LOGFILE" > "${'$'}LOGFILE.tmp" && mv -f "${'$'}LOGFILE.tmp" "${'$'}LOGFILE"; fi
+rm -f "${'$'}PIDFILE"
+"""
+
+    /**
+     * 修复 Termux 环境：node 报 `cannot locate symbol __hash_memory` 时，
+     * 是 libc++ 与 nodejs 版本错配（bootstrap 太旧），只能靠 pkg upgrade 对齐。
+     * 同样走受控脚本，命令模板写死，不接受外部参数。
+     */
+    fun repairEnvironment(ctx: Context): JSONObject {
+        termuxAccessError(ctx)?.let { return error("TERMUX_NOT_READY", it) }
+        val runId = UUID.randomUUID().toString().replace("-", "")
+        val jobsDir = File(TaskWorkspace.root(), FIXED_JOBS_DIR)
+        if (!jobsDir.isDirectory && !jobsDir.mkdirs()) return error("JOBS_DIR_FAILED", "无法创建依赖任务目录")
+        val pkg = shellQuote(PKG_PATH)
+        val command = "$pkg update -y && $pkg upgrade -y -o Dpkg::Options::=--force-confold"
+        val script = buildJobScript(
+            jobsDir, runId, command, 900, PKG_PATH,
+            "请先确认 Termux 已正确安装并可执行 pkg。"
+        )
+        return try {
+            val scriptFile = File(jobsDir, "$runId.sh")
+            scriptFile.writeText(script)
+            scriptFile.setExecutable(true)
+            val intent = Intent("com.termux.RUN_COMMAND")
+                .setComponent(ComponentName(TERMUX_PKG, TERMUX_RUN_SERVICE))
+                .putExtra("com.termux.RUN_COMMAND_PATH", BASH_PATH)
+                .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf(scriptFile.absolutePath))
+                .putExtra("com.termux.RUN_COMMAND_WORKDIR", jobsDir.absolutePath)
+                .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
+                .putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "ElysiaFloat")
+                .putExtra("com.termux.RUN_COMMAND_COMMAND_DESCRIPTION", "ElysiaFloat repair termux env")
+            if (startTermuxService(ctx, intent) == null) {
+                return error("DISPATCH_FAILED", "Termux 服务启动失败（startForegroundService/startService 均无效）")
+            }
+            audit(ctx, "repair_env", runId, "pkg upgrade")
+            JSONObject().put("ok", true).put("runId", runId).put("timeoutSec", 900)
+        } catch (e: Exception) {
+            if (e is SecurityException) {
+                val reason = termuxAccessError(ctx) ?: e.message ?: "未知"
+                error("TERMUX_PERMISSION_DENIED", "Termux 命令执行权限被系统拒绝：$reason")
+            } else {
+                error("DISPATCH_FAILED", e.message ?: "Termux 启动失败")
+            }
+        }
+    }
+
+    /**
      * 固定模板安装（0.12 / E5）：只接受 termux-pkg 与 npm 两种，不拼接任意 shell。
      * 包名与版本走白名单正则；命令模板写死，用户只能给包名。
      */
@@ -381,44 +469,11 @@ rm -f "${'$'}PIDFILE"
             "${shellQuote(NPM_PATH)} install -g --no-audit --no-fund ${shellQuote(target)}"
         }
 
-        val script = """#!/data/data/com.termux/files/usr/bin/bash
-PIDFILE="${jobsDir.absolutePath}/$runId.pid"
-LOGFILE="${jobsDir.absolutePath}/$runId.log"
-EXITFILE="${jobsDir.absolutePath}/$runId.exit"
-CANCELFILE="${jobsDir.absolutePath}/$runId.cancel"
-TIMEOUT=900
-START=${'$'}(date +%s)
-rm -f "${'$'}CANCELFILE"
-echo ${'$'}${'$'} > "${'$'}PIDFILE"
-BIN=${shellQuote(if (kind == "termux-pkg") PKG_PATH else NPM_PATH)}
-# 先在 shell 里确认二进制存在：直接跑会得到 exit 127，用户看不出是「没装 nodejs」。
-if [ ! -x "${'$'}BIN" ]; then
-  { echo "找不到可执行文件：${'$'}BIN"; echo "请先在 Termux 里执行：pkg install -y nodejs"; } > "${'$'}LOGFILE" 2>&1
-  echo 127 > "${'$'}EXITFILE"
-  rm -f "${'$'}PIDFILE"
-  exit 0
-fi
-$command > "${'$'}LOGFILE" 2>&1 &
-CHILD=${'$'}!
-TIMEDOUT=0
-while kill -0 ${'$'}CHILD 2>/dev/null; do
-  if [ -f "${'$'}CANCELFILE" ]; then
-    kill -TERM ${'$'}CHILD 2>/dev/null; sleep 2; kill -KILL ${'$'}CHILD 2>/dev/null
-    rm -f "${'$'}CANCELFILE"; break
-  fi
-  if [ ${'$'}(( ${'$'}(date +%s) - START )) -ge "${'$'}TIMEOUT" ]; then
-    kill -TERM ${'$'}CHILD 2>/dev/null; sleep 2; kill -KILL ${'$'}CHILD 2>/dev/null
-    TIMEDOUT=1; break
-  fi
-  sleep 1
-done
-wait ${'$'}CHILD 2>/dev/null
-CODE=${'$'}?
-if [ "${'$'}TIMEDOUT" = "1" ]; then CODE=124; fi
-echo ${'$'}CODE > "${'$'}EXITFILE"
-if [ -f "${'$'}LOGFILE" ]; then tail -c 200000 "${'$'}LOGFILE" > "${'$'}LOGFILE.tmp" && mv -f "${'$'}LOGFILE.tmp" "${'$'}LOGFILE"; fi
-rm -f "${'$'}PIDFILE"
-"""
+        val script = buildJobScript(
+            jobsDir, runId, command, 900,
+            if (kind == "termux-pkg") PKG_PATH else NPM_PATH,
+            "请先在 Termux 里执行：pkg install -y nodejs"
+        )
         return try {
             val scriptFile = File(jobsDir, "$runId.sh")
             scriptFile.writeText(script)

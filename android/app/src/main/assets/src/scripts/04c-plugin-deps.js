@@ -142,13 +142,35 @@ async function plugDepWaitTermux(runId, pluginId, timeoutMs) {
 }
 /** 把退出码翻译成可操作的原因；有日志就把最后几行贴出来。 */
 function plugDepFailText(exitCode, tail) {
+  const detail = (tail || []).filter(Boolean).slice(-8).join('\n');
+  // 链接器报错优先：这类问题的修法很明确，别让用户去猜「退出码 1」。
+  if (/CANNOT LINK EXECUTABLE|cannot locate symbol/i.test(detail)) {
+    const sym = (detail.match(/cannot locate symbol\s+"?([^"\s]+)/i) || [])[1] || '';
+    return 'Termux 环境坏了：node 启动时链接失败' + (sym ? '（缺少符号 ' + sym + '）' : '') + '。\n' +
+      '原因是 Termux 里的 libc++ 与 nodejs 版本不匹配，node 根本跑不起来，npm 因此退 1。\n' +
+      '点下面的「修复 Termux 环境」会执行 pkg update && pkg upgrade 把两者对齐；\n' +
+      '也可以自己在 Termux 里执行：pkg upgrade -y\n' +
+      '—— 最后输出 ——\n' + detail;
+  }
   const head = '安装命令退出码 ' + exitCode;
   const hint = exitCode === 1
     ? '（包管理器自己报的错，通常是包名不对、npm 源不可达或磁盘/权限问题）'
     : (exitCode === 124 ? '（超过时限被终止，常见于 npm 包太大或网络太慢）'
       : (exitCode === 127 ? '（找不到可执行文件，通常是 nodejs/npm 没装好）' : ''));
-  const detail = (tail || []).filter(Boolean).slice(-8).join('\n');
   return head + hint + (detail ? '\n—— 最后输出 ——\n' + detail : '\n（没有捕获到输出，请到插件依赖日志里查看）');
+}
+/** Termux 环境坏了（node/js 链接失败）时，允许用户一键 pkg upgrade 修好再重试。 */
+async function plugDepRepairEnv(plugin) {
+  if (typeof Perm.repairTermuxEnv !== 'function') return { ok: false, error: '当前原生桥不支持环境修复' };
+  const pid = plugin && plugin.id;
+  plugDepAppendLog(pid, '开始修复 Termux 环境（pkg update && pkg upgrade）');
+  let run;
+  try { run = plugDepJson(Perm.repairTermuxEnv(), {}); }
+  catch (e) { return { ok: false, error: errMsg(e) }; }
+  if (!run || !run.ok || !run.runId) return { ok: false, error: (run && run.error) || 'Termux 未接受修复任务' };
+  const done = await plugDepWaitTermux(run.runId, pid, 900000);
+  plugDepAppendLog(pid, done.ok ? 'Termux 环境已更新，可重新安装依赖' : '修复失败：' + done.error);
+  return done;
 }
 function plugDepTermuxInfo() {
   if (!HAS_PERM || typeof Perm.getTermuxWorkerState !== 'function') return { installed: false, bridge: false };
@@ -332,6 +354,7 @@ function plugDepPanelHtml(plugin) {
   }
   html += '<div class="pc-actions" style="margin-top:10px">' +
     '<button type="button" class="pc-btn pc-primary" data-dep-all="install"' + (plugDepAccess(plugin) ? ' disabled' : '') + '>安装全部缺失</button>' +
+    '<button type="button" class="pc-btn pc-mini" data-dep-repair="1"' + (plugDepAccess(plugin) ? ' disabled' : '') + ' title="执行 pkg update && pkg upgrade，修复 node 链接失败">修复 Termux 环境</button>' +
     '<button type="button" class="pc-btn pc-mini" data-dep-all="remove"' + (plugDepAccess(plugin) ? ' disabled' : '') + '>全部卸载</button>' +
     '</div>';
   html += plan.map(({ dep, state }) => {
@@ -375,6 +398,14 @@ async function plugDepHandleUi(el) {
       : await plugDepUninstallAll(plugin);
     if (!r.ok) toast(r.error || '操作失败');
     else toast(el.dataset.depAll === 'install' ? '依赖已处理' : '依赖已卸载');
+    plugDepRefreshPanel();
+    return true;
+  }
+  if (el.dataset.depRepair) {
+    if (!(await uiConfirm('会用 Termux 的包管理器把系统包整体升级一遍（pkg update && pkg upgrade）。\n\n' +
+      '用于修复 node 因 libc++ 版本不匹配而链接失败的问题。过程中可能需要下载若干包，耗时较长。\n\n是否继续？', '修复 Termux 环境', '环境修复'))) return true;
+    const r = await plugDepRepairEnv(plugin);
+    toast(r.ok ? 'Termux 环境已更新，请重新安装依赖' : (r.error || '修复失败'));
     plugDepRefreshPanel();
     return true;
   }

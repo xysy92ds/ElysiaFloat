@@ -104,6 +104,13 @@ class PermissionBridge(private val ctx: Context) {
     @JavascriptInterface
     fun requestTermuxRunCommandPermission(): String = TermuxWorker.requestRunCommandPermission(ctx).toString()
 
+    /**
+     * 修复 Termux 环境（pkg update && pkg upgrade）。
+     * 用于 nodejs 与 libc++ 版本错配、node 报 cannot locate symbol 的情况。
+     */
+    @JavascriptInterface
+    fun repairTermuxEnv(): String = TermuxWorker.repairEnvironment(ctx).toString()
+
     @JavascriptInterface
     fun createTermuxSession(): String = TermuxWorker.createSession(ctx).toString()
 
