@@ -20,7 +20,7 @@ android {
         applicationId "com.elly.assistant"
         minSdk 24
         targetSdk 34
-        versionCode 19
+        versionCode 20
         versionName "0.7.2"
     }
 

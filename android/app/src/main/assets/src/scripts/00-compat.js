@@ -470,7 +470,14 @@ function vibrate(ms) {
  *  免得用户只能靠卸载重装。
  * ========================================================== */
 let __bootOk = false;
-window.__bootDone = function () { __bootOk = true; };
+let __bootTimer = null;
+/** 启动真的走完了：撤掉超时器，并把「超时」误报出来的面板一起收走。 */
+window.__bootDone = function () {
+  __bootOk = true;
+  if (__bootTimer) { clearTimeout(__bootTimer); __bootTimer = null; }
+  const el = document.getElementById('boot-fail');
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+};
 
 function bootEsc(s) {
   // 不能用文件里的 esc：出错可能发生在它定义之前（TDZ），这里自带一份。
@@ -498,10 +505,17 @@ function bootFail(reason) {
     '<button id="boot-reset" style="flex:1;padding:9px;border:0;border-radius:9px;' +
     'background:#ff8fb1;color:#fff;font-weight:600">重置本地数据</button></div>';
   (document.body || document.documentElement).appendChild(box);
-  document.getElementById('boot-retry').onclick = () => location.reload();
-  document.getElementById('boot-reset').onclick = () => {
+  // 点完立刻给反馈：重载是瞬时的，不给反馈用户会以为按钮没响应。
+  document.getElementById('boot-retry').onclick = (ev) => {
+    ev.target.textContent = '正在重新加载…';
+    ev.target.disabled = true;
+    setTimeout(() => location.reload(), 60);
+  };
+  document.getElementById('boot-reset').onclick = (ev) => {
+    ev.target.textContent = '正在重置…';
+    ev.target.disabled = true;
     try { localStorage.clear(); } catch (e) {}
-    location.reload();
+    setTimeout(() => location.reload(), 60);
   };
 }
 
@@ -510,5 +524,7 @@ window.addEventListener('unhandledrejection', (e) => {
   const r = e && e.reason;
   bootFail('异步任务出错：' + ((r && (r.message || r)) || '未知'));
 });
-setTimeout(() => bootFail('启动超时（12 秒内没走完初始化）'), 12000);
+// 冷启动第一次要跑完 25 个模块的初始化，老机器上 12 秒并不宽裕；
+// 宁可多等一会儿，也不要冤枉好人。真卡死时下面这个面板照样会出来。
+__bootTimer = setTimeout(() => { __bootTimer = null; bootFail('启动超时（20 秒内没走完初始化）'); }, 20000);
 
