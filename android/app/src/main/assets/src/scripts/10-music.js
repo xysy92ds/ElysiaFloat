@@ -1217,7 +1217,10 @@ async function execTool(name, args, runTask) {
   if (name === 'run_termux_job') {
     const runTaskObj = task;
     if (runTaskObj.type !== 'workspace') return { success: false, errorCode: 'TASK_TYPE_DENIED', error: 'Termux 只能在工作任务中运行' };
-    const job = { jobId: runTaskObj.id + '-' + Date.now().toString(36), taskId: runTaskObj.id, executor: String(args.executor || ''), args: Array.isArray(args.args) ? args.args.map(String) : [], cwd: String(args.cwd || 'working') };
+    // 原生 runId 只接受 [A-Za-z0-9_-]，插件任务 id 是反域名（plug-com.xxx.runtime）带点，
+    // 直接拼会被判「任务 id 不合法」；这里只清洗 jobId，taskId 仍保留原名给工作区用。
+    const jobKey = String(runTaskObj.id || 'task').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 64);
+    const job = { jobId: jobKey + '-' + Date.now().toString(36), taskId: runTaskObj.id, executor: String(args.executor || ''), args: Array.isArray(args.args) ? args.args.map(String) : [], cwd: String(args.cwd || 'working') };
     if (!(await uiConfirm('即将通过 Termux 执行：' + job.executor + '\n参数：' + JSON.stringify(job.args) + '\n目录：' + job.cwd + '\n是否继续？', '确认执行', 'Termux 任务确认'))) return { success: false, kind: 'cancelled', error: '用户取消了 Termux 任务' };
     try { return JSON.parse(Perm.dispatchTermuxJob ? (Perm.dispatchTermuxJob(JSON.stringify(job)) || '{}') : '{}'); }
     catch (e) { return { success: false, errorCode: 'TERMUX_DISPATCH_FAILED', error: errMsg(e) }; }
