@@ -407,14 +407,12 @@ class FloatService : Service() {
         }
         wv.addJavascriptInterface(JsBridge(this, wv), "Android")
         wv.addJavascriptInterface(PermissionBridge(this), "Perm")
-        // 带上 versionCode 做破缓存：升级后 URL 变化，WebView 必然重新读 assets，
-        // 不会再拿上一版的 index.html 配新原生接口。
-        val vc = try {
-            packageManager.getPackageInfo(packageName, 0).let {
-                @Suppress("DEPRECATION") it.versionCode
-            }
-        } catch (_: Exception) { 0 }
-        wv.loadUrl("file:///android_asset/index.html?v=$vc")
+        // 破缓存用安装时间戳，不用 versionCode：这样每次覆盖安装都会换 URL，
+        // 既不依赖手动抬版本号，也不会因为忘了改而拉到上一版的 index.html。
+        val stamp = try {
+            packageManager.getPackageInfo(packageName, 0).lastUpdateTime
+        } catch (_: Exception) { 0L }
+        wv.loadUrl("file:///android_asset/index.html?v=$stamp")
         webView = wv
     }
 

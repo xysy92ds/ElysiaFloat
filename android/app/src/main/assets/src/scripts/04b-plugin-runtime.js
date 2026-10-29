@@ -11,18 +11,8 @@
  *  v1 清单（tools）继续按原样工作，不迁移也能运行。
  * ========================================================== */
 
-const PLUG_SURFACE_TYPES = ['page', 'entry', 'sessionType', 'command', 'event', 'job', 'settings', 'renderer', 'adapter', 'theme'];
-const PLUG_COMPONENT_TYPES = ['layout', 'text', 'stat', 'button', 'input', 'select', 'list', 'table', 'image',
-  'progress', 'chart', 'tabs', 'modal', 'choice', 'form', 'divider', 'spacer'];
-const PLUG_ACTION_TYPES = ['navigate', 'plugin.call', 'config.set', 'state.set', 'session.create', 'session.delete',
-  'message.send', 'theme.apply', 'theme.reset', 'confirm', 'openUrl', 'clipboard.write', 'job.schedule',
-  'dependency.install', 'custom'];
-const PLUG_CONFIG_TYPES = ['string', 'number', 'boolean', 'enum', 'secret', 'path', 'model-ref', 'json'];
-const PLUG_EVENT_NAMES = ['message.send', 'message.receive', 'session.create', 'session.delete', 'task.update',
-  'job.run', 'plugin.enable', 'plugin.disable', 'dependency.ready', 'gateway.message'];
-const PLUG_ENTRY_MOUNTS = ['plugins', 'chat.header', 'chat.footer', 'chat.composer.before', 'chat.message.after',
-  'panel.home', 'panel.tabs', 'settings.section', 'session.create', 'task.detail', 'notification'];
-const PLUG_SURFACE_ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
+// 运行时白名单常量已上移到 04-plugins-core.js（那里在加载期就会调用
+// plugNormalizeSurface，如果 const 留在这个文件里会踩 TDZ 白屏）。
 const PLUG_CONFIG_KEY = 'via_ai_plugin_config';
 const PLUG_STATE_KEY = 'via_ai_plugin_state';
 const PLUG_JOBS_KEY = 'via_ai_plugin_jobs';

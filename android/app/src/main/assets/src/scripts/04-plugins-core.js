@@ -13,6 +13,27 @@ const PLUG_MARKET_DEFAULT_URL = 'https://raw.githubusercontent.com/xysy92ds/Elys
 const PLUG_ID_RE = /^[A-Za-z0-9_.-]{2,64}$/;
 const PLUG_SHA256_RE = /^[a-f0-9]{64}$/i;
 const PLUG_TOOL_RE = /^[A-Za-z][A-Za-z0-9_]{1,63}$/;
+/* ----------------------------------------------------------
+ *  运行时白名单常量。
+ *  必须声明在这个文件里，不能留在 04b-plugin-runtime.js：
+ *  下面第 143 行会在脚本加载时就把已存插件过一遍 plugNormalize，
+ *  而 plugNormalizeSurface 是本包里的函数声明（会被提升），
+ *  它引用的常量若是 const 且定义在后面的文件里，就会踩 TDZ ——
+ *  ReferenceError: Cannot access 'PLUG_SURFACE_TYPES' before initialization。
+ *  装过插件的机器起来就白屏、卸载重装才好，根因就是这一条。
+ * ---------------------------------------------------------- */
+const PLUG_SURFACE_TYPES = ['page', 'entry', 'sessionType', 'command', 'event', 'job', 'settings', 'renderer', 'adapter', 'theme'];
+const PLUG_COMPONENT_TYPES = ['layout', 'text', 'stat', 'button', 'input', 'select', 'list', 'table', 'image',
+  'progress', 'chart', 'tabs', 'modal', 'choice', 'form', 'divider', 'spacer'];
+const PLUG_ACTION_TYPES = ['navigate', 'plugin.call', 'config.set', 'state.set', 'session.create', 'session.delete',
+  'message.send', 'theme.apply', 'theme.reset', 'confirm', 'openUrl', 'clipboard.write', 'job.schedule',
+  'dependency.install', 'custom'];
+const PLUG_CONFIG_TYPES = ['string', 'number', 'boolean', 'enum', 'secret', 'path', 'model-ref', 'json'];
+const PLUG_EVENT_NAMES = ['message.send', 'message.receive', 'session.create', 'session.delete', 'task.update',
+  'job.run', 'plugin.enable', 'plugin.disable', 'dependency.ready', 'gateway.message'];
+const PLUG_ENTRY_MOUNTS = ['plugins', 'chat.header', 'chat.footer', 'chat.composer.before', 'chat.message.after',
+  'panel.home', 'panel.tabs', 'settings.section', 'session.create', 'task.detail', 'notification'];
+const PLUG_SURFACE_ID_RE = /^[A-Za-z0-9_.-]{1,64}$/;
 const PLUG_PERMISSION_INFO = {
   'network.public': { label: '公网网络请求', risk: '可向互联网发送数据' },
   'network.local': { label: '局域网/本机网络请求', risk: '可访问局域网设备或本机服务' },
