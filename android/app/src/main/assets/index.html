@@ -6169,8 +6169,10 @@ function plugRuntimeEntriesHtml() {
     let block = '<div class="plug-group"><div class="plug-group-hd"><span class="plug-group-ic">' + plugEsc(p.icon) + '</span><span class="plug-group-name">' + plugEsc(p.name) +
       '<span class="plug-sub">v' + plugEsc(p.version) + ' · 开放运行时</span></span>' + (enabled ? '' : '<span class="plug-sub">已停用</span>') + '</div>';
     const nav = (label, pid, sid, disabled) => '<button type="button" class="pc-btn pc-mini" data-plug-open="' + plugEsc(pid + ':' + sid) + '"' + (disabled ? ' disabled' : '') + '>' + plugEsc(label) + '</button>';
+    // 设置分区不是 page，走 plugOpenPage 一定找不到 → 会误报「插件页面不存在」。
+    const cfgNav = (label, pid, sid, disabled) => '<button type="button" class="pc-btn pc-mini" data-plug-config="' + plugEsc(pid + ':' + sid) + '"' + (disabled ? ' disabled' : '') + '>' + plugEsc(label) + '</button>';
     pages.forEach(s => { block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">' + plugEsc(s.title) + '</div><div class="pc-row-d">页面 · ' + plugEsc(s.id) + '</div></div>' + nav('打开', p.id, s.id, !enabled) + '</div>'; });
-    settings.forEach(s => { block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">' + plugEsc(s.title) + '</div><div class="pc-row-d">设置分区 · ' + plugEsc(s.id) + '</div></div>' + nav('配置', p.id, s.id, !enabled) + '</div>'; });
+    settings.forEach(s => { block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">' + plugEsc(s.title) + '</div><div class="pc-row-d">设置分区 · ' + plugEsc(s.id) + '</div></div>' + cfgNav('配置', p.id, s.id, !enabled) + '</div>'; });
     entries.forEach(s => {
       const token = plugRegisterAction(p, s.action);
       block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">' + plugEsc(s.title) + '</div><div class="pc-row-d">入口 · ' + plugEsc(s.mount) + '</div></div>' +
@@ -6194,7 +6196,7 @@ function plugRuntimeEntriesHtml() {
     if (renderers.length) block += '<div class="pc-row-d">渲染模板：' + plugEsc(renderers.map(s => s.id).join('、')) + '</div>';
     if (adapters.length) block += '<div class="pc-row-d">适配器（0.15 开放实现）：' + plugEsc(adapters.map(s => s.id + ':' + s.kind).join('、')) + '</div>';
     if (!settings.length && (p.configFields || []).length) {
-      block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">插件配置</div><div class="pc-row-d">' + plugEsc((p.configFields || []).length + ' 项') + '</div></div>' + nav('配置', p.id, '', !enabled) + '</div>';
+      block += '<div class="pc-row-item"><div class="pc-row-main"><div class="pc-row-t">插件配置</div><div class="pc-row-d">' + plugEsc((p.configFields || []).length + ' 项') + '</div></div>' + cfgNav('配置', p.id, '', !enabled) + '</div>';
     }
     html += block + '</div>';
   });
